@@ -8,6 +8,15 @@ Note:
     >>> from video_converter.core.orchestrator import Orchestrator
 """
 
+from video_converter.core.config import (
+    AutomationConfig,
+    Config,
+    EncodingConfig,
+    NotificationConfig,
+    PathsConfig,
+    PhotosConfig,
+    ProcessingConfig,
+)
 from video_converter.core.logger import (
     LogLevel,
     configure_logging,
@@ -29,6 +38,14 @@ from video_converter.core.types import (
 )
 
 __all__ = [
+    # Config
+    "AutomationConfig",
+    "Config",
+    "EncodingConfig",
+    "NotificationConfig",
+    "PathsConfig",
+    "PhotosConfig",
+    "ProcessingConfig",
     # Logger
     "configure_logging",
     "get_log_dir",
