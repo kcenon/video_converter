@@ -2317,6 +2317,7 @@ class ResourceMonitor:
 | **Photos 통합 모듈** |
 | SRS-301 | Photos 라이브러리 스캔 | SDS-E01-001 | PhotosExtractor | 매핑 |
 | SRS-302 | iCloud 비디오 다운로드 | SDS-E01-001 | PhotosExtractor._download_from_icloud | 매핑 |
+| SRS-303 | H.264 비디오 필터링 | SDS-P01-005 | PhotosVideoFilter | 매핑 |
 | **메타데이터 모듈** |
 | SRS-401 | 메타데이터 추출 | SDS-P01-002 | MetadataManager.extract | 매핑 |
 | SRS-402 | 메타데이터 검증 | SDS-P01-002 | MetadataManager.verify | 매핑 |
@@ -2345,6 +2346,7 @@ class ResourceMonitor:
 | SDS-P01-001 | CodecDetector | src/video_converter/processors/codec_detector.py | CodecDetector |
 | SDS-P01-002 | MetadataManager | src/video_converter/processors/metadata.py | MetadataManager |
 | SDS-P01-003 | QualityValidator | src/video_converter/processors/validator.py | QualityValidator |
+| SDS-P01-005 | PhotosVideoFilter | src/video_converter/extractors/photos_extractor.py | PhotosVideoFilter |
 | SDS-A01-001 | LaunchdManager | src/video_converter/automation/launchd.py | LaunchdManager |
 | SDS-R01-001 | MacOSNotifier | src/video_converter/reporters/notifier.py | MacOSNotifier |
 | SDS-D01-005 | ConversionHistory | src/video_converter/core/history.py | ConversionHistory |

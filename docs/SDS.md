@@ -582,6 +582,71 @@ class GPSHandler:
         pass
 ```
 
+#### SDS-P01-005: Photos Video Filter Design
+
+| Item | Content |
+|------|---------|
+| **SDS ID** | SDS-P01-005 |
+| **Module** | PhotosVideoFilter |
+| **File** | `src/video_converter/extractors/photos_extractor.py` |
+| **SRS Trace** | SRS-302 (Video Filtering) |
+| **Responsibility** | Filter Photos library videos for H.264 conversion candidates |
+
+**Filter Criteria**:
+
+| Criterion | Include | Exclude |
+|-----------|---------|---------|
+| Codec | H.264, AVC, AVC1, x264 | HEVC, H.265, hvc1, hev1, x265, VP9, AV1 |
+| Albums | User-specified | Screenshots, Bursts, Slo-mo (default) |
+| Availability | Local files only | iCloud-only files |
+| Validity | Valid video files | Corrupted or invalid files |
+
+**Design**:
+
+```python
+@dataclass
+class LibraryStats:
+    """Statistics about videos in the Photos library."""
+    total: int = 0
+    h264: int = 0
+    hevc: int = 0
+    other: int = 0
+    in_cloud: int = 0
+    total_size_h264: int = 0
+
+    @property
+    def estimated_savings(self) -> int:
+        """Estimate ~50% savings with H.265 conversion."""
+        return int(self.total_size_h264 * 0.5)
+
+class PhotosVideoFilter:
+    """Filter Photos library videos for conversion candidates."""
+
+    DEFAULT_EXCLUDE_ALBUMS = {"Screenshots", "Bursts", "Slo-mo"}
+
+    def __init__(
+        self,
+        library: PhotosLibrary,
+        include_albums: list[str] | None = None,
+        exclude_albums: list[str] | None = None,
+    ) -> None:
+        """Initialize filter with album configuration."""
+        pass
+
+    def get_conversion_candidates(
+        self,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+        limit: int | None = None,
+    ) -> list[PhotosVideoInfo]:
+        """Get H.264 videos that need conversion."""
+        pass
+
+    def get_stats(self) -> LibraryStats:
+        """Get library statistics with codec distribution."""
+        pass
+```
+
 ---
 
 ## 4. Class Detailed Design
@@ -841,6 +906,7 @@ class RetryPolicy:
 | SRS-201 | HW Conversion | SDS-V01-002 | HardwareConverter | Mapped |
 | SRS-202 | SW Conversion | SDS-V01-003 | SoftwareConverter | Mapped |
 | SRS-301 | Photos Scan | SDS-E01-002 | PhotosExtractor | Mapped |
+| SRS-302 | Video Filtering | SDS-P01-005 | PhotosVideoFilter | Mapped |
 | SRS-401 | Metadata Extraction | SDS-P01-002 | MetadataManager | Mapped |
 | SRS-402 | GPS Preservation | SDS-P01-004 | GPSHandler | Mapped |
 | SRS-501 | Quality Validation | SDS-P01-003 | QualityValidator | Mapped |
@@ -860,6 +926,7 @@ class RetryPolicy:
 | SDS-P01-002 | metadata_manager.py | MetadataManager |
 | SDS-P01-003 | quality_validator.py | QualityValidator |
 | SDS-P01-004 | gps.py | GPSHandler |
+| SDS-P01-005 | photos_extractor.py | PhotosVideoFilter |
 | SDS-A01-001 | launchd_manager.py | LaunchdManager |
 
 ---
