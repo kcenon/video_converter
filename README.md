@@ -66,6 +66,20 @@ video-converter run --priority date_oldest
 # Available priorities: fifo, date_oldest, date_newest, size_smallest, size_largest
 ```
 
+### Resume Interrupted Conversion
+
+If a conversion is interrupted (system crash, restart, or manual pause), you can resume from where it left off:
+
+```bash
+# Check for resumable sessions
+video-converter status --sessions
+
+# Resume the interrupted session
+video-converter run --resume
+```
+
+Session state is automatically saved to `~/.local/share/video_converter/sessions/`.
+
 ### Enable Daily Automation
 
 ```bash

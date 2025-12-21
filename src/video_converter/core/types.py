@@ -319,6 +319,252 @@ class ConversionReport:
         self.warnings.extend(result.warnings)
 
 
+class SessionStatus(Enum):
+    """Status of a conversion session for persistence.
+
+    Attributes:
+        ACTIVE: Session is currently running.
+        PAUSED: Session was paused and can be resumed.
+        COMPLETED: Session finished successfully.
+        INTERRUPTED: Session was interrupted (crash, shutdown).
+        CANCELLED: Session was explicitly cancelled.
+    """
+
+    ACTIVE = "active"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+    INTERRUPTED = "interrupted"
+    CANCELLED = "cancelled"
+
+
+@dataclass
+class VideoEntry:
+    """Entry for a video file in session state.
+
+    Attributes:
+        path: Absolute path to the video file.
+        output_path: Absolute path to the output file.
+        status: Current conversion status.
+        error_message: Error message if failed.
+        original_size: Size of original file in bytes.
+        converted_size: Size of converted file in bytes.
+    """
+
+    path: Path
+    output_path: Path
+    status: ConversionStatus = ConversionStatus.PENDING
+    error_message: str | None = None
+    original_size: int = 0
+    converted_size: int = 0
+
+    def __post_init__(self) -> None:
+        """Validate and normalize fields."""
+        if isinstance(self.path, str):
+            self.path = Path(self.path)
+        if isinstance(self.output_path, str):
+            self.output_path = Path(self.output_path)
+        if isinstance(self.status, str):
+            self.status = ConversionStatus(self.status)
+
+    def to_dict(self) -> dict:
+        """Convert to JSON-serializable dictionary."""
+        return {
+            "path": str(self.path),
+            "output_path": str(self.output_path),
+            "status": self.status.value,
+            "error_message": self.error_message,
+            "original_size": self.original_size,
+            "converted_size": self.converted_size,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> VideoEntry:
+        """Create from dictionary."""
+        return cls(
+            path=Path(data["path"]),
+            output_path=Path(data["output_path"]),
+            status=ConversionStatus(data["status"]),
+            error_message=data.get("error_message"),
+            original_size=data.get("original_size", 0),
+            converted_size=data.get("converted_size", 0),
+        )
+
+
+@dataclass
+class SessionState:
+    """Persistent session state for resumable conversions.
+
+    Tracks all information needed to resume an interrupted conversion session,
+    including which files have been processed and any temporary files created.
+
+    Attributes:
+        session_id: Unique identifier for this session.
+        status: Current session status.
+        started_at: When the session started.
+        updated_at: When the session was last updated.
+        current_index: Index of the file currently being processed.
+        pending_videos: List of videos waiting to be processed.
+        completed_videos: List of successfully completed videos.
+        failed_videos: List of videos that failed conversion.
+        temporary_files: List of temporary files created during conversion.
+        output_dir: Output directory for converted files.
+        config_snapshot: Snapshot of configuration at session start.
+    """
+
+    session_id: str
+    status: SessionStatus = SessionStatus.ACTIVE
+    started_at: datetime = field(default_factory=datetime.now)
+    updated_at: datetime = field(default_factory=datetime.now)
+    current_index: int = 0
+    pending_videos: list[VideoEntry] = field(default_factory=list)
+    completed_videos: list[VideoEntry] = field(default_factory=list)
+    failed_videos: list[VideoEntry] = field(default_factory=list)
+    temporary_files: list[Path] = field(default_factory=list)
+    output_dir: Path | None = None
+    config_snapshot: dict = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Validate and normalize fields."""
+        if isinstance(self.status, str):
+            self.status = SessionStatus(self.status)
+        if isinstance(self.started_at, str):
+            self.started_at = datetime.fromisoformat(self.started_at)
+        if isinstance(self.updated_at, str):
+            self.updated_at = datetime.fromisoformat(self.updated_at)
+        if self.output_dir is not None and isinstance(self.output_dir, str):
+            self.output_dir = Path(self.output_dir)
+        # Normalize temporary files
+        self.temporary_files = [
+            Path(f) if isinstance(f, str) else f for f in self.temporary_files
+        ]
+
+    @property
+    def total_videos(self) -> int:
+        """Get total number of videos in the session."""
+        return (
+            len(self.pending_videos)
+            + len(self.completed_videos)
+            + len(self.failed_videos)
+        )
+
+    @property
+    def progress(self) -> float:
+        """Get session progress as a fraction (0.0-1.0)."""
+        total = self.total_videos
+        if total == 0:
+            return 0.0
+        processed = len(self.completed_videos) + len(self.failed_videos)
+        return processed / total
+
+    @property
+    def is_resumable(self) -> bool:
+        """Check if this session can be resumed."""
+        return self.status in (SessionStatus.PAUSED, SessionStatus.INTERRUPTED)
+
+    def mark_video_completed(
+        self,
+        video: VideoEntry,
+        original_size: int = 0,
+        converted_size: int = 0,
+    ) -> None:
+        """Move a video from pending to completed.
+
+        Args:
+            video: The video entry to mark complete.
+            original_size: Size of original file in bytes.
+            converted_size: Size of converted file in bytes.
+        """
+        video.status = ConversionStatus.COMPLETED
+        video.original_size = original_size
+        video.converted_size = converted_size
+        if video in self.pending_videos:
+            self.pending_videos.remove(video)
+        if video not in self.completed_videos:
+            self.completed_videos.append(video)
+        self.updated_at = datetime.now()
+
+    def mark_video_failed(self, video: VideoEntry, error: str) -> None:
+        """Move a video from pending to failed.
+
+        Args:
+            video: The video entry to mark failed.
+            error: Error message describing the failure.
+        """
+        video.status = ConversionStatus.FAILED
+        video.error_message = error
+        if video in self.pending_videos:
+            self.pending_videos.remove(video)
+        if video not in self.failed_videos:
+            self.failed_videos.append(video)
+        self.updated_at = datetime.now()
+
+    def add_temporary_file(self, path: Path) -> None:
+        """Track a temporary file created during conversion.
+
+        Args:
+            path: Path to the temporary file.
+        """
+        if path not in self.temporary_files:
+            self.temporary_files.append(path)
+            self.updated_at = datetime.now()
+
+    def remove_temporary_file(self, path: Path) -> None:
+        """Remove a temporary file from tracking.
+
+        Args:
+            path: Path to the temporary file.
+        """
+        if path in self.temporary_files:
+            self.temporary_files.remove(path)
+            self.updated_at = datetime.now()
+
+    def to_dict(self) -> dict:
+        """Convert to JSON-serializable dictionary."""
+        return {
+            "session_id": self.session_id,
+            "status": self.status.value,
+            "started_at": self.started_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+            "current_index": self.current_index,
+            "pending_videos": [v.to_dict() for v in self.pending_videos],
+            "completed_videos": [v.to_dict() for v in self.completed_videos],
+            "failed_videos": [v.to_dict() for v in self.failed_videos],
+            "temporary_files": [str(f) for f in self.temporary_files],
+            "output_dir": str(self.output_dir) if self.output_dir else None,
+            "config_snapshot": self.config_snapshot,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> SessionState:
+        """Create from dictionary.
+
+        Args:
+            data: Dictionary containing session state data.
+
+        Returns:
+            A new SessionState instance.
+        """
+        return cls(
+            session_id=data["session_id"],
+            status=SessionStatus(data["status"]),
+            started_at=datetime.fromisoformat(data["started_at"]),
+            updated_at=datetime.fromisoformat(data["updated_at"]),
+            current_index=data.get("current_index", 0),
+            pending_videos=[
+                VideoEntry.from_dict(v) for v in data.get("pending_videos", [])
+            ],
+            completed_videos=[
+                VideoEntry.from_dict(v) for v in data.get("completed_videos", [])
+            ],
+            failed_videos=[
+                VideoEntry.from_dict(v) for v in data.get("failed_videos", [])
+            ],
+            temporary_files=[Path(f) for f in data.get("temporary_files", [])],
+            output_dir=Path(data["output_dir"]) if data.get("output_dir") else None,
+            config_snapshot=data.get("config_snapshot", {}),
+        )
+
+
 # Type aliases for callbacks
 ProgressCallback = Callable[[ConversionProgress], None]
 CompleteCallback = Callable[[ConversionReport], None]
