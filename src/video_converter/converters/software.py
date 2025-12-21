@@ -145,7 +145,7 @@ class SoftwareConverter(BaseConverter):
             "-map_metadata",
             "0",  # Copy all metadata
             "-movflags",
-            "+faststart",  # Enable streaming
+            "+faststart+use_metadata_tags",  # Enable streaming and preserve metadata tags
             # Output
             str(request.output_path),
         ]
