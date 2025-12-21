@@ -45,6 +45,7 @@ from video_converter.converters.base import (
     EncoderNotAvailableError,
 )
 from video_converter.converters.factory import ConverterFactory
+from video_converter.core.session import SessionStateManager
 from video_converter.core.types import (
     BatchStatus,
     CompleteCallback,
@@ -57,6 +58,9 @@ from video_converter.core.types import (
     ConversionStatus,
     ProgressCallback,
     QueuePriority,
+    SessionState,
+    SessionStatus,
+    VideoEntry,
 )
 from video_converter.processors.quality_validator import (
     ValidationResult,
@@ -143,6 +147,7 @@ class Orchestrator:
         config: Orchestrator configuration.
         converter_factory: Factory for creating converters.
         validator: Video file validator.
+        session_manager: Session state manager for persistence.
     """
 
     def __init__(
@@ -150,6 +155,8 @@ class Orchestrator:
         config: OrchestratorConfig | None = None,
         converter_factory: ConverterFactory | None = None,
         validator: VideoValidator | None = None,
+        session_manager: SessionStateManager | None = None,
+        enable_session_persistence: bool = True,
     ) -> None:
         """Initialize the Orchestrator.
 
@@ -157,10 +164,18 @@ class Orchestrator:
             config: Optional configuration. Uses defaults if not provided.
             converter_factory: Optional converter factory.
             validator: Optional video validator.
+            session_manager: Optional session state manager.
+            enable_session_persistence: Whether to enable session persistence.
         """
         self.config = config or OrchestratorConfig()
         self.converter_factory = converter_factory or ConverterFactory()
         self.validator = validator or VideoValidator()
+        self._enable_session_persistence = enable_session_persistence
+
+        if enable_session_persistence:
+            self.session_manager = session_manager or SessionStateManager()
+        else:
+            self.session_manager = None
 
         self._converter: BaseConverter | None = None
         self._cancelled = False
@@ -170,6 +185,7 @@ class Orchestrator:
         self._batch_status = BatchStatus.IDLE
         self._current_session_id: str | None = None
         self._tasks: list[ConversionTask] = []
+        self._current_session: SessionState | None = None
 
     def _get_converter(self) -> BaseConverter:
         """Get or create the video converter.
@@ -456,6 +472,7 @@ class Orchestrator:
         output_dir: Path | None = None,
         on_progress: ProgressCallback | None = None,
         on_complete: CompleteCallback | None = None,
+        resume_session: bool = False,
     ) -> ConversionReport:
         """Run batch conversion on multiple files.
 
@@ -464,6 +481,7 @@ class Orchestrator:
             output_dir: Directory for output files. Uses original dirs if None.
             on_progress: Optional progress callback.
             on_complete: Optional completion callback.
+            resume_session: If True, try to resume an interrupted session.
 
         Returns:
             ConversionReport with batch statistics.
@@ -522,6 +540,16 @@ class Orchestrator:
                 on_complete(report)
             return report
 
+        # Create session state for persistence
+        if self.session_manager:
+            self._current_session = self.session_manager.create_session(
+                video_paths=[t.input_path for t in self._tasks],
+                output_dir=output_dir,
+                config=self.config,
+            )
+            self._current_session_id = self._current_session.session_id
+            report.session_id = self._current_session_id
+
         # Stage 2: Process queue
         total_tasks = len(self._tasks)
         for i, task in enumerate(self._tasks):
@@ -531,9 +559,15 @@ class Orchestrator:
             if self._cancelled:
                 report.cancelled = True
                 self._batch_status = BatchStatus.CANCELLED
+                if self.session_manager:
+                    self.session_manager.cancel_session()
                 break
 
             task.status = ConversionStatus.IN_PROGRESS
+
+            # Update session state
+            if self._current_session:
+                self._current_session.current_index = i
 
             self._emit_progress(
                 on_progress,
@@ -555,9 +589,27 @@ class Orchestrator:
             task.result = result
             if result.success:
                 task.status = ConversionStatus.COMPLETED
+                # Update session state
+                if self.session_manager and self._current_session:
+                    video_entry = self._find_video_entry(task.input_path)
+                    if video_entry:
+                        self.session_manager.mark_video_completed(
+                            video_entry,
+                            result.original_size,
+                            result.converted_size,
+                        )
             else:
                 task.status = ConversionStatus.FAILED
                 task.error = result.error_message
+
+                # Update session state
+                if self.session_manager and self._current_session:
+                    video_entry = self._find_video_entry(task.input_path)
+                    if video_entry:
+                        self.session_manager.mark_video_failed(
+                            video_entry,
+                            result.error_message or "Unknown error",
+                        )
 
                 # Move to failed directory if configured
                 if self.config.move_to_failed and task.input_path.exists():
@@ -574,6 +626,8 @@ class Orchestrator:
         report.completed_at = datetime.now()
         if not self._cancelled:
             self._batch_status = BatchStatus.COMPLETED
+            if self.session_manager:
+                self.session_manager.complete_session()
 
         self._emit_progress(
             on_progress,
@@ -591,6 +645,99 @@ class Orchestrator:
             on_complete(report)
 
         return report
+
+    def _find_video_entry(self, input_path: Path) -> VideoEntry | None:
+        """Find a VideoEntry in the current session by input path.
+
+        Args:
+            input_path: The input path to search for.
+
+        Returns:
+            The VideoEntry if found, None otherwise.
+        """
+        if self._current_session is None:
+            return None
+
+        for video in self._current_session.pending_videos:
+            if video.path == input_path:
+                return video
+        return None
+
+    async def resume_session(
+        self,
+        on_progress: ProgressCallback | None = None,
+        on_complete: CompleteCallback | None = None,
+    ) -> ConversionReport | None:
+        """Resume an interrupted or paused session from disk.
+
+        This method loads a previously saved session and continues
+        processing any pending videos.
+
+        Args:
+            on_progress: Optional progress callback.
+            on_complete: Optional completion callback.
+
+        Returns:
+            ConversionReport if resumed successfully, None if no session to resume.
+        """
+        if not self.session_manager:
+            logger.warning("Session persistence is disabled, cannot resume")
+            return None
+
+        session = self.session_manager.resume_session()
+        if session is None:
+            logger.info("No resumable session found")
+            return None
+
+        self._current_session = session
+        self._current_session_id = session.session_id
+
+        logger.info(
+            f"Resuming session {session.session_id} with "
+            f"{len(session.pending_videos)} pending videos"
+        )
+
+        # Get pending video paths
+        pending_paths = [v.path for v in session.pending_videos]
+
+        if not pending_paths:
+            logger.info("No pending videos to process")
+            self.session_manager.complete_session()
+            return ConversionReport(
+                session_id=session.session_id,
+                started_at=session.started_at,
+                completed_at=datetime.now(),
+                total_files=session.total_videos,
+                successful=len(session.completed_videos),
+                failed=len(session.failed_videos),
+            )
+
+        return await self.run(
+            input_paths=pending_paths,
+            output_dir=session.output_dir,
+            on_progress=on_progress,
+            on_complete=on_complete,
+        )
+
+    def has_resumable_session(self) -> bool:
+        """Check if there is a resumable session available.
+
+        Returns:
+            True if a session can be resumed, False otherwise.
+        """
+        if not self.session_manager:
+            return False
+        return self.session_manager.has_resumable_session()
+
+    def get_session_status(self) -> dict | None:
+        """Get the current session status.
+
+        Returns:
+            Session status dictionary, or None if no session.
+        """
+        if not self.session_manager:
+            return None
+        return self.session_manager.get_session_status()
 
     async def run_directory(
         self,
@@ -656,11 +803,19 @@ class Orchestrator:
         self._paused = True
         self._pause_event.clear()
         self._batch_status = BatchStatus.PAUSED
+
+        # Update session state
+        if self.session_manager:
+            self.session_manager.pause_session()
+
         logger.info("Batch conversion paused")
         return True
 
     def resume(self) -> bool:
         """Resume a paused batch conversion.
+
+        This resumes a batch that was paused in the current session.
+        To resume a saved session from disk, use resume_session() instead.
 
         Returns:
             True if resumed, False if not paused.
@@ -671,6 +826,12 @@ class Orchestrator:
         self._paused = False
         self._pause_event.set()
         self._batch_status = BatchStatus.RUNNING
+
+        # Update session state
+        if self.session_manager and self._current_session:
+            self._current_session.status = SessionStatus.ACTIVE
+            self.session_manager.save(force=True)
+
         logger.info("Batch conversion resumed")
         return True
 

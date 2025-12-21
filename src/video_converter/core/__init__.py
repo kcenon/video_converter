@@ -25,6 +25,13 @@ from video_converter.core.logger import (
     get_logger,
     set_log_level,
 )
+from video_converter.core.session import (
+    SessionCorruptedError,
+    SessionNotFoundError,
+    SessionStateError,
+    SessionStateManager,
+    get_session_manager,
+)
 from video_converter.core.types import (
     BatchStatus,
     CompleteCallback,
@@ -37,6 +44,9 @@ from video_converter.core.types import (
     ConversionStatus,
     ProgressCallback,
     QueuePriority,
+    SessionState,
+    SessionStatus,
+    VideoEntry,
 )
 
 __all__ = [
@@ -55,6 +65,15 @@ __all__ = [
     "get_logger",
     "LogLevel",
     "set_log_level",
+    # Session
+    "get_session_manager",
+    "SessionCorruptedError",
+    "SessionNotFoundError",
+    "SessionState",
+    "SessionStateError",
+    "SessionStateManager",
+    "SessionStatus",
+    "VideoEntry",
     # Types
     "BatchStatus",
     "CompleteCallback",
