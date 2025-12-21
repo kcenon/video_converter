@@ -41,7 +41,9 @@ from video_converter.utils.command_runner import (
     CommandExecutionError,
     CommandNotFoundError,
     CommandRunner,
+    FFprobeRunner,
 )
+from video_converter.utils.progress_parser import FFmpegProgressParser
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -79,6 +81,7 @@ class BaseConverter(ABC):
         """
         self.mode = mode
         self._command_runner = CommandRunner()
+        self._ffprobe_runner = FFprobeRunner(self._command_runner)
         self._cancelled = False
         self._current_process: asyncio.subprocess.Process | None = None
 
@@ -112,6 +115,23 @@ class BaseConverter(ABC):
             List of command arguments for FFmpeg.
         """
         ...
+
+    def _get_video_duration(self, path: Path) -> float:
+        """Get video duration in seconds using ffprobe.
+
+        Args:
+            path: Path to the video file.
+
+        Returns:
+            Duration in seconds, or 0.0 if cannot be determined.
+        """
+        try:
+            info = self._ffprobe_runner.probe(path, show_streams=False)
+            if "format" in info and "duration" in info["format"]:
+                return float(info["format"]["duration"])
+        except Exception as e:
+            logger.debug(f"Could not get video duration: {e}")
+        return 0.0
 
     async def convert(
         self,
@@ -157,6 +177,10 @@ class BaseConverter(ABC):
                 completed_at=datetime.now(),
             )
 
+        # Get video duration for progress calculation
+        video_duration = self._get_video_duration(request.input_path)
+        progress_parser = FFmpegProgressParser(total_duration=video_duration)
+
         # Ensure output directory exists
         request.output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -165,16 +189,38 @@ class BaseConverter(ABC):
         logger.info(f"Starting conversion: {request.input_path.name}")
         logger.debug(f"Command: {' '.join(command)}")
 
+        stderr_output = []
+        last_speed = 0.0
+
         try:
-            # Create subprocess
+            # Create subprocess with stderr streaming
             self._current_process = await asyncio.create_subprocess_exec(
                 *command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
 
-            # Wait for completion
-            stdout, stderr = await self._current_process.communicate()
+            # Read stderr line by line for progress updates
+            while True:
+                if self._current_process.stderr is None:
+                    break
+
+                line = await self._current_process.stderr.readline()
+                if not line:
+                    break
+
+                line_str = line.decode("utf-8", errors="replace")
+                stderr_output.append(line_str)
+
+                # Parse progress from FFmpeg output
+                if progress := progress_parser.parse_line(line_str):
+                    last_speed = progress.speed
+                    if on_progress and video_duration > 0:
+                        # Callback with progress ratio (0.0-1.0)
+                        on_progress(progress.percentage / 100.0)
+
+            # Wait for process to complete
+            await self._current_process.wait()
 
             if self._cancelled:
                 # Clean up partial output
@@ -190,7 +236,7 @@ class BaseConverter(ABC):
                 )
 
             if self._current_process.returncode != 0:
-                error_msg = stderr.decode("utf-8", errors="replace").strip()
+                error_msg = "".join(stderr_output).strip()
                 # Clean up partial output
                 if request.output_path.exists():
                     request.output_path.unlink()
@@ -198,7 +244,7 @@ class BaseConverter(ABC):
                     success=False,
                     request=request,
                     original_size=original_size,
-                    error_message=f"FFmpeg failed: {error_msg[:500]}",
+                    error_message=f"FFmpeg failed: {error_msg[-500:]}",
                     started_at=started_at,
                     completed_at=datetime.now(),
                 )
@@ -217,15 +263,21 @@ class BaseConverter(ABC):
             converted_size = request.output_path.stat().st_size
             duration = time.perf_counter() - start_time
 
-            # Calculate speed ratio (requires video duration)
-            speed_ratio = 0.0
-            # Speed ratio calculation would require video duration from probe
+            # Calculate speed ratio from FFmpeg's reported speed or actual time
+            speed_ratio = last_speed
+            if speed_ratio == 0.0 and video_duration > 0 and duration > 0:
+                speed_ratio = video_duration / duration
+
+            # Call final progress callback
+            if on_progress:
+                on_progress(1.0)
 
             logger.info(
                 f"Conversion complete: {request.input_path.name} "
                 f"({original_size / 1024 / 1024:.1f}MB -> "
                 f"{converted_size / 1024 / 1024:.1f}MB, "
-                f"{(1 - converted_size / original_size) * 100:.1f}% reduction)"
+                f"{(1 - converted_size / original_size) * 100:.1f}% reduction, "
+                f"{speed_ratio:.1f}x speed)"
             )
 
             return ConversionResult(
