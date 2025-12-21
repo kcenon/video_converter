@@ -87,21 +87,57 @@ Configuration file location: `~/.config/video_converter/config.json`
 
 ```json
 {
+  "version": "1.0.0",
   "encoding": {
     "mode": "hardware",
-    "quality": 45
-  },
-  "automation": {
-    "enabled": true,
-    "schedule": "daily",
-    "time": "03:00"
+    "quality": 45,
+    "crf": 22,
+    "preset": "medium"
   },
   "paths": {
     "output": "~/Videos/Converted",
-    "processed": "~/Videos/Processed"
+    "processed": "~/Videos/Processed",
+    "failed": "~/Videos/Failed"
+  },
+  "automation": {
+    "enabled": false,
+    "schedule": "daily",
+    "time": "03:00"
+  },
+  "photos": {
+    "include_albums": [],
+    "exclude_albums": ["Screenshots"],
+    "download_from_icloud": true
+  },
+  "processing": {
+    "max_concurrent": 2,
+    "validate_quality": true,
+    "preserve_original": true
+  },
+  "notification": {
+    "on_complete": true,
+    "on_error": true,
+    "daily_summary": false
   }
 }
 ```
+
+### Environment Variable Overrides
+
+Configuration can be overridden using environment variables with the `VIDEO_CONVERTER_` prefix:
+
+```bash
+# Override encoding mode
+export VIDEO_CONVERTER_ENCODING__MODE=software
+
+# Override quality setting
+export VIDEO_CONVERTER_ENCODING__QUALITY=80
+
+# Override max concurrent jobs
+export VIDEO_CONVERTER_PROCESSING__MAX_CONCURRENT=4
+```
+
+Note: Use double underscore (`__`) for nested configuration keys.
 
 ## How It Works
 
