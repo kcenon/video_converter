@@ -26,6 +26,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import osxphotos
 
+    from video_converter.processors.codec_detector import CodecDetector
+
 logger = logging.getLogger(__name__)
 
 
@@ -100,6 +102,8 @@ class PhotosVideoInfo:
         in_cloud: Whether the video is stored in iCloud.
         location: GPS coordinates (latitude, longitude) if available.
         albums: List of album names containing this video.
+        codec: Video codec name (e.g., "h264", "hevc").
+        size: File size in bytes.
     """
 
     uuid: str
@@ -113,6 +117,12 @@ class PhotosVideoInfo:
     in_cloud: bool = False
     location: tuple[float, float] | None = None
     albums: list[str] = field(default_factory=list)
+    codec: str | None = None
+    size: int = 0
+
+    # Codec name variations for identification
+    H264_CODECS = frozenset({"h264", "avc", "avc1", "x264"})
+    HEVC_CODECS = frozenset({"hevc", "h265", "hvc1", "hev1", "x265"})
 
     @property
     def is_available_locally(self) -> bool:
@@ -124,6 +134,41 @@ class PhotosVideoInfo:
         if self.path is None:
             return False
         return self.path.exists()
+
+    @property
+    def is_h264(self) -> bool:
+        """Check if video codec is H.264/AVC.
+
+        Returns:
+            True if the codec is any variant of H.264.
+        """
+        if self.codec is None:
+            return False
+        return self.codec.lower() in self.H264_CODECS
+
+    @property
+    def is_hevc(self) -> bool:
+        """Check if video codec is H.265/HEVC.
+
+        Returns:
+            True if the codec is any variant of H.265/HEVC.
+        """
+        if self.codec is None:
+            return False
+        return self.codec.lower() in self.HEVC_CODECS
+
+    @property
+    def needs_conversion(self) -> bool:
+        """Check if video needs H.265 conversion.
+
+        A video needs conversion if:
+        - It is locally available (not iCloud-only)
+        - Its codec is H.264
+
+        Returns:
+            True if the video should be converted to H.265.
+        """
+        return self.is_available_locally and self.is_h264
 
 
 class PhotosLibrary:
@@ -471,3 +516,287 @@ To grant access:
 Quick access command:
   open "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"
 """.strip()
+
+
+@dataclass
+class LibraryStats:
+    """Statistics about videos in the Photos library.
+
+    Attributes:
+        total: Total number of videos.
+        h264: Number of H.264 encoded videos.
+        hevc: Number of H.265/HEVC encoded videos.
+        other: Number of videos with other codecs.
+        in_cloud: Number of videos stored in iCloud only.
+        total_size_h264: Total size of H.264 videos in bytes.
+        estimated_savings: Estimated storage savings after conversion in bytes.
+    """
+
+    total: int = 0
+    h264: int = 0
+    hevc: int = 0
+    other: int = 0
+    in_cloud: int = 0
+    total_size_h264: int = 0
+
+    @property
+    def estimated_savings(self) -> int:
+        """Estimate storage savings after H.265 conversion.
+
+        Assumes approximately 50% size reduction with H.265.
+
+        Returns:
+            Estimated bytes that could be saved.
+        """
+        return int(self.total_size_h264 * 0.5)
+
+    @property
+    def estimated_savings_gb(self) -> float:
+        """Get estimated savings in gigabytes.
+
+        Returns:
+            Estimated savings in GB.
+        """
+        return self.estimated_savings / (1024 * 1024 * 1024)
+
+
+class PhotosVideoFilter:
+    """Filter Photos library videos for conversion candidates.
+
+    This class provides filtering capabilities to identify H.264 videos
+    that need conversion to H.265/HEVC, with support for album-based
+    and date-based filtering.
+
+    SDS Reference: SDS-P01-005
+    SRS Reference: SRS-302 (Video Filtering)
+
+    Example:
+        >>> library = PhotosLibrary()
+        >>> filter = PhotosVideoFilter(
+        ...     library,
+        ...     exclude_albums=["Screenshots", "Bursts"]
+        ... )
+        >>> candidates = filter.get_conversion_candidates(limit=100)
+        >>> print(f"Found {len(candidates)} videos to convert")
+    """
+
+    # Default albums to exclude from conversion
+    DEFAULT_EXCLUDE_ALBUMS = frozenset({"Screenshots", "Bursts", "Slo-mo"})
+
+    def __init__(
+        self,
+        library: PhotosLibrary,
+        include_albums: list[str] | None = None,
+        exclude_albums: list[str] | None = None,
+    ) -> None:
+        """Initialize PhotosVideoFilter.
+
+        Args:
+            library: PhotosLibrary instance to filter.
+            include_albums: Only include videos from these albums.
+                If None, includes all albums.
+            exclude_albums: Exclude videos from these albums.
+                If None, uses DEFAULT_EXCLUDE_ALBUMS.
+        """
+        self._library = library
+        self._include_albums = set(include_albums) if include_albums else None
+        self._exclude_albums = (
+            set(exclude_albums)
+            if exclude_albums is not None
+            else set(self.DEFAULT_EXCLUDE_ALBUMS)
+        )
+        self._codec_detector: CodecDetector | None = None
+
+    @property
+    def codec_detector(self) -> CodecDetector:
+        """Get or create codec detector instance.
+
+        Returns:
+            CodecDetector for analyzing video codecs.
+        """
+        if self._codec_detector is None:
+            from video_converter.processors.codec_detector import CodecDetector
+            self._codec_detector = CodecDetector()
+        return self._codec_detector
+
+    def _passes_album_filter(self, video: PhotosVideoInfo) -> bool:
+        """Check if video passes album filter.
+
+        Args:
+            video: Video to check.
+
+        Returns:
+            True if video passes album filter, False otherwise.
+        """
+        video_albums = set(video.albums)
+
+        # Check exclude filter first
+        if self._exclude_albums and video_albums & self._exclude_albums:
+            return False
+
+        # Check include filter
+        if self._include_albums is not None:
+            if not video_albums & self._include_albums:
+                return False
+
+        return True
+
+    def _detect_codec(self, video: PhotosVideoInfo) -> str | None:
+        """Detect video codec using FFprobe.
+
+        Args:
+            video: Video to analyze.
+
+        Returns:
+            Codec name or None if detection fails.
+        """
+        if not video.is_available_locally or video.path is None:
+            return None
+
+        try:
+            from video_converter.processors.codec_detector import (
+                CorruptedVideoError,
+                InvalidVideoError,
+            )
+            info = self.codec_detector.analyze(video.path)
+            return info.codec
+        except (InvalidVideoError, CorruptedVideoError, FileNotFoundError) as e:
+            logger.warning(f"Failed to detect codec for {video.filename}: {e}")
+            return None
+
+    def _enrich_with_codec(self, video: PhotosVideoInfo) -> PhotosVideoInfo:
+        """Enrich video info with codec and size data.
+
+        Args:
+            video: Video to enrich.
+
+        Returns:
+            Video with codec and size information.
+        """
+        if not video.is_available_locally or video.path is None:
+            return video
+
+        # Get codec
+        codec = self._detect_codec(video)
+
+        # Get file size
+        try:
+            size = video.path.stat().st_size if video.path else 0
+        except OSError:
+            size = 0
+
+        return PhotosVideoInfo(
+            uuid=video.uuid,
+            filename=video.filename,
+            path=video.path,
+            date=video.date,
+            date_modified=video.date_modified,
+            duration=video.duration,
+            favorite=video.favorite,
+            hidden=video.hidden,
+            in_cloud=video.in_cloud,
+            location=video.location,
+            albums=video.albums,
+            codec=codec,
+            size=size,
+        )
+
+    def get_conversion_candidates(
+        self,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+        limit: int | None = None,
+    ) -> list[PhotosVideoInfo]:
+        """Get videos that need conversion from H.264 to H.265.
+
+        This method filters Photos library videos to find candidates
+        for conversion, applying album and date filters.
+
+        Args:
+            from_date: Only include videos created after this date.
+            to_date: Only include videos created before this date.
+            limit: Maximum number of candidates to return.
+
+        Returns:
+            List of PhotosVideoInfo for videos that need conversion.
+        """
+        logger.info("Searching for H.264 conversion candidates...")
+
+        candidates: list[PhotosVideoInfo] = []
+
+        # Get all videos with date filtering
+        videos = self._library.get_videos(
+            from_date=from_date,
+            to_date=to_date,
+        )
+
+        for video in videos:
+            # Skip if doesn't pass album filter
+            if not self._passes_album_filter(video):
+                continue
+
+            # Skip if not available locally
+            if not video.is_available_locally:
+                logger.debug(f"Skipping iCloud-only video: {video.filename}")
+                continue
+
+            # Enrich with codec info
+            enriched = self._enrich_with_codec(video)
+
+            # Check if needs conversion
+            if enriched.needs_conversion:
+                candidates.append(enriched)
+                logger.debug(f"Found candidate: {enriched.filename} ({enriched.codec})")
+
+                if limit and len(candidates) >= limit:
+                    break
+
+        logger.info(f"Found {len(candidates)} H.264 videos for conversion")
+        return candidates
+
+    def get_stats(self) -> LibraryStats:
+        """Get statistics about videos in the library.
+
+        Analyzes all videos in the library to provide statistics
+        about codec distribution and potential storage savings.
+
+        Returns:
+            LibraryStats with codec distribution and size information.
+        """
+        logger.info("Analyzing library statistics...")
+
+        stats = LibraryStats()
+
+        videos = self._library.get_videos()
+        stats.total = len(videos)
+
+        for video in videos:
+            # Track iCloud-only videos
+            if not video.is_available_locally:
+                stats.in_cloud += 1
+                continue
+
+            # Detect codec
+            codec = self._detect_codec(video)
+            if codec is None:
+                stats.other += 1
+                continue
+
+            codec_lower = codec.lower()
+            if codec_lower in PhotosVideoInfo.H264_CODECS:
+                stats.h264 += 1
+                try:
+                    if video.path:
+                        stats.total_size_h264 += video.path.stat().st_size
+                except OSError:
+                    pass
+            elif codec_lower in PhotosVideoInfo.HEVC_CODECS:
+                stats.hevc += 1
+            else:
+                stats.other += 1
+
+        logger.info(
+            f"Library stats: {stats.total} total, {stats.h264} H.264, "
+            f"{stats.hevc} HEVC, {stats.in_cloud} in cloud"
+        )
+        return stats

@@ -9,10 +9,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from video_converter.extractors.photos_extractor import (
+    LibraryStats,
     MediaType,
     PhotosAccessDeniedError,
     PhotosLibrary,
     PhotosLibraryNotFoundError,
+    PhotosVideoFilter,
     PhotosVideoInfo,
     get_permission_instructions,
 )
@@ -450,3 +452,436 @@ class TestGetPermissionInstructions:
         instructions = get_permission_instructions()
         assert "open" in instructions
         assert "preference.security" in instructions
+
+
+class TestPhotosVideoInfoCodec:
+    """Tests for PhotosVideoInfo codec-related properties."""
+
+    def test_is_h264_with_h264_codec(self, tmp_path: Path) -> None:
+        """Test is_h264 returns True for H.264 codec."""
+        video_file = tmp_path / "video.mov"
+        video_file.touch()
+
+        video = PhotosVideoInfo(
+            uuid="uuid1",
+            filename="video.mov",
+            path=video_file,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+            codec="h264",
+        )
+
+        assert video.is_h264 is True
+        assert video.is_hevc is False
+
+    def test_is_h264_with_avc_codec(self, tmp_path: Path) -> None:
+        """Test is_h264 returns True for AVC codec variant."""
+        video_file = tmp_path / "video.mov"
+        video_file.touch()
+
+        video = PhotosVideoInfo(
+            uuid="uuid1",
+            filename="video.mov",
+            path=video_file,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+            codec="avc1",
+        )
+
+        assert video.is_h264 is True
+
+    def test_is_hevc_with_hevc_codec(self, tmp_path: Path) -> None:
+        """Test is_hevc returns True for HEVC codec."""
+        video_file = tmp_path / "video.mov"
+        video_file.touch()
+
+        video = PhotosVideoInfo(
+            uuid="uuid1",
+            filename="video.mov",
+            path=video_file,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+            codec="hevc",
+        )
+
+        assert video.is_hevc is True
+        assert video.is_h264 is False
+
+    def test_is_hevc_with_h265_codec(self, tmp_path: Path) -> None:
+        """Test is_hevc returns True for H.265 codec variant."""
+        video_file = tmp_path / "video.mov"
+        video_file.touch()
+
+        video = PhotosVideoInfo(
+            uuid="uuid1",
+            filename="video.mov",
+            path=video_file,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+            codec="h265",
+        )
+
+        assert video.is_hevc is True
+
+    def test_codec_none_returns_false(self) -> None:
+        """Test is_h264 and is_hevc return False when codec is None."""
+        video = PhotosVideoInfo(
+            uuid="uuid1",
+            filename="video.mov",
+            path=None,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+            codec=None,
+        )
+
+        assert video.is_h264 is False
+        assert video.is_hevc is False
+
+    def test_needs_conversion_h264_local(self, tmp_path: Path) -> None:
+        """Test needs_conversion returns True for local H.264 video."""
+        video_file = tmp_path / "video.mov"
+        video_file.touch()
+
+        video = PhotosVideoInfo(
+            uuid="uuid1",
+            filename="video.mov",
+            path=video_file,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+            codec="h264",
+        )
+
+        assert video.needs_conversion is True
+
+    def test_needs_conversion_hevc_returns_false(self, tmp_path: Path) -> None:
+        """Test needs_conversion returns False for HEVC video."""
+        video_file = tmp_path / "video.mov"
+        video_file.touch()
+
+        video = PhotosVideoInfo(
+            uuid="uuid1",
+            filename="video.mov",
+            path=video_file,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+            codec="hevc",
+        )
+
+        assert video.needs_conversion is False
+
+    def test_needs_conversion_icloud_only_returns_false(self) -> None:
+        """Test needs_conversion returns False for iCloud-only video."""
+        video = PhotosVideoInfo(
+            uuid="uuid1",
+            filename="video.mov",
+            path=None,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+            codec="h264",
+            in_cloud=True,
+        )
+
+        assert video.needs_conversion is False
+
+
+class TestLibraryStats:
+    """Tests for LibraryStats dataclass."""
+
+    def test_library_stats_creation(self) -> None:
+        """Test creating LibraryStats with values."""
+        stats = LibraryStats(
+            total=100,
+            h264=60,
+            hevc=30,
+            other=5,
+            in_cloud=5,
+            total_size_h264=10_000_000_000,  # 10 GB
+        )
+
+        assert stats.total == 100
+        assert stats.h264 == 60
+        assert stats.hevc == 30
+
+    def test_estimated_savings(self) -> None:
+        """Test estimated_savings calculation."""
+        stats = LibraryStats(
+            total_size_h264=10_000_000_000,  # 10 GB
+        )
+
+        assert stats.estimated_savings == 5_000_000_000  # 5 GB
+
+    def test_estimated_savings_gb(self) -> None:
+        """Test estimated_savings_gb calculation."""
+        stats = LibraryStats(
+            total_size_h264=10 * 1024 * 1024 * 1024,  # 10 GB
+        )
+
+        assert stats.estimated_savings_gb == 5.0
+
+    def test_default_values(self) -> None:
+        """Test default values for LibraryStats."""
+        stats = LibraryStats()
+
+        assert stats.total == 0
+        assert stats.h264 == 0
+        assert stats.hevc == 0
+        assert stats.other == 0
+        assert stats.in_cloud == 0
+        assert stats.total_size_h264 == 0
+
+
+class TestPhotosVideoFilter:
+    """Tests for PhotosVideoFilter class."""
+
+    def test_init_with_defaults(self) -> None:
+        """Test PhotosVideoFilter initialization with defaults."""
+        mock_library = MagicMock(spec=PhotosLibrary)
+
+        filter = PhotosVideoFilter(mock_library)
+
+        assert filter._library == mock_library
+        assert filter._include_albums is None
+        assert "Screenshots" in filter._exclude_albums
+
+    def test_init_with_custom_albums(self) -> None:
+        """Test PhotosVideoFilter initialization with custom albums."""
+        mock_library = MagicMock(spec=PhotosLibrary)
+
+        filter = PhotosVideoFilter(
+            mock_library,
+            include_albums=["Vacation", "Family"],
+            exclude_albums=["Private"],
+        )
+
+        assert filter._include_albums == {"Vacation", "Family"}
+        assert filter._exclude_albums == {"Private"}
+
+    def test_init_with_empty_exclude(self) -> None:
+        """Test PhotosVideoFilter with empty exclude list."""
+        mock_library = MagicMock(spec=PhotosLibrary)
+
+        filter = PhotosVideoFilter(mock_library, exclude_albums=[])
+
+        assert filter._exclude_albums == set()
+
+    def test_passes_album_filter_no_filters(self) -> None:
+        """Test album filter passes when no filters set."""
+        mock_library = MagicMock(spec=PhotosLibrary)
+        filter = PhotosVideoFilter(mock_library, exclude_albums=[])
+
+        video = PhotosVideoInfo(
+            uuid="uuid1",
+            filename="video.mov",
+            path=None,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+            albums=["Random Album"],
+        )
+
+        assert filter._passes_album_filter(video) is True
+
+    def test_passes_album_filter_excluded(self) -> None:
+        """Test album filter rejects excluded album."""
+        mock_library = MagicMock(spec=PhotosLibrary)
+        filter = PhotosVideoFilter(
+            mock_library,
+            exclude_albums=["Screenshots"],
+        )
+
+        video = PhotosVideoInfo(
+            uuid="uuid1",
+            filename="video.mov",
+            path=None,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+            albums=["Screenshots"],
+        )
+
+        assert filter._passes_album_filter(video) is False
+
+    def test_passes_album_filter_included(self) -> None:
+        """Test album filter passes for included album."""
+        mock_library = MagicMock(spec=PhotosLibrary)
+        filter = PhotosVideoFilter(
+            mock_library,
+            include_albums=["Vacation"],
+            exclude_albums=[],
+        )
+
+        video = PhotosVideoInfo(
+            uuid="uuid1",
+            filename="video.mov",
+            path=None,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+            albums=["Vacation", "2024"],
+        )
+
+        assert filter._passes_album_filter(video) is True
+
+    def test_passes_album_filter_not_in_include(self) -> None:
+        """Test album filter rejects video not in include list."""
+        mock_library = MagicMock(spec=PhotosLibrary)
+        filter = PhotosVideoFilter(
+            mock_library,
+            include_albums=["Vacation"],
+            exclude_albums=[],
+        )
+
+        video = PhotosVideoInfo(
+            uuid="uuid1",
+            filename="video.mov",
+            path=None,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+            albums=["Work"],
+        )
+
+        assert filter._passes_album_filter(video) is False
+
+    def test_get_conversion_candidates_filters_h264(self, tmp_path: Path) -> None:
+        """Test get_conversion_candidates returns only H.264 videos."""
+        mock_library = MagicMock(spec=PhotosLibrary)
+
+        video_file = tmp_path / "video.mov"
+        video_file.write_bytes(b"fake video content")
+
+        h264_video = PhotosVideoInfo(
+            uuid="uuid1",
+            filename="h264_video.mov",
+            path=video_file,
+            date=datetime(2024, 1, 1),
+            date_modified=None,
+            duration=60.0,
+        )
+
+        hevc_video = PhotosVideoInfo(
+            uuid="uuid2",
+            filename="hevc_video.mov",
+            path=video_file,
+            date=datetime(2024, 1, 1),
+            date_modified=None,
+            duration=60.0,
+        )
+
+        mock_library.get_videos.return_value = [h264_video, hevc_video]
+
+        filter = PhotosVideoFilter(mock_library, exclude_albums=[])
+
+        # Mock codec detector to return h264 for first, hevc for second
+        with patch.object(filter, "_detect_codec") as mock_detect:
+            mock_detect.side_effect = ["h264", "hevc"]
+            candidates = filter.get_conversion_candidates()
+
+        assert len(candidates) == 1
+        assert candidates[0].codec == "h264"
+
+    def test_get_conversion_candidates_skips_icloud_only(self) -> None:
+        """Test get_conversion_candidates skips iCloud-only videos."""
+        mock_library = MagicMock(spec=PhotosLibrary)
+
+        icloud_video = PhotosVideoInfo(
+            uuid="uuid1",
+            filename="icloud_video.mov",
+            path=None,
+            date=datetime(2024, 1, 1),
+            date_modified=None,
+            duration=60.0,
+            in_cloud=True,
+        )
+
+        mock_library.get_videos.return_value = [icloud_video]
+
+        filter = PhotosVideoFilter(mock_library, exclude_albums=[])
+
+        candidates = filter.get_conversion_candidates()
+
+        assert len(candidates) == 0
+
+    def test_get_conversion_candidates_respects_limit(self, tmp_path: Path) -> None:
+        """Test get_conversion_candidates respects limit parameter."""
+        mock_library = MagicMock(spec=PhotosLibrary)
+
+        videos = []
+        for i in range(5):
+            video_file = tmp_path / f"video{i}.mov"
+            video_file.write_bytes(b"fake")
+            videos.append(
+                PhotosVideoInfo(
+                    uuid=f"uuid{i}",
+                    filename=f"video{i}.mov",
+                    path=video_file,
+                    date=datetime(2024, 1, 1),
+                    date_modified=None,
+                    duration=60.0,
+                )
+            )
+
+        mock_library.get_videos.return_value = videos
+
+        filter = PhotosVideoFilter(mock_library, exclude_albums=[])
+
+        with patch.object(filter, "_detect_codec", return_value="h264"):
+            candidates = filter.get_conversion_candidates(limit=2)
+
+        assert len(candidates) == 2
+
+    def test_get_stats(self, tmp_path: Path) -> None:
+        """Test get_stats returns correct statistics."""
+        mock_library = MagicMock(spec=PhotosLibrary)
+
+        video_file = tmp_path / "video.mov"
+        video_file.write_bytes(b"x" * 1000)
+
+        local_h264 = PhotosVideoInfo(
+            uuid="uuid1",
+            filename="h264.mov",
+            path=video_file,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+        )
+
+        local_hevc = PhotosVideoInfo(
+            uuid="uuid2",
+            filename="hevc.mov",
+            path=video_file,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+        )
+
+        icloud_video = PhotosVideoInfo(
+            uuid="uuid3",
+            filename="icloud.mov",
+            path=None,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+            in_cloud=True,
+        )
+
+        mock_library.get_videos.return_value = [local_h264, local_hevc, icloud_video]
+
+        filter = PhotosVideoFilter(mock_library, exclude_albums=[])
+
+        with patch.object(filter, "_detect_codec") as mock_detect:
+            mock_detect.side_effect = ["h264", "hevc", None]
+            stats = filter.get_stats()
+
+        assert stats.total == 3
+        assert stats.h264 == 1
+        assert stats.hevc == 1
+        assert stats.in_cloud == 1
