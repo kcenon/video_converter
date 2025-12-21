@@ -235,6 +235,37 @@ launchctl unload ~/Library/LaunchAgents/com.user.videoconverter.plist
 </dict>
 ```
 
+### Python API를 사용한 Plist 생성
+
+video_converter 패키지는 launchd plist 파일을 프로그래밍 방식으로 생성하는 Python API를 제공합니다:
+
+```python
+from video_converter.automation import (
+    LaunchdPlistGenerator,
+    generate_daily_plist,
+    generate_watch_plist,
+)
+from pathlib import Path
+
+# 매일 새벽 3시에 실행하는 plist 생성
+generator = LaunchdPlistGenerator()
+plist = generator.generate_plist(hour=3, minute=0)
+generator.write_plist(plist)
+
+# 또는 편의 함수 사용
+plist = generate_daily_plist(hour=3, minute=0)
+
+# 폴더 감시 plist 생성
+plist = generate_watch_plist([Path("~/Videos/Import")])
+```
+
+주요 기능:
+- Python 경로 자동 감지
+- 환경 변수 설정 (PATH, PYTHONUNBUFFERED)
+- `~/Library/Logs/video_converter/`로 로그 파일 리다이렉션
+- 시간 기반 및 폴더 기반 트리거 모두 지원
+- macOS `plutil`을 사용한 plist 유효성 검사
+
 ## 방법 4: Shell Script + Cron
 
 ### crontab 설정
