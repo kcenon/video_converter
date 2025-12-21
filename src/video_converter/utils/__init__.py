@@ -12,6 +12,10 @@ from video_converter.utils.command_runner import (
     CommandRunner,
     FFprobeRunner,
 )
+from video_converter.utils.progress_parser import (
+    FFmpegProgress,
+    FFmpegProgressParser,
+)
 
 __all__ = [
     "CommandResult",
@@ -19,4 +23,6 @@ __all__ = [
     "CommandNotFoundError",
     "CommandExecutionError",
     "FFprobeRunner",
+    "FFmpegProgress",
+    "FFmpegProgressParser",
 ]
