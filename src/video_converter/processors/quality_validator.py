@@ -1,10 +1,12 @@
 """Video quality validation module.
 
 This module provides video file integrity validation using FFprobe to ensure
-converted files are playable and not corrupted.
+converted files are playable and not corrupted. It also includes compression
+ratio validation to detect encoding issues.
 
 SDS Reference: SDS-P01-003
 SRS Reference: SRS-501 (Conversion Result Verification)
+SRS Reference: SRS-503 (Compression Ratio Validation)
 
 Example:
     >>> validator = VideoValidator()
@@ -13,6 +15,11 @@ Example:
     ...     print("Video is valid!")
     ... else:
     ...     print(f"Errors: {result.errors}")
+
+    >>> # Compression ratio validation
+    >>> comp_validator = CompressionValidator()
+    >>> result = comp_validator.validate(100_000_000, 40_000_000)
+    >>> print(f"Compression ratio: {result.compression_ratio:.1%}")
 """
 
 from __future__ import annotations
@@ -1079,3 +1086,313 @@ class PropertyComparer:
             severity=ComparisonSeverity.ERROR,
             message="" if matches else f"Audio channels mismatch: {orig_channels} → {conv_channels}",
         )
+
+
+class ContentType(Enum):
+    """Content type for compression ratio validation.
+
+    Different content types have different expected compression ratios.
+    High-motion content (sports, action) compresses less efficiently,
+    while low-motion content (interviews, static scenes) compresses better.
+
+    Attributes:
+        STANDARD: Normal video content (default).
+        HIGH_MOTION: High-motion content like sports or action.
+        LOW_MOTION: Low-motion content like interviews or static scenes.
+    """
+
+    STANDARD = "standard"
+    HIGH_MOTION = "high_motion"
+    LOW_MOTION = "low_motion"
+
+
+@dataclass
+class CompressionRange:
+    """Expected compression ratio range for a content type.
+
+    SDS Reference: SDS-P05-003
+
+    Attributes:
+        min_ratio: Minimum expected compression ratio (0.0 to 1.0).
+        max_ratio: Maximum expected compression ratio (0.0 to 1.0).
+        content_type: The content type this range applies to.
+    """
+
+    min_ratio: float
+    max_ratio: float
+    content_type: ContentType = ContentType.STANDARD
+
+    def __post_init__(self) -> None:
+        """Validate range values."""
+        if not 0.0 <= self.min_ratio <= 1.0:
+            raise ValueError(f"min_ratio must be between 0.0 and 1.0, got {self.min_ratio}")
+        if not 0.0 <= self.max_ratio <= 1.0:
+            raise ValueError(f"max_ratio must be between 0.0 and 1.0, got {self.max_ratio}")
+        if self.min_ratio > self.max_ratio:
+            raise ValueError(
+                f"min_ratio ({self.min_ratio}) must be <= max_ratio ({self.max_ratio})"
+            )
+
+
+class CompressionSeverity(Enum):
+    """Severity level for compression ratio issues.
+
+    Attributes:
+        NORMAL: Compression ratio is within expected range.
+        WARNING: Compression ratio is outside expected range but not critical.
+        ERROR: Compression ratio indicates a serious encoding issue.
+    """
+
+    NORMAL = "normal"
+    WARNING = "warning"
+    ERROR = "error"
+
+
+@dataclass
+class CompressionValidationResult:
+    """Result of compression ratio validation.
+
+    SDS Reference: SDS-P05-003
+    SRS Reference: SRS-503 (Compression Ratio Validation)
+
+    Attributes:
+        valid: Overall validation result (True if within acceptable range).
+        compression_ratio: Calculated compression ratio (0.0 to 1.0).
+        original_size: Original file size in bytes.
+        converted_size: Converted file size in bytes.
+        content_type: Content type used for validation.
+        severity: Severity level of the result.
+        message: Human-readable description of the result.
+        expected_range: The expected compression range for the content type.
+    """
+
+    valid: bool
+    compression_ratio: float
+    original_size: int
+    converted_size: int
+    content_type: ContentType
+    severity: CompressionSeverity
+    message: str = ""
+    expected_range: CompressionRange | None = None
+
+    @property
+    def size_reduction_percent(self) -> float:
+        """Get size reduction as percentage.
+
+        Returns:
+            Size reduction percentage (0-100).
+        """
+        return self.compression_ratio * 100
+
+    @property
+    def file_grew(self) -> bool:
+        """Check if file size increased after conversion.
+
+        Returns:
+            True if converted file is larger than original.
+        """
+        return self.converted_size > self.original_size
+
+
+class CompressionValidator:
+    """Validate compression ratio is within expected range.
+
+    This class validates that the compression ratio of a converted video
+    falls within expected ranges for different content types. It helps
+    detect encoding issues such as:
+    - File grew significantly (encoding issue)
+    - Below expected compression (quality setting too high)
+    - Too aggressive compression (quality loss)
+
+    SDS Reference: SDS-P05-003
+    SRS Reference: SRS-503 (Compression Ratio Validation)
+
+    Expected Compression Ranges:
+        - Standard Video: 30% - 70%
+        - High Motion: 20% - 60%
+        - Low Motion: 40% - 80%
+
+    Warning Thresholds:
+        - < 20%: File grew significantly (encoding issue)
+        - < 30%: Below expected (quality setting too high?)
+        - > 80%: Too aggressive (quality loss?)
+
+    Example:
+        >>> validator = CompressionValidator()
+        >>> result = validator.validate(100_000_000, 40_000_000)
+        >>> if result.valid:
+        ...     print(f"Compression OK: {result.compression_ratio:.1%}")
+        >>> else:
+        ...     print(f"Warning: {result.message}")
+
+    Attributes:
+        ranges: Dictionary mapping content types to compression ranges.
+        critical_low: Threshold below which indicates serious encoding issue.
+        critical_high: Threshold above which indicates excessive compression.
+    """
+
+    # Default compression ranges per content type
+    DEFAULT_RANGES: dict[ContentType, CompressionRange] = {
+        ContentType.STANDARD: CompressionRange(0.30, 0.70, ContentType.STANDARD),
+        ContentType.HIGH_MOTION: CompressionRange(0.20, 0.60, ContentType.HIGH_MOTION),
+        ContentType.LOW_MOTION: CompressionRange(0.40, 0.80, ContentType.LOW_MOTION),
+    }
+
+    # Critical thresholds
+    DEFAULT_CRITICAL_LOW = 0.20  # Below 20% compression is suspicious
+    DEFAULT_CRITICAL_HIGH = 0.80  # Above 80% compression may lose quality
+
+    def __init__(
+        self,
+        *,
+        ranges: dict[ContentType, CompressionRange] | None = None,
+        critical_low: float = DEFAULT_CRITICAL_LOW,
+        critical_high: float = DEFAULT_CRITICAL_HIGH,
+    ) -> None:
+        """Initialize the compression validator.
+
+        Args:
+            ranges: Custom compression ranges per content type.
+                   Uses default ranges if not provided.
+            critical_low: Threshold below which is a critical issue (default: 0.20).
+            critical_high: Threshold above which is a critical issue (default: 0.80).
+        """
+        self.ranges = ranges if ranges is not None else self.DEFAULT_RANGES.copy()
+        self.critical_low = critical_low
+        self.critical_high = critical_high
+
+    def validate(
+        self,
+        original_size: int,
+        converted_size: int,
+        content_type: ContentType = ContentType.STANDARD,
+    ) -> CompressionValidationResult:
+        """Validate compression ratio is within expected range.
+
+        Calculates the compression ratio and checks if it falls within
+        the expected range for the given content type.
+
+        Args:
+            original_size: Original file size in bytes.
+            converted_size: Converted file size in bytes.
+            content_type: Type of video content (default: STANDARD).
+
+        Returns:
+            CompressionValidationResult containing validation details.
+
+        Raises:
+            ValueError: If original_size is not positive.
+        """
+        if original_size <= 0:
+            raise ValueError(f"original_size must be positive, got {original_size}")
+
+        if converted_size < 0:
+            raise ValueError(f"converted_size cannot be negative, got {converted_size}")
+
+        # Calculate compression ratio: 1 - (converted / original)
+        # A ratio of 0.5 means the file is 50% smaller
+        compression_ratio = 1 - (converted_size / original_size)
+
+        expected_range = self.ranges.get(content_type)
+
+        # Determine severity and validity
+        severity, valid, message = self._evaluate_ratio(
+            compression_ratio, expected_range, content_type
+        )
+
+        return CompressionValidationResult(
+            valid=valid,
+            compression_ratio=compression_ratio,
+            original_size=original_size,
+            converted_size=converted_size,
+            content_type=content_type,
+            severity=severity,
+            message=message,
+            expected_range=expected_range,
+        )
+
+    def _evaluate_ratio(
+        self,
+        ratio: float,
+        expected_range: CompressionRange | None,
+        content_type: ContentType,
+    ) -> tuple[CompressionSeverity, bool, str]:
+        """Evaluate compression ratio and determine severity.
+
+        Args:
+            ratio: Calculated compression ratio.
+            expected_range: Expected range for the content type.
+            content_type: Content type being validated.
+
+        Returns:
+            Tuple of (severity, valid, message).
+        """
+        # File grew (negative compression)
+        if ratio < 0:
+            return (
+                CompressionSeverity.ERROR,
+                False,
+                f"File grew by {abs(ratio):.1%} - possible encoding issue",
+            )
+
+        # Critical low compression
+        if ratio < self.critical_low:
+            return (
+                CompressionSeverity.ERROR,
+                False,
+                f"Very low compression ({ratio:.1%}) - file nearly same size or grew",
+            )
+
+        # Critical high compression
+        if ratio > self.critical_high:
+            return (
+                CompressionSeverity.WARNING,
+                True,  # Still valid but warn about quality loss
+                f"Very high compression ({ratio:.1%}) - possible quality loss",
+            )
+
+        # Check against expected range
+        if expected_range is not None:
+            if ratio < expected_range.min_ratio:
+                return (
+                    CompressionSeverity.WARNING,
+                    True,  # Still valid but warn
+                    f"Compression ({ratio:.1%}) below expected range "
+                    f"({expected_range.min_ratio:.0%}-{expected_range.max_ratio:.0%}) "
+                    f"for {content_type.value} content",
+                )
+            if ratio > expected_range.max_ratio:
+                return (
+                    CompressionSeverity.WARNING,
+                    True,  # Still valid but warn
+                    f"Compression ({ratio:.1%}) above expected range "
+                    f"({expected_range.min_ratio:.0%}-{expected_range.max_ratio:.0%}) "
+                    f"for {content_type.value} content",
+                )
+
+        # Within expected range
+        return (
+            CompressionSeverity.NORMAL,
+            True,
+            f"Compression ratio ({ratio:.1%}) is within expected range",
+        )
+
+    def get_expected_range(self, content_type: ContentType) -> CompressionRange | None:
+        """Get the expected compression range for a content type.
+
+        Args:
+            content_type: The content type to get the range for.
+
+        Returns:
+            CompressionRange for the content type, or None if not defined.
+        """
+        return self.ranges.get(content_type)
+
+    def set_range(self, content_type: ContentType, range_: CompressionRange) -> None:
+        """Set a custom compression range for a content type.
+
+        Args:
+            content_type: The content type to set the range for.
+            range_: The compression range to set.
+        """
+        self.ranges[content_type] = range_
