@@ -46,6 +46,7 @@ from video_converter.converters.base import (
 )
 from video_converter.converters.factory import ConverterFactory
 from video_converter.core.types import (
+    BatchStatus,
     CompleteCallback,
     ConversionMode,
     ConversionProgress,
@@ -55,6 +56,7 @@ from video_converter.core.types import (
     ConversionStage,
     ConversionStatus,
     ProgressCallback,
+    QueuePriority,
 )
 from video_converter.processors.quality_validator import (
     ValidationResult,
@@ -89,6 +91,7 @@ class OrchestratorConfig:
         delete_original: Whether to delete original after success.
         move_to_processed: Directory to move processed originals.
         move_to_failed: Directory to move failed files.
+        queue_priority: Priority ordering for batch queue.
     """
 
     mode: ConversionMode = ConversionMode.HARDWARE
@@ -103,6 +106,7 @@ class OrchestratorConfig:
     delete_original: bool = False
     move_to_processed: Path | None = None
     move_to_failed: Path | None = None
+    queue_priority: QueuePriority = QueuePriority.FIFO
 
 
 @dataclass
@@ -160,6 +164,10 @@ class Orchestrator:
 
         self._converter: BaseConverter | None = None
         self._cancelled = False
+        self._paused = False
+        self._pause_event = asyncio.Event()
+        self._pause_event.set()  # Not paused initially
+        self._batch_status = BatchStatus.IDLE
         self._current_session_id: str | None = None
         self._tasks: list[ConversionTask] = []
 
@@ -211,6 +219,34 @@ class Orchestrator:
             stem = f"{stem}{self.config.output_suffix}"
 
         return output_dir / f"{stem}.mp4"
+
+    def _sort_by_priority(self, paths: list[Path]) -> list[Path]:
+        """Sort input paths according to configured priority.
+
+        Args:
+            paths: List of input file paths.
+
+        Returns:
+            Sorted list of paths.
+        """
+        priority = self.config.queue_priority
+
+        if priority == QueuePriority.FIFO:
+            return paths
+
+        if priority == QueuePriority.DATE_OLDEST:
+            return sorted(paths, key=lambda p: p.stat().st_mtime)
+
+        if priority == QueuePriority.DATE_NEWEST:
+            return sorted(paths, key=lambda p: p.stat().st_mtime, reverse=True)
+
+        if priority == QueuePriority.SIZE_SMALLEST:
+            return sorted(paths, key=lambda p: p.stat().st_size)
+
+        if priority == QueuePriority.SIZE_LARGEST:
+            return sorted(paths, key=lambda p: p.stat().st_size, reverse=True)
+
+        return paths
 
     def _emit_progress(
         self,
@@ -433,6 +469,9 @@ class Orchestrator:
             ConversionReport with batch statistics.
         """
         self._cancelled = False
+        self._paused = False
+        self._pause_event.set()
+        self._batch_status = BatchStatus.RUNNING
         self._current_session_id = self._generate_session_id()
 
         report = ConversionReport(
@@ -443,21 +482,25 @@ class Orchestrator:
 
         if not input_paths:
             report.completed_at = datetime.now()
+            self._batch_status = BatchStatus.COMPLETED
             if on_complete:
                 on_complete(report)
             return report
+
+        # Sort input paths by priority
+        sorted_paths = self._sort_by_priority(list(input_paths))
 
         # Stage 1: Discovery - Build task queue
         self._emit_progress(
             on_progress,
             ConversionStage.DISCOVERY,
             ConversionStatus.IN_PROGRESS,
-            total_files=len(input_paths),
+            total_files=len(sorted_paths),
             message="Discovering videos...",
         )
 
         self._tasks = []
-        for input_path in input_paths:
+        for input_path in sorted_paths:
             output_path = self._create_output_path(input_path, output_dir)
 
             # Skip if output already exists
@@ -482,8 +525,12 @@ class Orchestrator:
         # Stage 2: Process queue
         total_tasks = len(self._tasks)
         for i, task in enumerate(self._tasks):
+            # Wait if paused
+            await self._pause_event.wait()
+
             if self._cancelled:
                 report.cancelled = True
+                self._batch_status = BatchStatus.CANCELLED
                 break
 
             task.status = ConversionStatus.IN_PROGRESS
@@ -525,6 +572,8 @@ class Orchestrator:
 
         # Complete
         report.completed_at = datetime.now()
+        if not self._cancelled:
+            self._batch_status = BatchStatus.COMPLETED
 
         self._emit_progress(
             on_progress,
@@ -586,9 +635,60 @@ class Orchestrator:
     def cancel(self) -> None:
         """Cancel the current conversion operation."""
         self._cancelled = True
+        self._batch_status = BatchStatus.CANCELLED
         if self._converter:
             self._converter.cancel()
+        # Also resume if paused, so the loop can exit
+        self._pause_event.set()
         logger.info("Conversion cancelled by user")
+
+    def pause(self) -> bool:
+        """Pause the batch conversion.
+
+        Pauses after the current file completes.
+
+        Returns:
+            True if paused, False if not running.
+        """
+        if self._batch_status != BatchStatus.RUNNING:
+            return False
+
+        self._paused = True
+        self._pause_event.clear()
+        self._batch_status = BatchStatus.PAUSED
+        logger.info("Batch conversion paused")
+        return True
+
+    def resume(self) -> bool:
+        """Resume a paused batch conversion.
+
+        Returns:
+            True if resumed, False if not paused.
+        """
+        if self._batch_status != BatchStatus.PAUSED:
+            return False
+
+        self._paused = False
+        self._pause_event.set()
+        self._batch_status = BatchStatus.RUNNING
+        logger.info("Batch conversion resumed")
+        return True
+
+    def get_batch_status(self) -> BatchStatus:
+        """Get current batch conversion status.
+
+        Returns:
+            Current BatchStatus.
+        """
+        return self._batch_status
+
+    def is_paused(self) -> bool:
+        """Check if batch conversion is paused.
+
+        Returns:
+            True if paused, False otherwise.
+        """
+        return self._batch_status == BatchStatus.PAUSED
 
     def get_pending_tasks(self) -> list[ConversionTask]:
         """Get list of pending tasks.

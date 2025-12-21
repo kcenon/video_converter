@@ -47,6 +47,24 @@ class ConversionMode(Enum):
     SOFTWARE = "software"
 
 
+class QueuePriority(Enum):
+    """Queue priority ordering for batch processing.
+
+    Attributes:
+        FIFO: First-in, first-out (default).
+        DATE_OLDEST: Oldest files first (by modification time).
+        DATE_NEWEST: Newest files first (by modification time).
+        SIZE_SMALLEST: Smallest files first.
+        SIZE_LARGEST: Largest files first.
+    """
+
+    FIFO = "fifo"
+    DATE_OLDEST = "date_oldest"
+    DATE_NEWEST = "date_newest"
+    SIZE_SMALLEST = "size_smallest"
+    SIZE_LARGEST = "size_largest"
+
+
 class ConversionStage(Enum):
     """Stages in the conversion pipeline.
 
@@ -86,6 +104,24 @@ class ConversionStatus(Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     SKIPPED = "skipped"
+    CANCELLED = "cancelled"
+
+
+class BatchStatus(Enum):
+    """Status of a batch conversion operation.
+
+    Attributes:
+        IDLE: No batch is running.
+        RUNNING: Batch is actively processing.
+        PAUSED: Batch is paused by user.
+        COMPLETED: Batch finished (success or with failures).
+        CANCELLED: Batch was cancelled.
+    """
+
+    IDLE = "idle"
+    RUNNING = "running"
+    PAUSED = "paused"
+    COMPLETED = "completed"
     CANCELLED = "cancelled"
 
 
