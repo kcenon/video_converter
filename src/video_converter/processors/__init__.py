@@ -6,6 +6,13 @@ codec detection, metadata management, and quality validation.
 SDS Reference: SDS-P01
 """
 
+from video_converter.processors.metadata import (
+    GPSCoordinates,
+    MetadataApplicationError,
+    MetadataExtractionError,
+    MetadataProcessor,
+    MetadataVerificationResult,
+)
 from video_converter.processors.quality_validator import (
     ComparisonSeverity,
     CompressionRange,
@@ -24,6 +31,13 @@ from video_converter.processors.quality_validator import (
 )
 
 __all__ = [
+    # Metadata processing
+    "GPSCoordinates",
+    "MetadataApplicationError",
+    "MetadataExtractionError",
+    "MetadataProcessor",
+    "MetadataVerificationResult",
+    # Quality validation
     "ComparisonSeverity",
     "CompressionRange",
     "CompressionSeverity",
