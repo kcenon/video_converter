@@ -61,10 +61,10 @@ docs = [
 video-converter = "video_converter.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/video_converter"
-Documentation = "https://github.com/yourusername/video_converter#readme"
-Repository = "https://github.com/yourusername/video_converter.git"
-Issues = "https://github.com/yourusername/video_converter/issues"
+Homepage = "https://github.com/kcenon/video_converter"
+Documentation = "https://github.com/kcenon/video_converter#readme"
+Repository = "https://github.com/kcenon/video_converter.git"
+Issues = "https://github.com/kcenon/video_converter/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

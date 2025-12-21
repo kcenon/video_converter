@@ -29,7 +29,7 @@ Automated video codec conversion solution for macOS that converts H.264 videos t
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/video_converter.git
+git clone https://github.com/kcenon/video_converter.git
 cd video_converter
 
 # Install dependencies
