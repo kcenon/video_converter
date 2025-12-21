@@ -26,6 +26,7 @@ from video_converter.core.logger import (
     set_log_level,
 )
 from video_converter.core.types import (
+    BatchStatus,
     CompleteCallback,
     ConversionMode,
     ConversionProgress,
@@ -35,6 +36,7 @@ from video_converter.core.types import (
     ConversionStage,
     ConversionStatus,
     ProgressCallback,
+    QueuePriority,
 )
 
 __all__ = [
@@ -54,6 +56,7 @@ __all__ = [
     "LogLevel",
     "set_log_level",
     # Types
+    "BatchStatus",
     "CompleteCallback",
     "ConversionMode",
     "ConversionProgress",
@@ -63,6 +66,7 @@ __all__ = [
     "ConversionStage",
     "ConversionStatus",
     "ProgressCallback",
+    "QueuePriority",
 ]
 
 

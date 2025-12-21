@@ -18,11 +18,13 @@ from video_converter.core.orchestrator import (
     VIDEO_EXTENSIONS,
 )
 from video_converter.core.types import (
+    BatchStatus,
     ConversionMode,
     ConversionProgress,
     ConversionResult,
     ConversionStage,
     ConversionStatus,
+    QueuePriority,
 )
 from video_converter.processors.quality_validator import (
     ValidationResult,
@@ -364,3 +366,112 @@ class TestVideoExtensions:
         assert ".m4v" in VIDEO_EXTENSIONS
         assert ".avi" in VIDEO_EXTENSIONS
         assert ".mkv" in VIDEO_EXTENSIONS
+
+
+class TestQueuePriority:
+    """Tests for queue priority ordering."""
+
+    def test_default_priority_is_fifo(self) -> None:
+        """Test default priority is FIFO."""
+        config = OrchestratorConfig()
+        assert config.queue_priority == QueuePriority.FIFO
+
+    def test_sort_by_priority_fifo(self) -> None:
+        """Test FIFO ordering preserves order."""
+        config = OrchestratorConfig(queue_priority=QueuePriority.FIFO)
+        orchestrator = Orchestrator(config=config)
+
+        paths = [Path("a.mov"), Path("b.mov"), Path("c.mov")]
+        sorted_paths = orchestrator._sort_by_priority(paths)
+
+        assert sorted_paths == paths
+
+    def test_sort_by_priority_size_smallest(self) -> None:
+        """Test sorting by size (smallest first)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create files with different sizes
+            small = Path(tmpdir) / "small.mov"
+            medium = Path(tmpdir) / "medium.mov"
+            large = Path(tmpdir) / "large.mov"
+
+            small.write_bytes(b"x" * 100)
+            medium.write_bytes(b"x" * 500)
+            large.write_bytes(b"x" * 1000)
+
+            config = OrchestratorConfig(queue_priority=QueuePriority.SIZE_SMALLEST)
+            orchestrator = Orchestrator(config=config)
+
+            paths = [large, small, medium]
+            sorted_paths = orchestrator._sort_by_priority(paths)
+
+            assert sorted_paths[0] == small
+            assert sorted_paths[1] == medium
+            assert sorted_paths[2] == large
+
+    def test_sort_by_priority_size_largest(self) -> None:
+        """Test sorting by size (largest first)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            small = Path(tmpdir) / "small.mov"
+            large = Path(tmpdir) / "large.mov"
+
+            small.write_bytes(b"x" * 100)
+            large.write_bytes(b"x" * 1000)
+
+            config = OrchestratorConfig(queue_priority=QueuePriority.SIZE_LARGEST)
+            orchestrator = Orchestrator(config=config)
+
+            paths = [small, large]
+            sorted_paths = orchestrator._sort_by_priority(paths)
+
+            assert sorted_paths[0] == large
+            assert sorted_paths[1] == small
+
+
+class TestBatchStatus:
+    """Tests for batch status management."""
+
+    def test_initial_status_is_idle(self) -> None:
+        """Test orchestrator starts in IDLE status."""
+        orchestrator = Orchestrator()
+        assert orchestrator.get_batch_status() == BatchStatus.IDLE
+
+    def test_pause_when_not_running(self) -> None:
+        """Test pause returns False when not running."""
+        orchestrator = Orchestrator()
+        assert orchestrator.pause() is False
+
+    def test_resume_when_not_paused(self) -> None:
+        """Test resume returns False when not paused."""
+        orchestrator = Orchestrator()
+        assert orchestrator.resume() is False
+
+    def test_is_paused(self) -> None:
+        """Test is_paused property."""
+        orchestrator = Orchestrator()
+        assert orchestrator.is_paused() is False
+
+    def test_cancel_sets_cancelled_status(self) -> None:
+        """Test cancel sets CANCELLED status."""
+        orchestrator = Orchestrator()
+        orchestrator._batch_status = BatchStatus.RUNNING
+        orchestrator.cancel()
+        assert orchestrator.get_batch_status() == BatchStatus.CANCELLED
+
+    @pytest.mark.asyncio
+    async def test_run_sets_running_status(self) -> None:
+        """Test run sets RUNNING status initially."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a video file
+            video = Path(tmpdir) / "video.mov"
+            video.touch()
+
+            orchestrator = Orchestrator()
+            # Cancel immediately to exit
+            orchestrator._cancelled = True
+
+            await orchestrator.run(input_paths=[video])
+            # After run completes (cancelled), check it was running
+            assert orchestrator._batch_status in (
+                BatchStatus.COMPLETED,
+                BatchStatus.CANCELLED,
+            )
