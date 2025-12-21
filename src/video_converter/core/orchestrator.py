@@ -40,11 +40,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from video_converter.converters import (
+from video_converter.converters.base import (
     BaseConverter,
-    ConverterFactory,
     EncoderNotAvailableError,
 )
+from video_converter.converters.factory import ConverterFactory
 from video_converter.core.types import (
     CompleteCallback,
     ConversionMode,
