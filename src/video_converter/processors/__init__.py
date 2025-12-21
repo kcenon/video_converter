@@ -7,6 +7,10 @@ SDS Reference: SDS-P01
 """
 
 from video_converter.processors.quality_validator import (
+    ComparisonSeverity,
+    PropertyComparer,
+    PropertyComparison,
+    PropertyComparisonResult,
     StreamInfo,
     ValidationResult,
     ValidationStrictness,
@@ -15,6 +19,10 @@ from video_converter.processors.quality_validator import (
 )
 
 __all__ = [
+    "ComparisonSeverity",
+    "PropertyComparer",
+    "PropertyComparison",
+    "PropertyComparisonResult",
     "StreamInfo",
     "ValidationResult",
     "ValidationStrictness",

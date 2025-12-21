@@ -407,3 +407,478 @@ class TestValidationStrictness:
         assert ValidationStrictness.QUICK.value == "quick"
         assert ValidationStrictness.STANDARD.value == "standard"
         assert ValidationStrictness.STRICT.value == "strict"
+
+
+# Import new classes for property comparison tests
+from video_converter.processors.quality_validator import (
+    ComparisonSeverity,
+    PropertyComparer,
+    PropertyComparison,
+    PropertyComparisonResult,
+)
+
+
+class TestComparisonSeverity:
+    """Tests for ComparisonSeverity enum."""
+
+    def test_severity_values(self) -> None:
+        """Test that severity enum has expected values."""
+        assert ComparisonSeverity.ERROR.value == "error"
+        assert ComparisonSeverity.WARNING.value == "warning"
+
+
+class TestPropertyComparison:
+    """Tests for PropertyComparison dataclass."""
+
+    def test_property_comparison_match(self) -> None:
+        """Test creating a matching property comparison."""
+        comparison = PropertyComparison(
+            property_name="resolution",
+            original_value="1920x1080",
+            converted_value="1920x1080",
+            matches=True,
+        )
+        assert comparison.matches is True
+        assert comparison.severity == ComparisonSeverity.WARNING  # default
+
+    def test_property_comparison_mismatch_error(self) -> None:
+        """Test creating a mismatched property comparison with ERROR severity."""
+        comparison = PropertyComparison(
+            property_name="resolution",
+            original_value="1920x1080",
+            converted_value="1280x720",
+            matches=False,
+            severity=ComparisonSeverity.ERROR,
+            message="Resolution mismatch: 1920x1080 → 1280x720",
+        )
+        assert comparison.matches is False
+        assert comparison.severity == ComparisonSeverity.ERROR
+        assert "1920x1080" in comparison.message
+
+    def test_property_comparison_with_tolerance(self) -> None:
+        """Test property comparison with tolerance value."""
+        comparison = PropertyComparison(
+            property_name="fps",
+            original_value=29.97,
+            converted_value=29.971,
+            matches=True,
+            tolerance=0.001,
+            severity=ComparisonSeverity.WARNING,
+        )
+        assert comparison.tolerance == 0.001
+        assert comparison.matches is True
+
+
+class TestPropertyComparisonResult:
+    """Tests for PropertyComparisonResult dataclass."""
+
+    def test_empty_result(self) -> None:
+        """Test default result is all_match True."""
+        result = PropertyComparisonResult()
+        assert result.all_match is True
+        assert result.comparisons == []
+        assert result.errors == []
+        assert result.warnings == []
+
+    def test_add_matching_comparison(self) -> None:
+        """Test adding a matching comparison."""
+        result = PropertyComparisonResult()
+        comparison = PropertyComparison(
+            property_name="resolution",
+            original_value="1920x1080",
+            converted_value="1920x1080",
+            matches=True,
+        )
+        result.add_comparison(comparison)
+
+        assert result.all_match is True
+        assert len(result.comparisons) == 1
+        assert result.errors == []
+        assert result.warnings == []
+
+    def test_add_error_comparison(self) -> None:
+        """Test adding a mismatched ERROR comparison."""
+        result = PropertyComparisonResult()
+        comparison = PropertyComparison(
+            property_name="resolution",
+            original_value="1920x1080",
+            converted_value="1280x720",
+            matches=False,
+            severity=ComparisonSeverity.ERROR,
+            message="Resolution mismatch",
+        )
+        result.add_comparison(comparison)
+
+        assert result.all_match is False
+        assert len(result.errors) == 1
+        assert "Resolution mismatch" in result.errors[0]
+
+    def test_add_warning_comparison(self) -> None:
+        """Test adding a mismatched WARNING comparison."""
+        result = PropertyComparisonResult()
+        comparison = PropertyComparison(
+            property_name="fps",
+            original_value=30.0,
+            converted_value=29.97,
+            matches=False,
+            severity=ComparisonSeverity.WARNING,
+            message="FPS mismatch",
+        )
+        result.add_comparison(comparison)
+
+        assert result.all_match is True  # warnings don't affect all_match
+        assert len(result.warnings) == 1
+        assert result.errors == []
+
+
+class TestPropertyComparer:
+    """Tests for PropertyComparer class."""
+
+    @pytest.fixture
+    def comparer(self) -> PropertyComparer:
+        """Create a PropertyComparer instance."""
+        return PropertyComparer()
+
+    @pytest.fixture
+    def matching_video_info(self) -> tuple[VideoInfo, VideoInfo]:
+        """Create matching VideoInfo pair."""
+        video_stream = StreamInfo(
+            index=0,
+            codec_type="video",
+            codec_name="h264",
+            width=1920,
+            height=1080,
+            fps=30.0,
+        )
+        audio_stream = StreamInfo(
+            index=1,
+            codec_type="audio",
+            codec_name="aac",
+            channels=2,
+        )
+
+        original = VideoInfo(
+            path=Path("original.mp4"),
+            format_name="mp4",
+            duration=120.0,
+            size=50_000_000,
+            bit_rate=3_333_333,
+            streams=[video_stream, audio_stream],
+        )
+
+        converted = VideoInfo(
+            path=Path("converted.mp4"),
+            format_name="mp4",
+            duration=120.0,
+            size=40_000_000,
+            bit_rate=2_666_666,
+            streams=[video_stream, audio_stream],
+        )
+
+        return original, converted
+
+    def test_init_default_tolerances(self) -> None:
+        """Test default tolerance values."""
+        comparer = PropertyComparer()
+        assert comparer.fps_tolerance == 0.001
+        assert comparer.duration_tolerance == 0.5
+
+    def test_init_custom_tolerances(self) -> None:
+        """Test custom tolerance values."""
+        comparer = PropertyComparer(fps_tolerance=0.01, duration_tolerance=1.0)
+        assert comparer.fps_tolerance == 0.01
+        assert comparer.duration_tolerance == 1.0
+
+    def test_compare_matching_videos(
+        self,
+        comparer: PropertyComparer,
+        matching_video_info: tuple[VideoInfo, VideoInfo],
+    ) -> None:
+        """Test comparing videos with matching properties."""
+        original, converted = matching_video_info
+        result = comparer.compare(original, converted)
+
+        assert result.all_match is True
+        assert result.errors == []
+        assert result.warnings == []
+        assert len(result.comparisons) == 6  # resolution, fps, duration, aspect, codec, channels
+
+    def test_compare_resolution_mismatch(self, comparer: PropertyComparer) -> None:
+        """Test resolution mismatch detection."""
+        orig_stream = StreamInfo(0, "video", "h264", width=1920, height=1080, fps=30.0)
+        conv_stream = StreamInfo(0, "video", "h264", width=1280, height=720, fps=30.0)
+
+        original = VideoInfo(
+            path=Path("original.mp4"),
+            format_name="mp4",
+            duration=60.0,
+            size=10_000_000,
+            bit_rate=None,
+            streams=[orig_stream],
+        )
+        converted = VideoInfo(
+            path=Path("converted.mp4"),
+            format_name="mp4",
+            duration=60.0,
+            size=5_000_000,
+            bit_rate=None,
+            streams=[conv_stream],
+        )
+
+        result = comparer.compare(original, converted)
+
+        assert result.all_match is False
+        assert any("resolution" in e.lower() for e in result.errors)
+        # Note: 1920x1080 and 1280x720 have the same aspect ratio (16:9)
+
+    def test_compare_fps_within_tolerance(self, comparer: PropertyComparer) -> None:
+        """Test FPS comparison within tolerance."""
+        orig_stream = StreamInfo(0, "video", "h264", width=1920, height=1080, fps=29.970)
+        conv_stream = StreamInfo(0, "video", "h264", width=1920, height=1080, fps=29.9705)
+
+        original = VideoInfo(
+            path=Path("original.mp4"),
+            format_name="mp4",
+            duration=60.0,
+            size=10_000_000,
+            bit_rate=None,
+            streams=[orig_stream],
+        )
+        converted = VideoInfo(
+            path=Path("converted.mp4"),
+            format_name="mp4",
+            duration=60.0,
+            size=8_000_000,
+            bit_rate=None,
+            streams=[conv_stream],
+        )
+
+        result = comparer.compare(original, converted)
+
+        fps_comparison = next(c for c in result.comparisons if c.property_name == "fps")
+        assert fps_comparison.matches is True
+
+    def test_compare_fps_outside_tolerance(self, comparer: PropertyComparer) -> None:
+        """Test FPS comparison outside tolerance."""
+        orig_stream = StreamInfo(0, "video", "h264", width=1920, height=1080, fps=30.0)
+        conv_stream = StreamInfo(0, "video", "h264", width=1920, height=1080, fps=29.97)
+
+        original = VideoInfo(
+            path=Path("original.mp4"),
+            format_name="mp4",
+            duration=60.0,
+            size=10_000_000,
+            bit_rate=None,
+            streams=[orig_stream],
+        )
+        converted = VideoInfo(
+            path=Path("converted.mp4"),
+            format_name="mp4",
+            duration=60.0,
+            size=8_000_000,
+            bit_rate=None,
+            streams=[conv_stream],
+        )
+
+        result = comparer.compare(original, converted)
+
+        fps_comparison = next(c for c in result.comparisons if c.property_name == "fps")
+        assert fps_comparison.matches is False
+        assert fps_comparison.severity == ComparisonSeverity.WARNING
+
+    def test_compare_duration_within_tolerance(self, comparer: PropertyComparer) -> None:
+        """Test duration comparison within tolerance."""
+        stream = StreamInfo(0, "video", "h264", width=1920, height=1080, fps=30.0)
+
+        original = VideoInfo(
+            path=Path("original.mp4"),
+            format_name="mp4",
+            duration=120.0,
+            size=10_000_000,
+            bit_rate=None,
+            streams=[stream],
+        )
+        converted = VideoInfo(
+            path=Path("converted.mp4"),
+            format_name="mp4",
+            duration=120.3,  # within 0.5s tolerance
+            size=8_000_000,
+            bit_rate=None,
+            streams=[stream],
+        )
+
+        result = comparer.compare(original, converted)
+
+        duration_comparison = next(c for c in result.comparisons if c.property_name == "duration")
+        assert duration_comparison.matches is True
+
+    def test_compare_duration_outside_tolerance(self, comparer: PropertyComparer) -> None:
+        """Test duration comparison outside tolerance."""
+        stream = StreamInfo(0, "video", "h264", width=1920, height=1080, fps=30.0)
+
+        original = VideoInfo(
+            path=Path("original.mp4"),
+            format_name="mp4",
+            duration=120.0,
+            size=10_000_000,
+            bit_rate=None,
+            streams=[stream],
+        )
+        converted = VideoInfo(
+            path=Path("converted.mp4"),
+            format_name="mp4",
+            duration=121.0,  # 1.0s difference, outside tolerance
+            size=8_000_000,
+            bit_rate=None,
+            streams=[stream],
+        )
+
+        result = comparer.compare(original, converted)
+
+        duration_comparison = next(c for c in result.comparisons if c.property_name == "duration")
+        assert duration_comparison.matches is False
+        assert duration_comparison.severity == ComparisonSeverity.WARNING
+
+    def test_compare_audio_codec_mismatch(self, comparer: PropertyComparer) -> None:
+        """Test audio codec mismatch detection."""
+        video_stream = StreamInfo(0, "video", "h264", width=1920, height=1080, fps=30.0)
+        orig_audio = StreamInfo(1, "audio", "aac", channels=2)
+        conv_audio = StreamInfo(1, "audio", "mp3", channels=2)
+
+        original = VideoInfo(
+            path=Path("original.mp4"),
+            format_name="mp4",
+            duration=60.0,
+            size=10_000_000,
+            bit_rate=None,
+            streams=[video_stream, orig_audio],
+        )
+        converted = VideoInfo(
+            path=Path("converted.mp4"),
+            format_name="mp4",
+            duration=60.0,
+            size=8_000_000,
+            bit_rate=None,
+            streams=[video_stream, conv_audio],
+        )
+
+        result = comparer.compare(original, converted)
+
+        codec_comparison = next(c for c in result.comparisons if c.property_name == "audio_codec")
+        assert codec_comparison.matches is False
+        assert codec_comparison.severity == ComparisonSeverity.WARNING
+
+    def test_compare_audio_channels_mismatch(self, comparer: PropertyComparer) -> None:
+        """Test audio channels mismatch detection."""
+        video_stream = StreamInfo(0, "video", "h264", width=1920, height=1080, fps=30.0)
+        orig_audio = StreamInfo(1, "audio", "aac", channels=6)  # 5.1 surround
+        conv_audio = StreamInfo(1, "audio", "aac", channels=2)  # stereo
+
+        original = VideoInfo(
+            path=Path("original.mp4"),
+            format_name="mp4",
+            duration=60.0,
+            size=10_000_000,
+            bit_rate=None,
+            streams=[video_stream, orig_audio],
+        )
+        converted = VideoInfo(
+            path=Path("converted.mp4"),
+            format_name="mp4",
+            duration=60.0,
+            size=8_000_000,
+            bit_rate=None,
+            streams=[video_stream, conv_audio],
+        )
+
+        result = comparer.compare(original, converted)
+
+        channels_comparison = next(c for c in result.comparisons if c.property_name == "audio_channels")
+        assert channels_comparison.matches is False
+        assert channels_comparison.severity == ComparisonSeverity.ERROR
+        assert result.all_match is False
+
+    def test_compare_no_audio_both(self, comparer: PropertyComparer) -> None:
+        """Test comparing videos without audio streams."""
+        video_stream = StreamInfo(0, "video", "h264", width=1920, height=1080, fps=30.0)
+
+        original = VideoInfo(
+            path=Path("original.mp4"),
+            format_name="mp4",
+            duration=60.0,
+            size=10_000_000,
+            bit_rate=None,
+            streams=[video_stream],
+        )
+        converted = VideoInfo(
+            path=Path("converted.mp4"),
+            format_name="mp4",
+            duration=60.0,
+            size=8_000_000,
+            bit_rate=None,
+            streams=[video_stream],
+        )
+
+        result = comparer.compare(original, converted)
+
+        audio_codec = next(c for c in result.comparisons if c.property_name == "audio_codec")
+        audio_channels = next(c for c in result.comparisons if c.property_name == "audio_channels")
+        assert audio_codec.matches is True
+        assert audio_channels.matches is True
+
+    def test_compare_missing_video_stream(self, comparer: PropertyComparer) -> None:
+        """Test comparing when one video has no video stream."""
+        video_stream = StreamInfo(0, "video", "h264", width=1920, height=1080, fps=30.0)
+
+        original = VideoInfo(
+            path=Path("original.mp4"),
+            format_name="mp4",
+            duration=60.0,
+            size=10_000_000,
+            bit_rate=None,
+            streams=[video_stream],
+        )
+        converted = VideoInfo(
+            path=Path("converted.mp4"),
+            format_name="mp4",
+            duration=60.0,
+            size=8_000_000,
+            bit_rate=None,
+            streams=[],  # no streams
+        )
+
+        result = comparer.compare(original, converted)
+
+        assert result.all_match is False
+        resolution_comparison = next(c for c in result.comparisons if c.property_name == "resolution")
+        assert resolution_comparison.matches is False
+
+    def test_compare_aspect_ratio_mismatch(self, comparer: PropertyComparer) -> None:
+        """Test aspect ratio mismatch detection (same resolution but different)."""
+        # 16:9
+        orig_stream = StreamInfo(0, "video", "h264", width=1920, height=1080, fps=30.0)
+        # 4:3
+        conv_stream = StreamInfo(0, "video", "h264", width=1440, height=1080, fps=30.0)
+
+        original = VideoInfo(
+            path=Path("original.mp4"),
+            format_name="mp4",
+            duration=60.0,
+            size=10_000_000,
+            bit_rate=None,
+            streams=[orig_stream],
+        )
+        converted = VideoInfo(
+            path=Path("converted.mp4"),
+            format_name="mp4",
+            duration=60.0,
+            size=8_000_000,
+            bit_rate=None,
+            streams=[conv_stream],
+        )
+
+        result = comparer.compare(original, converted)
+
+        aspect_comparison = next(c for c in result.comparisons if c.property_name == "aspect_ratio")
+        assert aspect_comparison.matches is False
+        assert aspect_comparison.severity == ComparisonSeverity.ERROR
