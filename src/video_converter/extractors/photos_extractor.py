@@ -17,6 +17,8 @@ Example:
 from __future__ import annotations
 
 import logging
+import shutil
+import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -24,6 +26,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import osxphotos
 
     from video_converter.processors.codec_detector import CodecDetector
@@ -70,6 +74,47 @@ class PhotosLibraryNotFoundError(PhotosLibraryError):
         else:
             message = "Default Photos library not found"
         super().__init__(message)
+
+
+class VideoNotAvailableError(PhotosLibraryError):
+    """Raised when video is not available locally (iCloud only).
+
+    This exception indicates that the video file exists only in iCloud
+    and must be downloaded first using the Photos app.
+    """
+
+    def __init__(self, filename: str) -> None:
+        """Initialize with video filename.
+
+        Args:
+            filename: Name of the unavailable video file.
+        """
+        message = (
+            f"'{filename}' is stored in iCloud only. "
+            "Download it first in Photos app before exporting."
+        )
+        super().__init__(message)
+
+
+class ExportError(PhotosLibraryError):
+    """Raised when video export fails.
+
+    This exception covers various export failures including file copy
+    errors, permission issues, and insufficient disk space.
+    """
+
+    def __init__(self, message: str, filename: str | None = None) -> None:
+        """Initialize with error message and optional filename.
+
+        Args:
+            message: Description of what failed.
+            filename: Name of the video file if applicable.
+        """
+        if filename:
+            full_message = f"Failed to export '{filename}': {message}"
+        else:
+            full_message = f"Export failed: {message}"
+        super().__init__(full_message)
 
 
 class MediaType(Enum):
@@ -800,3 +845,253 @@ class PhotosVideoFilter:
             f"{stats.hevc} HEVC, {stats.in_cloud} in cloud"
         )
         return stats
+
+
+class VideoExporter:
+    """Export videos from Photos library to temporary directory.
+
+    This class provides functionality to export original quality videos
+    from the Photos library to a temporary directory for conversion,
+    with support for progress tracking and cleanup.
+
+    SDS Reference: SDS-P01-006
+    SRS Reference: SRS-303 (Video Export)
+
+    Example:
+        >>> exporter = VideoExporter()
+        >>> video = library.get_video_by_uuid("some-uuid")
+        >>> if video and video.is_available_locally:
+        ...     exported_path = exporter.export(video)
+        ...     # ... do conversion ...
+        ...     exporter.cleanup(exported_path)
+        >>> exporter.cleanup_all()
+
+    Attributes:
+        temp_dir: Directory where exported files are stored.
+    """
+
+    # Buffer size for file copy operations (1 MB)
+    COPY_BUFFER_SIZE = 1024 * 1024
+
+    def __init__(self, temp_dir: Path | None = None) -> None:
+        """Initialize video exporter.
+
+        Args:
+            temp_dir: Custom temporary directory for exports.
+                If None, creates a system temporary directory.
+        """
+        if temp_dir is not None:
+            self._temp_dir = temp_dir
+            self._temp_dir.mkdir(parents=True, exist_ok=True)
+            self._owns_temp_dir = False
+        else:
+            self._temp_dir = Path(tempfile.mkdtemp(prefix="video_converter_"))
+            self._owns_temp_dir = True
+
+        self._exported_files: set[Path] = set()
+        logger.debug(f"VideoExporter initialized with temp_dir: {self._temp_dir}")
+
+    @property
+    def temp_dir(self) -> Path:
+        """Get the temporary directory path.
+
+        Returns:
+            Path to the temporary directory.
+        """
+        return self._temp_dir
+
+    def export(
+        self,
+        video: PhotosVideoInfo,
+        on_progress: Callable[[float], None] | None = None,
+    ) -> Path:
+        """Export video to temporary directory.
+
+        Copies the original video file to the temporary directory,
+        preserving file metadata (modification times).
+
+        Args:
+            video: Video information from Photos library.
+            on_progress: Optional callback for progress updates.
+                Called with progress value from 0.0 to 1.0.
+
+        Returns:
+            Path to the exported video file.
+
+        Raises:
+            VideoNotAvailableError: Video is in iCloud and not downloaded.
+            ExportError: Export failed due to file system error.
+        """
+        # Validate video availability
+        if video.in_cloud and not video.is_available_locally:
+            raise VideoNotAvailableError(video.filename)
+
+        if video.path is None:
+            raise ExportError("No path available", video.filename)
+
+        if not video.path.exists():
+            raise ExportError("Source file does not exist", video.filename)
+
+        # Generate unique output path to avoid collisions
+        output_path = self._temp_dir / f"{video.uuid}_{video.filename}"
+
+        logger.info(f"Exporting video: {video.filename}")
+        logger.debug(f"Source: {video.path}")
+        logger.debug(f"Destination: {output_path}")
+
+        try:
+            if on_progress is not None:
+                self._copy_with_progress(video.path, output_path, on_progress)
+            else:
+                # Use shutil.copy2 to preserve metadata
+                shutil.copy2(video.path, output_path)
+
+            self._exported_files.add(output_path)
+            logger.info(f"Exported: {video.filename} -> {output_path.name}")
+            return output_path
+
+        except PermissionError as e:
+            raise ExportError(f"Permission denied: {e}", video.filename) from e
+        except OSError as e:
+            # Clean up partial file if it exists
+            if output_path.exists():
+                try:
+                    output_path.unlink()
+                except OSError:
+                    pass
+            raise ExportError(str(e), video.filename) from e
+
+    def _copy_with_progress(
+        self,
+        src: Path,
+        dst: Path,
+        callback: Callable[[float], None],
+    ) -> None:
+        """Copy file with progress reporting.
+
+        Copies file in chunks and reports progress via callback.
+        Also preserves file metadata after copy.
+
+        Args:
+            src: Source file path.
+            dst: Destination file path.
+            callback: Progress callback (0.0 to 1.0).
+        """
+        total_size = src.stat().st_size
+        copied = 0
+
+        with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
+            while True:
+                chunk = fsrc.read(self.COPY_BUFFER_SIZE)
+                if not chunk:
+                    break
+                fdst.write(chunk)
+                copied += len(chunk)
+                callback(copied / total_size)
+
+        # Preserve file metadata (modification times)
+        shutil.copystat(src, dst)
+
+    def cleanup(self, path: Path) -> bool:
+        """Remove a single exported file.
+
+        Only removes files that are within the temporary directory
+        and were exported by this exporter.
+
+        Args:
+            path: Path to the exported file to remove.
+
+        Returns:
+            True if file was removed, False otherwise.
+        """
+        # Safety check: only remove files in our temp directory
+        try:
+            path.relative_to(self._temp_dir)
+        except ValueError:
+            logger.warning(f"Refusing to cleanup file outside temp_dir: {path}")
+            return False
+
+        if path.exists():
+            try:
+                path.unlink()
+                self._exported_files.discard(path)
+                logger.debug(f"Cleaned up: {path.name}")
+                return True
+            except OSError as e:
+                logger.warning(f"Failed to cleanup {path.name}: {e}")
+                return False
+        return False
+
+    def cleanup_all(self) -> int:
+        """Remove all exported files and the temporary directory.
+
+        Only removes the temporary directory if it was created by
+        this exporter (not a custom directory).
+
+        Returns:
+            Number of files removed.
+        """
+        removed_count = 0
+
+        # Remove tracked files
+        for path in list(self._exported_files):
+            if self.cleanup(path):
+                removed_count += 1
+
+        # Remove temp directory if we own it
+        if self._owns_temp_dir and self._temp_dir.exists():
+            try:
+                shutil.rmtree(self._temp_dir, ignore_errors=True)
+                logger.info(f"Removed temporary directory: {self._temp_dir}")
+            except OSError as e:
+                logger.warning(f"Failed to remove temp directory: {e}")
+
+        self._exported_files.clear()
+        return removed_count
+
+    def get_exported_count(self) -> int:
+        """Get the number of currently exported files.
+
+        Returns:
+            Number of files in the exported files set.
+        """
+        return len(self._exported_files)
+
+    def get_temp_dir_size(self) -> int:
+        """Get total size of files in the temporary directory.
+
+        Returns:
+            Total size in bytes.
+        """
+        total = 0
+        if self._temp_dir.exists():
+            for path in self._temp_dir.iterdir():
+                if path.is_file():
+                    try:
+                        total += path.stat().st_size
+                    except OSError:
+                        pass
+        return total
+
+    def __enter__(self) -> VideoExporter:
+        """Context manager entry.
+
+        Returns:
+            Self for context manager usage.
+        """
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: object | None,
+    ) -> None:
+        """Context manager exit - cleanup all exported files.
+
+        Args:
+            exc_type: Exception type if an exception occurred.
+            exc_val: Exception value if an exception occurred.
+            exc_tb: Exception traceback if an exception occurred.
+        """
+        self.cleanup_all()

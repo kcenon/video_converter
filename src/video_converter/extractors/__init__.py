@@ -5,6 +5,7 @@ primarily the macOS Photos library.
 """
 
 from video_converter.extractors.photos_extractor import (
+    ExportError,
     LibraryStats,
     MediaType,
     PhotosAccessDeniedError,
@@ -13,10 +14,13 @@ from video_converter.extractors.photos_extractor import (
     PhotosLibraryNotFoundError,
     PhotosVideoFilter,
     PhotosVideoInfo,
+    VideoExporter,
+    VideoNotAvailableError,
     get_permission_instructions,
 )
 
 __all__ = [
+    "ExportError",
     "LibraryStats",
     "MediaType",
     "PhotosAccessDeniedError",
@@ -25,5 +29,7 @@ __all__ = [
     "PhotosLibraryNotFoundError",
     "PhotosVideoFilter",
     "PhotosVideoInfo",
+    "VideoExporter",
+    "VideoNotAvailableError",
     "get_permission_instructions",
 ]
