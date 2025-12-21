@@ -424,6 +424,80 @@ class MetadataManager:
         pass
 ```
 
+#### SDS-P01-004: GPS Handler Design
+
+| Item | Content |
+|------|---------|
+| **SDS ID** | SDS-P01-004 |
+| **Module** | GPSHandler |
+| **File** | `src/video_converter/processors/gps.py` |
+| **SRS Trace** | SRS-402 (GPS Preservation) |
+| **Responsibility** | GPS coordinate extraction, application, format conversion, and verification |
+
+**GPS Coordinate Formats**:
+
+| Format | Example | Container |
+|--------|---------|-----------|
+| QuickTime (ISO 6709) | `+37.774900-122.419400/` | QuickTime, Keys |
+| XMP | `37.774900 N`, `122.419400 W` | XMP metadata |
+| EXIF DMS | `37 deg 46' 30.00"` | EXIF |
+| Decimal | `37.7749`, `-122.4194` | Composite |
+
+**Design**:
+
+```python
+@dataclass
+class GPSCoordinates:
+    """GPS coordinate with format conversion support."""
+    latitude: float       # -90 to 90
+    longitude: float      # -180 to 180
+    altitude: float | None = None
+    accuracy: float | None = None
+    source_format: GPSFormat = GPSFormat.DECIMAL
+
+    PRECISION = 6         # ~0.1m accuracy
+    TOLERANCE = 0.000001  # Verification tolerance
+
+    def to_quicktime(self) -> str:
+        """Convert to ISO 6709 format: +37.774900-122.419400/"""
+        pass
+
+    def to_xmp(self) -> tuple[str, str]:
+        """Convert to XMP format: ('37.774900 N', '122.419400 W')"""
+        pass
+
+    def to_exif_dms(self) -> tuple[str, str, str, str]:
+        """Convert to EXIF DMS format."""
+        pass
+
+    def matches(self, other: GPSCoordinates, tolerance: float | None = None) -> bool:
+        """Compare coordinates within tolerance."""
+        pass
+
+    def distance_to(self, other: GPSCoordinates) -> float:
+        """Calculate distance in meters using Haversine formula."""
+        pass
+
+class GPSHandler:
+    """Handle GPS coordinate preservation during video conversion."""
+
+    def extract(self, path: Path) -> GPSCoordinates | None:
+        """Extract GPS from video, checking all format locations."""
+        pass
+
+    def apply(self, path: Path, coords: GPSCoordinates) -> bool:
+        """Apply GPS coordinates in multiple formats."""
+        pass
+
+    def copy(self, source: Path, dest: Path) -> bool:
+        """Copy GPS data from source to destination."""
+        pass
+
+    def verify(self, original: Path, converted: Path) -> GPSVerificationResult:
+        """Verify GPS was preserved within tolerance."""
+        pass
+```
+
 ---
 
 ## 4. Class Detailed Design
@@ -684,6 +758,7 @@ class RetryPolicy:
 | SRS-202 | SW Conversion | SDS-V01-003 | SoftwareConverter | Mapped |
 | SRS-301 | Photos Scan | SDS-E01-002 | PhotosExtractor | Mapped |
 | SRS-401 | Metadata Extraction | SDS-P01-002 | MetadataManager | Mapped |
+| SRS-402 | GPS Preservation | SDS-P01-004 | GPSHandler | Mapped |
 | SRS-501 | Quality Validation | SDS-P01-003 | QualityValidator | Mapped |
 | SRS-601 | Schedule Execution | SDS-A01-001 | LaunchdManager | Mapped |
 | SRS-701 | CLI Structure | SDS-I01-001 | CLI | Mapped |
@@ -700,6 +775,7 @@ class RetryPolicy:
 | SDS-P01-001 | codec_detector.py | CodecDetector |
 | SDS-P01-002 | metadata_manager.py | MetadataManager |
 | SDS-P01-003 | quality_validator.py | QualityValidator |
+| SDS-P01-004 | gps.py | GPSHandler |
 | SDS-A01-001 | launchd_manager.py | LaunchdManager |
 
 ---
