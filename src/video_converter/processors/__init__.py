@@ -8,6 +8,11 @@ SDS Reference: SDS-P01
 
 from video_converter.processors.quality_validator import (
     ComparisonSeverity,
+    CompressionRange,
+    CompressionSeverity,
+    CompressionValidationResult,
+    CompressionValidator,
+    ContentType,
     PropertyComparer,
     PropertyComparison,
     PropertyComparisonResult,
@@ -20,6 +25,11 @@ from video_converter.processors.quality_validator import (
 
 __all__ = [
     "ComparisonSeverity",
+    "CompressionRange",
+    "CompressionSeverity",
+    "CompressionValidationResult",
+    "CompressionValidator",
+    "ContentType",
     "PropertyComparer",
     "PropertyComparison",
     "PropertyComparisonResult",
