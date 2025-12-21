@@ -349,36 +349,74 @@ class HardwareConverter(BaseConverter):
 | **File** | `src/video_converter/processors/codec_detector.py` |
 | **SRS Trace** | SRS-101 |
 | **Responsibility** | Video codec detection and classification |
+| **Status** | ✅ Implemented |
 
 **Detection Algorithm**:
 
 ```python
 class CodecDetector:
     """
-    Video codec detector using FFprobe
+    Video codec detector using FFprobe.
 
-    Codec Mapping:
-    - h264, avc, avc1 → H.264
-    - hevc, h265, hvc1, hev1 → HEVC
+    Uses FFprobeRunner to analyze video files and extract:
+    - Video codec (h264, hevc, vp9, etc.)
+    - Resolution and frame rate
+    - Duration and bitrate
+    - Audio codec and container format
+    - Creation timestamp
     """
 
-    CODEC_MAPPING = {
-        "h264": "h264", "avc": "h264", "avc1": "h264",
-        "hevc": "hevc", "h265": "hevc", "hvc1": "hevc", "hev1": "hevc"
-    }
-
-    async def detect(self, video_path: Path) -> CodecInfo:
+    def analyze(self, path: Path) -> CodecInfo:
         """
-        Detect video codec
+        Analyze video file and return codec information.
 
         FFprobe Command:
-        ffprobe -v error -select_streams v:0
-                -show_entries stream=codec_name
-                -of default=noprint_wrappers=1:nokey=1
-                <path>
+        ffprobe -v error -print_format json
+                -show_format -show_streams <path>
+
+        Returns:
+            CodecInfo with is_h264, is_hevc, needs_conversion properties
         """
-        pass
+
+@dataclass
+class CodecInfo:
+    """Video codec and property information."""
+    path: Path
+    codec: str           # "h264", "hevc", "vp9", etc.
+    width: int           # Video width in pixels
+    height: int          # Video height in pixels
+    fps: float           # Frames per second
+    duration: float      # Duration in seconds
+    bitrate: int         # Bitrate in bits/second
+    size: int            # File size in bytes
+    audio_codec: str     # "aac", "opus", etc.
+    container: str       # "mp4", "mov", "mkv"
+    creation_time: datetime | None
+
+    H264_CODECS = frozenset({"h264", "avc", "avc1", "x264"})
+    HEVC_CODECS = frozenset({"hevc", "h265", "hvc1", "hev1", "x265"})
+
+    @property
+    def is_h264(self) -> bool: ...
+
+    @property
+    def is_hevc(self) -> bool: ...
+
+    @property
+    def needs_conversion(self) -> bool: ...
+
+    @property
+    def resolution_label(self) -> str:
+        """Returns "4K", "1080p", "720p", etc."""
 ```
+
+**Error Classes**:
+
+| Exception | Description |
+|-----------|-------------|
+| `InvalidVideoError` | File is not a valid video |
+| `CorruptedVideoError` | Video file is corrupted/incomplete |
+| `UnsupportedCodecError` | Unknown or unsupported codec |
 
 #### SDS-P01-002: Metadata Manager Design
 

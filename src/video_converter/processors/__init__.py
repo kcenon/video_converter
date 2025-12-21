@@ -6,6 +6,13 @@ codec detection, metadata management, GPS handling, and quality validation.
 SDS Reference: SDS-P01
 """
 
+from video_converter.processors.codec_detector import (
+    CodecDetector,
+    CodecInfo,
+    CorruptedVideoError,
+    InvalidVideoError,
+    UnsupportedCodecError,
+)
 from video_converter.processors.gps import (
     GPSCoordinates,
     GPSFormat,
@@ -36,6 +43,12 @@ from video_converter.processors.quality_validator import (
 )
 
 __all__ = [
+    # Codec detection
+    "CodecDetector",
+    "CodecInfo",
+    "CorruptedVideoError",
+    "InvalidVideoError",
+    "UnsupportedCodecError",
     # GPS handling
     "GPSCoordinates",
     "GPSFormat",
