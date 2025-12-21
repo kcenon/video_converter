@@ -641,3 +641,441 @@ class VideoValidator:
         # Check for multiple video streams (unusual, might indicate issues)
         if len(video_info.video_streams) > 1:
             result.add_warning(f"Multiple video streams detected: {len(video_info.video_streams)}")
+
+
+class ComparisonSeverity(Enum):
+    """Severity level for property mismatch.
+
+    Attributes:
+        ERROR: Mismatch indicates a critical problem.
+        WARNING: Mismatch is notable but not critical.
+    """
+
+    ERROR = "error"
+    WARNING = "warning"
+
+
+@dataclass
+class PropertyComparison:
+    """Result of comparing a single video property.
+
+    SDS Reference: SDS-P05-002
+    SRS Reference: SRS-502 (Video Property Comparison)
+
+    Attributes:
+        property_name: Name of the property being compared.
+        original_value: Value from the original file.
+        converted_value: Value from the converted file.
+        matches: Whether the values match within tolerance.
+        tolerance: Tolerance used for comparison (if applicable).
+        severity: Severity level if mismatch occurs.
+        message: Human-readable description of the comparison result.
+    """
+
+    property_name: str
+    original_value: Any
+    converted_value: Any
+    matches: bool
+    tolerance: float | None = None
+    severity: ComparisonSeverity = ComparisonSeverity.WARNING
+    message: str = ""
+
+
+@dataclass
+class PropertyComparisonResult:
+    """Result of comparing all video properties.
+
+    SDS Reference: SDS-P05-002
+
+    Attributes:
+        all_match: True if all critical properties match.
+        comparisons: List of individual property comparisons.
+        errors: List of error messages (critical mismatches).
+        warnings: List of warning messages (non-critical mismatches).
+    """
+
+    all_match: bool = True
+    comparisons: list[PropertyComparison] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+    def add_comparison(self, comparison: PropertyComparison) -> None:
+        """Add a property comparison result.
+
+        Args:
+            comparison: The comparison result to add.
+        """
+        self.comparisons.append(comparison)
+
+        if not comparison.matches:
+            if comparison.severity == ComparisonSeverity.ERROR:
+                self.all_match = False
+                self.errors.append(comparison.message or f"{comparison.property_name} mismatch")
+            else:
+                self.warnings.append(comparison.message or f"{comparison.property_name} mismatch")
+
+
+class PropertyComparer:
+    """Compare video properties between original and converted files.
+
+    This class provides comparison of video properties to ensure that
+    the conversion process did not alter critical parameters.
+
+    SDS Reference: SDS-P05-002
+    SRS Reference: SRS-502 (Video Property Comparison)
+
+    Tolerance Settings:
+        - Resolution: Exact match required (Error on mismatch)
+        - Frame Rate: ±0.001 fps tolerance (Warning on mismatch)
+        - Duration: ±0.5 second tolerance (Warning on mismatch)
+        - Aspect Ratio: Exact match required (Error on mismatch)
+        - Audio Codec: Exact match required (Warning on mismatch)
+        - Audio Channels: Exact match required (Error on mismatch)
+
+    Example:
+        >>> comparer = PropertyComparer()
+        >>> result = comparer.compare(original_info, converted_info)
+        >>> if result.all_match:
+        ...     print("All properties match!")
+        >>> else:
+        ...     print(f"Errors: {result.errors}")
+        ...     print(f"Warnings: {result.warnings}")
+    """
+
+    # Default tolerance values
+    FPS_TOLERANCE = 0.001
+    DURATION_TOLERANCE = 0.5
+
+    def __init__(
+        self,
+        *,
+        fps_tolerance: float = FPS_TOLERANCE,
+        duration_tolerance: float = DURATION_TOLERANCE,
+    ) -> None:
+        """Initialize the property comparer.
+
+        Args:
+            fps_tolerance: Tolerance for frame rate comparison (default: ±0.001 fps).
+            duration_tolerance: Tolerance for duration comparison (default: ±0.5 seconds).
+        """
+        self.fps_tolerance = fps_tolerance
+        self.duration_tolerance = duration_tolerance
+
+    def compare(
+        self,
+        original: VideoInfo,
+        converted: VideoInfo,
+    ) -> PropertyComparisonResult:
+        """Compare all properties between original and converted video.
+
+        Args:
+            original: VideoInfo from the original file.
+            converted: VideoInfo from the converted file.
+
+        Returns:
+            PropertyComparisonResult containing all comparison details.
+        """
+        result = PropertyComparisonResult()
+
+        # Compare resolution
+        result.add_comparison(self._compare_resolution(original, converted))
+
+        # Compare frame rate
+        result.add_comparison(self._compare_fps(original, converted))
+
+        # Compare duration
+        result.add_comparison(self._compare_duration(original, converted))
+
+        # Compare aspect ratio
+        result.add_comparison(self._compare_aspect_ratio(original, converted))
+
+        # Compare audio codec
+        result.add_comparison(self._compare_audio_codec(original, converted))
+
+        # Compare audio channels
+        result.add_comparison(self._compare_audio_channels(original, converted))
+
+        return result
+
+    def _compare_resolution(
+        self,
+        original: VideoInfo,
+        converted: VideoInfo,
+    ) -> PropertyComparison:
+        """Compare video resolution.
+
+        Args:
+            original: Original video info.
+            converted: Converted video info.
+
+        Returns:
+            PropertyComparison for resolution.
+        """
+        orig_video = original.primary_video_stream
+        conv_video = converted.primary_video_stream
+
+        if orig_video is None or conv_video is None:
+            return PropertyComparison(
+                property_name="resolution",
+                original_value=None,
+                converted_value=None,
+                matches=False,
+                severity=ComparisonSeverity.ERROR,
+                message="Cannot compare resolution: missing video stream",
+            )
+
+        orig_res = (orig_video.width, orig_video.height)
+        conv_res = (conv_video.width, conv_video.height)
+        matches = orig_res == conv_res
+
+        return PropertyComparison(
+            property_name="resolution",
+            original_value=f"{orig_res[0]}x{orig_res[1]}",
+            converted_value=f"{conv_res[0]}x{conv_res[1]}",
+            matches=matches,
+            severity=ComparisonSeverity.ERROR,
+            message="" if matches else f"Resolution mismatch: {orig_res[0]}x{orig_res[1]} → {conv_res[0]}x{conv_res[1]}",
+        )
+
+    def _compare_fps(
+        self,
+        original: VideoInfo,
+        converted: VideoInfo,
+    ) -> PropertyComparison:
+        """Compare video frame rate.
+
+        Args:
+            original: Original video info.
+            converted: Converted video info.
+
+        Returns:
+            PropertyComparison for frame rate.
+        """
+        orig_video = original.primary_video_stream
+        conv_video = converted.primary_video_stream
+
+        if orig_video is None or conv_video is None:
+            return PropertyComparison(
+                property_name="fps",
+                original_value=None,
+                converted_value=None,
+                matches=False,
+                tolerance=self.fps_tolerance,
+                severity=ComparisonSeverity.WARNING,
+                message="Cannot compare FPS: missing video stream",
+            )
+
+        orig_fps = orig_video.fps
+        conv_fps = conv_video.fps
+
+        if orig_fps is None or conv_fps is None:
+            return PropertyComparison(
+                property_name="fps",
+                original_value=orig_fps,
+                converted_value=conv_fps,
+                matches=False,
+                tolerance=self.fps_tolerance,
+                severity=ComparisonSeverity.WARNING,
+                message="Cannot compare FPS: unknown frame rate",
+            )
+
+        diff = abs(orig_fps - conv_fps)
+        matches = diff <= self.fps_tolerance
+
+        return PropertyComparison(
+            property_name="fps",
+            original_value=orig_fps,
+            converted_value=conv_fps,
+            matches=matches,
+            tolerance=self.fps_tolerance,
+            severity=ComparisonSeverity.WARNING,
+            message="" if matches else f"FPS mismatch: {orig_fps:.3f} → {conv_fps:.3f} (diff: {diff:.4f})",
+        )
+
+    def _compare_duration(
+        self,
+        original: VideoInfo,
+        converted: VideoInfo,
+    ) -> PropertyComparison:
+        """Compare video duration.
+
+        Args:
+            original: Original video info.
+            converted: Converted video info.
+
+        Returns:
+            PropertyComparison for duration.
+        """
+        orig_duration = original.duration
+        conv_duration = converted.duration
+
+        diff = abs(orig_duration - conv_duration)
+        matches = diff <= self.duration_tolerance
+
+        return PropertyComparison(
+            property_name="duration",
+            original_value=orig_duration,
+            converted_value=conv_duration,
+            matches=matches,
+            tolerance=self.duration_tolerance,
+            severity=ComparisonSeverity.WARNING,
+            message="" if matches else f"Duration mismatch: {orig_duration:.2f}s → {conv_duration:.2f}s (diff: {diff:.2f}s)",
+        )
+
+    def _compare_aspect_ratio(
+        self,
+        original: VideoInfo,
+        converted: VideoInfo,
+    ) -> PropertyComparison:
+        """Compare video aspect ratio.
+
+        Args:
+            original: Original video info.
+            converted: Converted video info.
+
+        Returns:
+            PropertyComparison for aspect ratio.
+        """
+        orig_video = original.primary_video_stream
+        conv_video = converted.primary_video_stream
+
+        if orig_video is None or conv_video is None:
+            return PropertyComparison(
+                property_name="aspect_ratio",
+                original_value=None,
+                converted_value=None,
+                matches=False,
+                severity=ComparisonSeverity.ERROR,
+                message="Cannot compare aspect ratio: missing video stream",
+            )
+
+        if not orig_video.width or not orig_video.height:
+            orig_ratio = None
+        else:
+            orig_ratio = round(orig_video.width / orig_video.height, 4)
+
+        if not conv_video.width or not conv_video.height:
+            conv_ratio = None
+        else:
+            conv_ratio = round(conv_video.width / conv_video.height, 4)
+
+        if orig_ratio is None or conv_ratio is None:
+            return PropertyComparison(
+                property_name="aspect_ratio",
+                original_value=orig_ratio,
+                converted_value=conv_ratio,
+                matches=False,
+                severity=ComparisonSeverity.ERROR,
+                message="Cannot compare aspect ratio: invalid dimensions",
+            )
+
+        matches = orig_ratio == conv_ratio
+
+        return PropertyComparison(
+            property_name="aspect_ratio",
+            original_value=orig_ratio,
+            converted_value=conv_ratio,
+            matches=matches,
+            severity=ComparisonSeverity.ERROR,
+            message="" if matches else f"Aspect ratio mismatch: {orig_ratio:.4f} → {conv_ratio:.4f}",
+        )
+
+    def _compare_audio_codec(
+        self,
+        original: VideoInfo,
+        converted: VideoInfo,
+    ) -> PropertyComparison:
+        """Compare audio codec.
+
+        Args:
+            original: Original video info.
+            converted: Converted video info.
+
+        Returns:
+            PropertyComparison for audio codec.
+        """
+        orig_audio = original.primary_audio_stream
+        conv_audio = converted.primary_audio_stream
+
+        if orig_audio is None and conv_audio is None:
+            return PropertyComparison(
+                property_name="audio_codec",
+                original_value=None,
+                converted_value=None,
+                matches=True,
+                severity=ComparisonSeverity.WARNING,
+                message="",
+            )
+
+        if orig_audio is None or conv_audio is None:
+            return PropertyComparison(
+                property_name="audio_codec",
+                original_value=orig_audio.codec_name if orig_audio else None,
+                converted_value=conv_audio.codec_name if conv_audio else None,
+                matches=False,
+                severity=ComparisonSeverity.WARNING,
+                message="Audio stream presence mismatch",
+            )
+
+        orig_codec = orig_audio.codec_name
+        conv_codec = conv_audio.codec_name
+        matches = orig_codec == conv_codec
+
+        return PropertyComparison(
+            property_name="audio_codec",
+            original_value=orig_codec,
+            converted_value=conv_codec,
+            matches=matches,
+            severity=ComparisonSeverity.WARNING,
+            message="" if matches else f"Audio codec mismatch: {orig_codec} → {conv_codec}",
+        )
+
+    def _compare_audio_channels(
+        self,
+        original: VideoInfo,
+        converted: VideoInfo,
+    ) -> PropertyComparison:
+        """Compare audio channels.
+
+        Args:
+            original: Original video info.
+            converted: Converted video info.
+
+        Returns:
+            PropertyComparison for audio channels.
+        """
+        orig_audio = original.primary_audio_stream
+        conv_audio = converted.primary_audio_stream
+
+        if orig_audio is None and conv_audio is None:
+            return PropertyComparison(
+                property_name="audio_channels",
+                original_value=None,
+                converted_value=None,
+                matches=True,
+                severity=ComparisonSeverity.ERROR,
+                message="",
+            )
+
+        if orig_audio is None or conv_audio is None:
+            return PropertyComparison(
+                property_name="audio_channels",
+                original_value=orig_audio.channels if orig_audio else None,
+                converted_value=conv_audio.channels if conv_audio else None,
+                matches=False,
+                severity=ComparisonSeverity.ERROR,
+                message="Audio stream presence mismatch",
+            )
+
+        orig_channels = orig_audio.channels
+        conv_channels = conv_audio.channels
+        matches = orig_channels == conv_channels
+
+        return PropertyComparison(
+            property_name="audio_channels",
+            original_value=orig_channels,
+            converted_value=conv_channels,
+            matches=matches,
+            severity=ComparisonSeverity.ERROR,
+            message="" if matches else f"Audio channels mismatch: {orig_channels} → {conv_channels}",
+        )
