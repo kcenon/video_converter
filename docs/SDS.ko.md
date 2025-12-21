@@ -1005,6 +1005,201 @@ def calculate_vmaf(
     """
 ```
 
+#### SDS-P01-004: GPS 핸들러 설계
+
+| 항목 | 내용 |
+|------|------|
+| **SDS ID** | SDS-P01-004 |
+| **모듈명** | GPSHandler |
+| **파일** | `src/video_converter/processors/gps.py` |
+| **SRS 추적** | SRS-402 (GPS 좌표 보존) |
+| **책임** | GPS 좌표 추출, 적용, 형식 변환 및 검증 |
+
+**GPS 좌표 형식**:
+
+| 형식 | 예시 | 컨테이너 |
+|------|------|----------|
+| QuickTime (ISO 6709) | `+37.774900-122.419400/` | QuickTime, Keys |
+| XMP | `37.774900 N`, `122.419400 W` | XMP 메타데이터 |
+| EXIF DMS | `37 deg 46' 30.00"` | EXIF |
+| 십진수 | `37.7749`, `-122.4194` | Composite |
+
+**설계**:
+
+```python
+@dataclass
+class GPSCoordinates:
+    """형식 변환을 지원하는 GPS 좌표."""
+    latitude: float       # -90 ~ 90
+    longitude: float      # -180 ~ 180
+    altitude: float | None = None
+    accuracy: float | None = None
+    source_format: GPSFormat = GPSFormat.DECIMAL
+
+    PRECISION = 6         # ~0.1m 정확도
+    TOLERANCE = 0.000001  # 검증 허용 오차
+
+    def to_quicktime(self) -> str:
+        """ISO 6709 형식으로 변환: +37.774900-122.419400/"""
+        pass
+
+    def to_xmp(self) -> tuple[str, str]:
+        """XMP 형식으로 변환: ('37.774900 N', '122.419400 W')"""
+        pass
+
+    def to_exif_dms(self) -> tuple[str, str, str, str]:
+        """EXIF DMS 형식으로 변환."""
+        pass
+
+    def matches(self, other: GPSCoordinates, tolerance: float | None = None) -> bool:
+        """허용 오차 내에서 좌표 비교."""
+        pass
+
+    def distance_to(self, other: GPSCoordinates) -> float:
+        """Haversine 공식을 사용하여 거리(미터) 계산."""
+        pass
+
+class GPSHandler:
+    """비디오 변환 중 GPS 좌표 보존 처리."""
+
+    def extract(self, path: Path) -> GPSCoordinates | None:
+        """모든 형식 위치에서 GPS 추출."""
+        pass
+
+    def apply(self, path: Path, coords: GPSCoordinates) -> bool:
+        """여러 형식으로 GPS 좌표 적용."""
+        pass
+
+    def copy(self, source: Path, dest: Path) -> bool:
+        """원본에서 대상으로 GPS 데이터 복사."""
+        pass
+
+    def verify(self, original: Path, converted: Path) -> GPSVerificationResult:
+        """허용 오차 내에서 GPS 보존 검증."""
+        pass
+```
+
+#### SDS-P01-005: Photos 비디오 필터 설계
+
+| 항목 | 내용 |
+|------|------|
+| **SDS ID** | SDS-P01-005 |
+| **모듈명** | PhotosVideoFilter |
+| **파일** | `src/video_converter/extractors/photos_extractor.py` |
+| **SRS 추적** | SRS-302 (비디오 필터링) |
+| **책임** | H.264 변환 후보 비디오를 Photos 라이브러리에서 필터링 |
+
+**필터 기준**:
+
+| 기준 | 포함 | 제외 |
+|------|------|------|
+| 코덱 | H.264, AVC, AVC1, x264 | HEVC, H.265, hvc1, hev1, x265, VP9, AV1 |
+| 앨범 | 사용자 지정 | Screenshots, Bursts, Slo-mo (기본값) |
+| 가용성 | 로컬 파일만 | iCloud 전용 파일 |
+| 유효성 | 유효한 비디오 파일 | 손상되거나 유효하지 않은 파일 |
+
+**설계**:
+
+```python
+@dataclass
+class LibraryStats:
+    """Photos 라이브러리의 비디오 통계."""
+    total: int = 0
+    h264: int = 0
+    hevc: int = 0
+    other: int = 0
+    in_cloud: int = 0
+    total_size_h264: int = 0
+
+    @property
+    def estimated_savings(self) -> int:
+        """H.265 변환으로 약 50% 절감 추정."""
+        return int(self.total_size_h264 * 0.5)
+
+class PhotosVideoFilter:
+    """변환 후보 비디오를 Photos 라이브러리에서 필터링."""
+
+    DEFAULT_EXCLUDE_ALBUMS = {"Screenshots", "Bursts", "Slo-mo"}
+
+    def __init__(
+        self,
+        library: PhotosLibrary,
+        include_albums: list[str] | None = None,
+        exclude_albums: list[str] | None = None,
+    ) -> None:
+        """앨범 설정으로 필터 초기화."""
+        pass
+
+    def get_conversion_candidates(
+        self,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+        limit: int | None = None,
+    ) -> list[PhotosVideoInfo]:
+        """변환이 필요한 H.264 비디오 조회."""
+        pass
+
+    def get_stats(self) -> LibraryStats:
+        """코덱 분포를 포함한 라이브러리 통계 조회."""
+        pass
+```
+
+#### SDS-P01-006: 비디오 내보내기 설계
+
+| 항목 | 내용 |
+|------|------|
+| **SDS ID** | SDS-P01-006 |
+| **모듈명** | VideoExporter |
+| **파일** | `src/video_converter/extractors/photos_extractor.py` |
+| **SRS 추적** | SRS-303 (비디오 내보내기) |
+| **책임** | 변환을 위해 Photos 라이브러리에서 임시 디렉토리로 비디오 내보내기 |
+
+**기능**:
+
+| 기능 | 설명 |
+|------|------|
+| 진행률 추적 | 대용량 파일 복사 진행률 콜백 지원 (0.0-1.0) |
+| 메타데이터 보존 | 수정 시간을 보존하여 파일 복사 |
+| 안전한 정리 | 관리되는 임시 디렉토리 내의 파일만 삭제 |
+| 컨텍스트 관리자 | `with` 문으로 자동 정리 지원 |
+| iCloud 처리 | 클라우드 전용 비디오에 대해 `VideoNotAvailableError` 발생 |
+
+**설계**:
+
+```python
+class VideoExporter:
+    """Photos 라이브러리에서 임시 디렉토리로 비디오 내보내기."""
+
+    COPY_BUFFER_SIZE = 1024 * 1024  # 1 MB
+
+    def __init__(self, temp_dir: Path | None = None) -> None:
+        """선택적 사용자 정의 임시 디렉토리로 초기화."""
+        pass
+
+    def export(
+        self,
+        video: PhotosVideoInfo,
+        on_progress: Callable[[float], None] | None = None,
+    ) -> Path:
+        """진행률 추적과 함께 임시 디렉토리로 비디오 내보내기."""
+        pass
+
+    def cleanup(self, path: Path) -> bool:
+        """단일 내보낸 파일 제거 (temp_dir 내의 파일만)."""
+        pass
+
+    def cleanup_all(self) -> int:
+        """모든 내보낸 파일과 소유한 경우 임시 디렉토리 제거."""
+        pass
+```
+
+**오류 클래스**:
+
+| 예외 | 설명 |
+|------|------|
+| `VideoNotAvailableError` | 비디오가 iCloud 전용이고 다운로드되지 않은 경우 발생 |
+| `ExportError` | 내보내기 실패 시 발생 (권한 거부, 디스크 공간 부족 등) |
+
 ---
 
 ### 3.5 Automation 모듈 (SDS-A01)
