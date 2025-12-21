@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from video_converter.extractors.photos_extractor import (
+    ExportError,
     LibraryStats,
     MediaType,
     PhotosAccessDeniedError,
@@ -16,6 +17,8 @@ from video_converter.extractors.photos_extractor import (
     PhotosLibraryNotFoundError,
     PhotosVideoFilter,
     PhotosVideoInfo,
+    VideoExporter,
+    VideoNotAvailableError,
     get_permission_instructions,
 )
 
@@ -885,3 +888,365 @@ class TestPhotosVideoFilter:
         assert stats.h264 == 1
         assert stats.hevc == 1
         assert stats.in_cloud == 1
+
+
+class TestVideoNotAvailableError:
+    """Tests for VideoNotAvailableError exception."""
+
+    def test_error_message_includes_filename(self) -> None:
+        """Test error message includes the filename."""
+        error = VideoNotAvailableError("my_video.mov")
+        assert "my_video.mov" in str(error)
+        assert "iCloud" in str(error)
+
+    def test_is_photos_library_error(self) -> None:
+        """Test VideoNotAvailableError inherits from PhotosLibraryError."""
+        error = VideoNotAvailableError("video.mov")
+        from video_converter.extractors.photos_extractor import PhotosLibraryError
+
+        assert isinstance(error, PhotosLibraryError)
+
+
+class TestExportError:
+    """Tests for ExportError exception."""
+
+    def test_error_message_with_filename(self) -> None:
+        """Test error message includes filename when provided."""
+        error = ExportError("Permission denied", "video.mov")
+        message = str(error)
+        assert "video.mov" in message
+        assert "Permission denied" in message
+
+    def test_error_message_without_filename(self) -> None:
+        """Test error message without filename."""
+        error = ExportError("Disk full")
+        message = str(error)
+        assert "Disk full" in message
+        assert "Export failed" in message
+
+
+class TestVideoExporter:
+    """Tests for VideoExporter class."""
+
+    def test_init_with_custom_temp_dir(self, tmp_path: Path) -> None:
+        """Test initialization with custom temporary directory."""
+        custom_dir = tmp_path / "exports"
+        exporter = VideoExporter(temp_dir=custom_dir)
+
+        assert exporter.temp_dir == custom_dir
+        assert custom_dir.exists()
+
+    def test_init_creates_system_temp_dir(self) -> None:
+        """Test initialization creates system temporary directory."""
+        exporter = VideoExporter()
+
+        assert exporter.temp_dir.exists()
+        assert "video_converter_" in str(exporter.temp_dir)
+
+        # Cleanup
+        exporter.cleanup_all()
+
+    def test_export_copies_file(self, tmp_path: Path) -> None:
+        """Test export copies file to temporary directory."""
+        # Create source file
+        source_file = tmp_path / "source.mov"
+        source_file.write_bytes(b"fake video content here")
+
+        video = PhotosVideoInfo(
+            uuid="test-uuid-123",
+            filename="source.mov",
+            path=source_file,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+        )
+
+        export_dir = tmp_path / "exports"
+        exporter = VideoExporter(temp_dir=export_dir)
+
+        exported_path = exporter.export(video)
+
+        assert exported_path.exists()
+        assert exported_path.read_bytes() == b"fake video content here"
+        assert "test-uuid-123_source.mov" == exported_path.name
+
+    def test_export_preserves_metadata(self, tmp_path: Path) -> None:
+        """Test export preserves file modification times."""
+        source_file = tmp_path / "source.mov"
+        source_file.write_bytes(b"video data")
+
+        video = PhotosVideoInfo(
+            uuid="uuid",
+            filename="source.mov",
+            path=source_file,
+            date=None,
+            date_modified=None,
+            duration=30.0,
+        )
+
+        exporter = VideoExporter(temp_dir=tmp_path / "exports")
+        exported_path = exporter.export(video)
+
+        # File times should be preserved
+        source_stat = source_file.stat()
+        export_stat = exported_path.stat()
+        assert abs(source_stat.st_mtime - export_stat.st_mtime) < 1.0
+
+    def test_export_with_progress_callback(self, tmp_path: Path) -> None:
+        """Test export calls progress callback."""
+        source_file = tmp_path / "source.mov"
+        source_file.write_bytes(b"x" * 2048)  # 2KB file
+
+        video = PhotosVideoInfo(
+            uuid="uuid",
+            filename="source.mov",
+            path=source_file,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+        )
+
+        progress_values: list[float] = []
+
+        def on_progress(value: float) -> None:
+            progress_values.append(value)
+
+        exporter = VideoExporter(temp_dir=tmp_path / "exports")
+        exporter.export(video, on_progress=on_progress)
+
+        # Progress should have been called
+        assert len(progress_values) > 0
+        # Final progress should be 1.0
+        assert progress_values[-1] == 1.0
+
+    def test_export_raises_for_icloud_only(self, tmp_path: Path) -> None:
+        """Test export raises VideoNotAvailableError for iCloud-only video."""
+        video = PhotosVideoInfo(
+            uuid="uuid",
+            filename="icloud_video.mov",
+            path=None,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+            in_cloud=True,
+        )
+
+        exporter = VideoExporter(temp_dir=tmp_path / "exports")
+
+        with pytest.raises(VideoNotAvailableError) as exc_info:
+            exporter.export(video)
+
+        assert "icloud_video.mov" in str(exc_info.value)
+
+    def test_export_raises_for_no_path(self, tmp_path: Path) -> None:
+        """Test export raises ExportError when video has no path."""
+        video = PhotosVideoInfo(
+            uuid="uuid",
+            filename="no_path.mov",
+            path=None,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+        )
+
+        exporter = VideoExporter(temp_dir=tmp_path / "exports")
+
+        with pytest.raises(ExportError) as exc_info:
+            exporter.export(video)
+
+        assert "No path available" in str(exc_info.value)
+
+    def test_export_raises_for_missing_source(self, tmp_path: Path) -> None:
+        """Test export raises ExportError when source file doesn't exist."""
+        video = PhotosVideoInfo(
+            uuid="uuid",
+            filename="missing.mov",
+            path=tmp_path / "nonexistent.mov",
+            date=None,
+            date_modified=None,
+            duration=60.0,
+        )
+
+        exporter = VideoExporter(temp_dir=tmp_path / "exports")
+
+        with pytest.raises(ExportError) as exc_info:
+            exporter.export(video)
+
+        assert "does not exist" in str(exc_info.value)
+
+    def test_cleanup_removes_file(self, tmp_path: Path) -> None:
+        """Test cleanup removes exported file."""
+        source_file = tmp_path / "source.mov"
+        source_file.write_bytes(b"data")
+
+        video = PhotosVideoInfo(
+            uuid="uuid",
+            filename="source.mov",
+            path=source_file,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+        )
+
+        exporter = VideoExporter(temp_dir=tmp_path / "exports")
+        exported_path = exporter.export(video)
+
+        assert exported_path.exists()
+        assert exporter.cleanup(exported_path) is True
+        assert not exported_path.exists()
+
+    def test_cleanup_rejects_outside_temp_dir(self, tmp_path: Path) -> None:
+        """Test cleanup refuses to remove files outside temp_dir."""
+        outside_file = tmp_path / "outside.txt"
+        outside_file.write_text("important data")
+
+        exporter = VideoExporter(temp_dir=tmp_path / "exports")
+
+        result = exporter.cleanup(outside_file)
+
+        assert result is False
+        assert outside_file.exists()  # File should still exist
+
+    def test_cleanup_all_removes_temp_dir(self, tmp_path: Path) -> None:
+        """Test cleanup_all removes temporary directory when owned."""
+        exporter = VideoExporter()
+        temp_dir = exporter.temp_dir
+
+        # Create a file in temp dir
+        test_file = temp_dir / "test.txt"
+        test_file.write_text("test")
+
+        exporter.cleanup_all()
+
+        assert not temp_dir.exists()
+
+    def test_cleanup_all_preserves_custom_dir(self, tmp_path: Path) -> None:
+        """Test cleanup_all preserves custom directory."""
+        custom_dir = tmp_path / "my_exports"
+        custom_dir.mkdir()
+
+        source_file = tmp_path / "source.mov"
+        source_file.write_bytes(b"data")
+
+        video = PhotosVideoInfo(
+            uuid="uuid",
+            filename="source.mov",
+            path=source_file,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+        )
+
+        exporter = VideoExporter(temp_dir=custom_dir)
+        exported_path = exporter.export(video)
+
+        removed = exporter.cleanup_all()
+
+        assert removed == 1
+        # Custom directory should still exist (files removed, not dir)
+        assert not exported_path.exists()
+
+    def test_get_exported_count(self, tmp_path: Path) -> None:
+        """Test get_exported_count returns correct count."""
+        source1 = tmp_path / "video1.mov"
+        source1.write_bytes(b"data1")
+        source2 = tmp_path / "video2.mov"
+        source2.write_bytes(b"data2")
+
+        video1 = PhotosVideoInfo(
+            uuid="uuid1",
+            filename="video1.mov",
+            path=source1,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+        )
+        video2 = PhotosVideoInfo(
+            uuid="uuid2",
+            filename="video2.mov",
+            path=source2,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+        )
+
+        exporter = VideoExporter(temp_dir=tmp_path / "exports")
+
+        assert exporter.get_exported_count() == 0
+
+        exporter.export(video1)
+        assert exporter.get_exported_count() == 1
+
+        exporter.export(video2)
+        assert exporter.get_exported_count() == 2
+
+    def test_get_temp_dir_size(self, tmp_path: Path) -> None:
+        """Test get_temp_dir_size returns correct size."""
+        source_file = tmp_path / "source.mov"
+        source_file.write_bytes(b"x" * 1000)  # 1000 bytes
+
+        video = PhotosVideoInfo(
+            uuid="uuid",
+            filename="source.mov",
+            path=source_file,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+        )
+
+        exporter = VideoExporter(temp_dir=tmp_path / "exports")
+        exporter.export(video)
+
+        size = exporter.get_temp_dir_size()
+        assert size == 1000
+
+    def test_context_manager_cleanup(self, tmp_path: Path) -> None:
+        """Test context manager cleans up on exit."""
+        source_file = tmp_path / "source.mov"
+        source_file.write_bytes(b"data")
+
+        video = PhotosVideoInfo(
+            uuid="uuid",
+            filename="source.mov",
+            path=source_file,
+            date=None,
+            date_modified=None,
+            duration=60.0,
+        )
+
+        with VideoExporter() as exporter:
+            temp_dir = exporter.temp_dir
+            exported_path = exporter.export(video)
+            assert exported_path.exists()
+
+        # After context exit, temp dir should be cleaned up
+        assert not temp_dir.exists()
+
+    def test_handles_large_files(self, tmp_path: Path) -> None:
+        """Test export handles files larger than buffer size."""
+        # Create file larger than COPY_BUFFER_SIZE (1MB)
+        large_content = b"x" * (2 * 1024 * 1024)  # 2MB
+        source_file = tmp_path / "large.mov"
+        source_file.write_bytes(large_content)
+
+        video = PhotosVideoInfo(
+            uuid="uuid",
+            filename="large.mov",
+            path=source_file,
+            date=None,
+            date_modified=None,
+            duration=120.0,
+        )
+
+        progress_calls = []
+
+        def on_progress(value: float) -> None:
+            progress_calls.append(value)
+
+        exporter = VideoExporter(temp_dir=tmp_path / "exports")
+        exported_path = exporter.export(video, on_progress=on_progress)
+
+        assert exported_path.exists()
+        assert exported_path.stat().st_size == len(large_content)
+        # Should have multiple progress calls for chunks
+        assert len(progress_calls) >= 2

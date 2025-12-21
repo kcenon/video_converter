@@ -664,6 +664,62 @@ class PhotosVideoFilter:
         pass
 ```
 
+#### SDS-P01-006: Video Exporter Design
+
+| Item | Content |
+|------|---------|
+| **SDS ID** | SDS-P01-006 |
+| **Module** | VideoExporter |
+| **File** | `src/video_converter/extractors/photos_extractor.py` |
+| **SRS Trace** | SRS-303 (Video Export) |
+| **Responsibility** | Export videos from Photos library to temporary directory for conversion |
+
+**Features**:
+
+| Feature | Description |
+|---------|-------------|
+| Progress Tracking | Callback support for large file copy progress (0.0-1.0) |
+| Metadata Preservation | Copies file with preserved modification times |
+| Safe Cleanup | Only removes files within managed temp directory |
+| Context Manager | Automatic cleanup on exit with `with` statement |
+| iCloud Handling | Raises `VideoNotAvailableError` for cloud-only videos |
+
+**Design**:
+
+```python
+class VideoExporter:
+    """Export videos from Photos library to temporary directory."""
+
+    COPY_BUFFER_SIZE = 1024 * 1024  # 1 MB
+
+    def __init__(self, temp_dir: Path | None = None) -> None:
+        """Initialize with optional custom temp directory."""
+        pass
+
+    def export(
+        self,
+        video: PhotosVideoInfo,
+        on_progress: Callable[[float], None] | None = None,
+    ) -> Path:
+        """Export video to temporary directory with progress tracking."""
+        pass
+
+    def cleanup(self, path: Path) -> bool:
+        """Remove a single exported file (within temp_dir only)."""
+        pass
+
+    def cleanup_all(self) -> int:
+        """Remove all exported files and temp directory if owned."""
+        pass
+```
+
+**Error Classes**:
+
+| Exception | Description |
+|-----------|-------------|
+| `VideoNotAvailableError` | Raised when video is iCloud-only and not downloaded |
+| `ExportError` | Raised when export fails (permission denied, disk full, etc.) |
+
 ---
 
 ## 4. Class Detailed Design
@@ -925,6 +981,7 @@ class RetryPolicy:
 | SRS-205 | Progress Monitoring | SDS-U01-002 | FFmpegProgressParser | Mapped |
 | SRS-301 | Photos Scan | SDS-E01-002 | PhotosExtractor | Mapped |
 | SRS-302 | Video Filtering | SDS-P01-005 | PhotosVideoFilter | Mapped |
+| SRS-303 | Video Export | SDS-P01-006 | VideoExporter | Mapped |
 | SRS-401 | Metadata Extraction | SDS-P01-002 | MetadataManager | Mapped |
 | SRS-402 | GPS Preservation | SDS-P01-004 | GPSHandler | Mapped |
 | SRS-501 | Quality Validation | SDS-P01-003 | QualityValidator | Mapped |
@@ -946,6 +1003,7 @@ class RetryPolicy:
 | SDS-P01-003 | quality_validator.py | QualityValidator |
 | SDS-P01-004 | gps.py | GPSHandler |
 | SDS-P01-005 | photos_extractor.py | PhotosVideoFilter |
+| SDS-P01-006 | photos_extractor.py | VideoExporter |
 | SDS-A01-001 | launchd_manager.py | LaunchdManager |
 | SDS-U01-001 | command_runner.py | CommandRunner, FFprobeRunner |
 | SDS-U01-002 | progress_parser.py | FFmpegProgressParser |
