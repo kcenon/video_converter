@@ -4,6 +4,11 @@ This module provides the central orchestration and type definitions
 for the video conversion pipeline.
 """
 
+from video_converter.core.orchestrator import (
+    ConversionTask,
+    Orchestrator,
+    OrchestratorConfig,
+)
 from video_converter.core.types import (
     CompleteCallback,
     ConversionMode,
@@ -25,5 +30,8 @@ __all__ = [
     "ConversionResult",
     "ConversionStage",
     "ConversionStatus",
+    "ConversionTask",
+    "Orchestrator",
+    "OrchestratorConfig",
     "ProgressCallback",
 ]
