@@ -54,6 +54,18 @@ video-converter convert input.mp4 output.mp4 --mode hardware
 video-converter run --mode photos
 ```
 
+### Batch Conversion with Priority
+
+```bash
+# Process smallest files first
+video-converter run --priority size_smallest
+
+# Process oldest files first
+video-converter run --priority date_oldest
+
+# Available priorities: fifo, date_oldest, date_newest, size_smallest, size_largest
+```
+
 ### Enable Daily Automation
 
 ```bash
