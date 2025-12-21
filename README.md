@@ -83,7 +83,53 @@ Session state is automatically saved to `~/.local/share/video_converter/sessions
 ### Enable Daily Automation
 
 ```bash
-video-converter install-service --time 03:00
+# Install with default schedule (daily at 3:00 AM)
+video-converter install-service
+
+# Install with custom time
+video-converter install-service --time 02:00
+
+# Install for weekly execution (every Monday at 4:00 AM)
+video-converter install-service --time 04:00 --weekday 1
+
+# Install with folder watching
+video-converter install-service --watch ~/Videos/Import
+
+# Combine time schedule with folder watching
+video-converter install-service --time 03:00 --watch ~/Videos/Import
+
+# Force reinstall if already installed
+video-converter install-service --force
+```
+
+### Check Service Status
+
+```bash
+video-converter status
+```
+
+Output example:
+```
+╭──────────────────────────────────────────────╮
+│         Video Converter Service              │
+├──────────────────────────────────────────────┤
+│  Status:     ○ Idle                          │
+│  Schedule:   Daily at 03:00                  │
+│  Plist:      ...aunchAgents/com.videocon...  │
+╰──────────────────────────────────────────────╯
+```
+
+### Remove Automation Service
+
+```bash
+# Uninstall service (with confirmation)
+video-converter uninstall-service
+
+# Uninstall without confirmation
+video-converter uninstall-service --yes
+
+# Uninstall and remove log files
+video-converter uninstall-service --remove-logs
 ```
 
 ## Usage
@@ -92,18 +138,19 @@ video-converter install-service --time 03:00
 video-converter <command> [options]
 
 Commands:
-  convert       Single file conversion
-  run           Batch conversion execution
-  status        Service status check
-  stats         Conversion statistics
-  config        Configuration management
-  install       Install automation service
-  uninstall     Remove automation service
+  convert           Single file conversion
+  run               Batch conversion execution
+  status            Service and conversion status
+  stats             Conversion statistics
+  setup             Initial setup wizard
+  install-service   Install launchd automation service
+  uninstall-service Remove launchd automation service
 
 Global Options:
   --config      Config file path
   --verbose     Detailed log output
   --quiet       Minimal output
+  --version     Show version
   --help        Show help
 ```
 

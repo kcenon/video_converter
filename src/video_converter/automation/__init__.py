@@ -16,8 +16,15 @@ from video_converter.automation.launchd import (
     generate_watch_plist,
     validate_plist_syntax,
 )
+from video_converter.automation.service_manager import (
+    ServiceManager,
+    ServiceResult,
+    ServiceState,
+    ServiceStatus,
+)
 
 __all__ = [
+    # launchd module
     "LaunchdSchedule",
     "LaunchdConfig",
     "LaunchdPlistGenerator",
@@ -28,4 +35,9 @@ __all__ = [
     "DEFAULT_PLIST_NAME",
     "DEFAULT_LOG_DIR",
     "SERVICE_LABEL",
+    # service_manager module
+    "ServiceManager",
+    "ServiceResult",
+    "ServiceState",
+    "ServiceStatus",
 ]
