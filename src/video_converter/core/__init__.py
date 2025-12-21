@@ -8,6 +8,14 @@ Note:
     >>> from video_converter.core.orchestrator import Orchestrator
 """
 
+from video_converter.core.logger import (
+    LogLevel,
+    configure_logging,
+    get_log_dir,
+    get_log_file_path,
+    get_logger,
+    set_log_level,
+)
 from video_converter.core.types import (
     CompleteCallback,
     ConversionMode,
@@ -21,6 +29,14 @@ from video_converter.core.types import (
 )
 
 __all__ = [
+    # Logger
+    "configure_logging",
+    "get_log_dir",
+    "get_log_file_path",
+    "get_logger",
+    "LogLevel",
+    "set_log_level",
+    # Types
     "CompleteCallback",
     "ConversionMode",
     "ConversionProgress",
