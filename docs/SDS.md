@@ -169,7 +169,8 @@ video_converter/
 │       └── utils/
 │           ├── __init__.py
 │           ├── command_runner.py      # SDS-U01-001
-│           └── file_utils.py          # SDS-U01-002
+│           ├── progress_parser.py     # SDS-U01-002
+│           └── file_utils.py          # SDS-U01-003
 ├── tests/
 ├── config/
 │   └── defaults.json
@@ -338,9 +339,10 @@ def configure_logging(
 |------|---------|
 | **SDS ID** | SDS-V01-002 |
 | **Module** | HardwareConverter |
-| **File** | `src/video_converter/converters/hardware_converter.py` |
-| **SRS Trace** | SRS-201 |
-| **Responsibility** | VideoToolbox hardware-accelerated H.265 encoding |
+| **File** | `src/video_converter/converters/hardware.py` |
+| **SRS Trace** | SRS-201, SRS-205 |
+| **Responsibility** | VideoToolbox hardware-accelerated H.265 encoding with real-time progress |
+| **Status** | ✅ Implemented |
 
 **Conversion Algorithm**:
 
@@ -351,6 +353,11 @@ class HardwareConverter(BaseConverter):
 
     Uses Apple Silicon Media Engine for fast H.265 encoding.
     Typically 20x+ realtime for 4K content.
+
+    Features:
+    - Real-time progress tracking via FFmpeg stderr parsing
+    - Speed ratio calculation (actual vs video duration)
+    - Metadata preservation with use_metadata_tags movflag
     """
 
     def build_command(self, request: ConversionRequest) -> List[str]:
@@ -364,8 +371,7 @@ class HardwareConverter(BaseConverter):
             -tag:v hvc1
             -c:a copy
             -map_metadata 0
-            -movflags use_metadata_tags
-            -progress pipe:1
+            -movflags +faststart+use_metadata_tags
             <output>
         """
         return [
@@ -376,11 +382,22 @@ class HardwareConverter(BaseConverter):
             "-tag:v", "hvc1",
             "-c:a", "copy",
             "-map_metadata", "0",
-            "-movflags", "use_metadata_tags",
-            "-progress", "pipe:1",
+            "-movflags", "+faststart+use_metadata_tags",
             str(request.output_path)
         ]
 ```
+
+**Progress Tracking**:
+
+The base converter parses FFmpeg stderr output in real-time to extract:
+- Frame count and FPS
+- Current time position
+- Encoding speed (e.g., 6.0x realtime)
+- Bitrate and output size
+
+Progress percentage is calculated as: `current_time / total_duration * 100`
+
+Speed ratio is derived from FFmpeg's reported speed or calculated from actual conversion time.
 
 ---
 
@@ -905,6 +922,7 @@ class RetryPolicy:
 | SRS-101 | Codec Detection | SDS-P01-001 | CodecDetector | Mapped |
 | SRS-201 | HW Conversion | SDS-V01-002 | HardwareConverter | Mapped |
 | SRS-202 | SW Conversion | SDS-V01-003 | SoftwareConverter | Mapped |
+| SRS-205 | Progress Monitoring | SDS-U01-002 | FFmpegProgressParser | Mapped |
 | SRS-301 | Photos Scan | SDS-E01-002 | PhotosExtractor | Mapped |
 | SRS-302 | Video Filtering | SDS-P01-005 | PhotosVideoFilter | Mapped |
 | SRS-401 | Metadata Extraction | SDS-P01-002 | MetadataManager | Mapped |
@@ -920,14 +938,17 @@ class RetryPolicy:
 | SDS-C01-001 | orchestrator.py | Orchestrator |
 | SDS-C01-002 | config.py | Config |
 | SDS-E01-002 | photos_extractor.py | PhotosExtractor |
-| SDS-V01-002 | hardware_converter.py | HardwareConverter |
-| SDS-V01-003 | software_converter.py | SoftwareConverter |
+| SDS-V01-001 | base.py | BaseConverter |
+| SDS-V01-002 | hardware.py | HardwareConverter |
+| SDS-V01-003 | software.py | SoftwareConverter |
 | SDS-P01-001 | codec_detector.py | CodecDetector |
 | SDS-P01-002 | metadata_manager.py | MetadataManager |
 | SDS-P01-003 | quality_validator.py | QualityValidator |
 | SDS-P01-004 | gps.py | GPSHandler |
 | SDS-P01-005 | photos_extractor.py | PhotosVideoFilter |
 | SDS-A01-001 | launchd_manager.py | LaunchdManager |
+| SDS-U01-001 | command_runner.py | CommandRunner, FFprobeRunner |
+| SDS-U01-002 | progress_parser.py | FFmpegProgressParser |
 
 ---
 
@@ -942,7 +963,7 @@ class RetryPolicy:
 | Facade | Orchestrator | core/orchestrator.py |
 | Template Method | Conversion workflow | converters/base.py |
 | Adapter | External tool integration | adapters/ |
-| Observer | Progress monitoring | core/progress.py |
+| Observer | Progress monitoring | utils/progress_parser.py, converters/base.py |
 
 ### 11.2 Reference Documents
 
