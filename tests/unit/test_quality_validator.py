@@ -882,3 +882,338 @@ class TestPropertyComparer:
         aspect_comparison = next(c for c in result.comparisons if c.property_name == "aspect_ratio")
         assert aspect_comparison.matches is False
         assert aspect_comparison.severity == ComparisonSeverity.ERROR
+
+
+# Import compression validation classes
+from video_converter.processors.quality_validator import (
+    CompressionRange,
+    CompressionSeverity,
+    CompressionValidationResult,
+    CompressionValidator,
+    ContentType,
+)
+
+
+class TestContentType:
+    """Tests for ContentType enum."""
+
+    def test_content_type_values(self) -> None:
+        """Test that content type enum has expected values."""
+        assert ContentType.STANDARD.value == "standard"
+        assert ContentType.HIGH_MOTION.value == "high_motion"
+        assert ContentType.LOW_MOTION.value == "low_motion"
+
+
+class TestCompressionRange:
+    """Tests for CompressionRange dataclass."""
+
+    def test_valid_range_creation(self) -> None:
+        """Test creating a valid compression range."""
+        range_ = CompressionRange(0.30, 0.70, ContentType.STANDARD)
+        assert range_.min_ratio == 0.30
+        assert range_.max_ratio == 0.70
+        assert range_.content_type == ContentType.STANDARD
+
+    def test_range_with_default_content_type(self) -> None:
+        """Test compression range with default content type."""
+        range_ = CompressionRange(0.20, 0.60)
+        assert range_.content_type == ContentType.STANDARD
+
+    def test_invalid_min_ratio_negative(self) -> None:
+        """Test that negative min_ratio raises ValueError."""
+        with pytest.raises(ValueError, match="min_ratio must be between"):
+            CompressionRange(-0.1, 0.70)
+
+    def test_invalid_min_ratio_above_one(self) -> None:
+        """Test that min_ratio above 1.0 raises ValueError."""
+        with pytest.raises(ValueError, match="min_ratio must be between"):
+            CompressionRange(1.1, 0.70)
+
+    def test_invalid_max_ratio_negative(self) -> None:
+        """Test that negative max_ratio raises ValueError."""
+        with pytest.raises(ValueError, match="max_ratio must be between"):
+            CompressionRange(0.30, -0.1)
+
+    def test_invalid_max_ratio_above_one(self) -> None:
+        """Test that max_ratio above 1.0 raises ValueError."""
+        with pytest.raises(ValueError, match="max_ratio must be between"):
+            CompressionRange(0.30, 1.5)
+
+    def test_min_greater_than_max(self) -> None:
+        """Test that min_ratio > max_ratio raises ValueError."""
+        with pytest.raises(ValueError, match="min_ratio .* must be <= max_ratio"):
+            CompressionRange(0.70, 0.30)
+
+
+class TestCompressionSeverity:
+    """Tests for CompressionSeverity enum."""
+
+    def test_severity_values(self) -> None:
+        """Test that severity enum has expected values."""
+        assert CompressionSeverity.NORMAL.value == "normal"
+        assert CompressionSeverity.WARNING.value == "warning"
+        assert CompressionSeverity.ERROR.value == "error"
+
+
+class TestCompressionValidationResult:
+    """Tests for CompressionValidationResult dataclass."""
+
+    def test_valid_result_creation(self) -> None:
+        """Test creating a valid compression result."""
+        result = CompressionValidationResult(
+            valid=True,
+            compression_ratio=0.50,
+            original_size=100_000_000,
+            converted_size=50_000_000,
+            content_type=ContentType.STANDARD,
+            severity=CompressionSeverity.NORMAL,
+        )
+        assert result.valid is True
+        assert result.compression_ratio == 0.50
+        assert result.original_size == 100_000_000
+        assert result.converted_size == 50_000_000
+
+    def test_size_reduction_percent_property(self) -> None:
+        """Test size_reduction_percent property calculation."""
+        result = CompressionValidationResult(
+            valid=True,
+            compression_ratio=0.60,
+            original_size=100_000_000,
+            converted_size=40_000_000,
+            content_type=ContentType.STANDARD,
+            severity=CompressionSeverity.NORMAL,
+        )
+        assert result.size_reduction_percent == 60.0
+
+    def test_file_grew_property_true(self) -> None:
+        """Test file_grew property when file increased in size."""
+        result = CompressionValidationResult(
+            valid=False,
+            compression_ratio=-0.20,
+            original_size=100_000_000,
+            converted_size=120_000_000,
+            content_type=ContentType.STANDARD,
+            severity=CompressionSeverity.ERROR,
+        )
+        assert result.file_grew is True
+
+    def test_file_grew_property_false(self) -> None:
+        """Test file_grew property when file decreased in size."""
+        result = CompressionValidationResult(
+            valid=True,
+            compression_ratio=0.50,
+            original_size=100_000_000,
+            converted_size=50_000_000,
+            content_type=ContentType.STANDARD,
+            severity=CompressionSeverity.NORMAL,
+        )
+        assert result.file_grew is False
+
+
+class TestCompressionValidator:
+    """Tests for CompressionValidator class."""
+
+    @pytest.fixture
+    def validator(self) -> CompressionValidator:
+        """Create a CompressionValidator instance."""
+        return CompressionValidator()
+
+    def test_init_default_values(self) -> None:
+        """Test default initialization values."""
+        validator = CompressionValidator()
+        assert validator.critical_low == 0.20
+        assert validator.critical_high == 0.80
+        assert len(validator.ranges) == 3
+
+    def test_init_custom_thresholds(self) -> None:
+        """Test custom threshold initialization."""
+        validator = CompressionValidator(critical_low=0.15, critical_high=0.85)
+        assert validator.critical_low == 0.15
+        assert validator.critical_high == 0.85
+
+    def test_init_custom_ranges(self) -> None:
+        """Test custom ranges initialization."""
+        custom_ranges = {
+            ContentType.STANDARD: CompressionRange(0.40, 0.60),
+        }
+        validator = CompressionValidator(ranges=custom_ranges)
+        assert len(validator.ranges) == 1
+        assert validator.ranges[ContentType.STANDARD].min_ratio == 0.40
+
+    def test_validate_standard_normal_compression(self, validator: CompressionValidator) -> None:
+        """Test validation with normal compression for standard content."""
+        # 50% compression - within 30-70% range for standard
+        result = validator.validate(100_000_000, 50_000_000)
+
+        assert result.valid is True
+        assert result.compression_ratio == 0.50
+        assert result.severity == CompressionSeverity.NORMAL
+        assert result.content_type == ContentType.STANDARD
+
+    def test_validate_high_motion_normal_compression(self, validator: CompressionValidator) -> None:
+        """Test validation with normal compression for high motion content."""
+        # 40% compression - within 20-60% range for high_motion
+        result = validator.validate(100_000_000, 60_000_000, ContentType.HIGH_MOTION)
+
+        assert result.valid is True
+        assert result.compression_ratio == 0.40
+        assert result.severity == CompressionSeverity.NORMAL
+        assert result.content_type == ContentType.HIGH_MOTION
+
+    def test_validate_low_motion_normal_compression(self, validator: CompressionValidator) -> None:
+        """Test validation with normal compression for low motion content."""
+        # 60% compression - within 40-80% range for low_motion
+        result = validator.validate(100_000_000, 40_000_000, ContentType.LOW_MOTION)
+
+        assert result.valid is True
+        assert result.compression_ratio == 0.60
+        assert result.severity == CompressionSeverity.NORMAL
+        assert result.content_type == ContentType.LOW_MOTION
+
+    def test_validate_file_grew(self, validator: CompressionValidator) -> None:
+        """Test validation when file grew after conversion."""
+        # File grew by 20%
+        result = validator.validate(100_000_000, 120_000_000)
+
+        assert result.valid is False
+        assert result.compression_ratio == pytest.approx(-0.20)
+        assert result.severity == CompressionSeverity.ERROR
+        assert result.file_grew is True
+        assert "grew" in result.message.lower()
+
+    def test_validate_very_low_compression(self, validator: CompressionValidator) -> None:
+        """Test validation with very low compression (below critical_low)."""
+        # 10% compression - below 20% critical threshold
+        result = validator.validate(100_000_000, 90_000_000)
+
+        assert result.valid is False
+        assert result.compression_ratio == pytest.approx(0.10)
+        assert result.severity == CompressionSeverity.ERROR
+        assert "very low" in result.message.lower()
+
+    def test_validate_very_high_compression(self, validator: CompressionValidator) -> None:
+        """Test validation with very high compression (above critical_high)."""
+        # 85% compression - above 80% critical threshold
+        result = validator.validate(100_000_000, 15_000_000)
+
+        assert result.valid is True  # Still valid but with warning
+        assert result.compression_ratio == 0.85
+        assert result.severity == CompressionSeverity.WARNING
+        assert "quality loss" in result.message.lower()
+
+    def test_validate_below_expected_range(self, validator: CompressionValidator) -> None:
+        """Test validation with compression below expected range."""
+        # 25% compression - below 30% min for standard
+        result = validator.validate(100_000_000, 75_000_000)
+
+        assert result.valid is True  # Still valid but with warning
+        assert result.compression_ratio == 0.25
+        assert result.severity == CompressionSeverity.WARNING
+        assert "below expected range" in result.message.lower()
+
+    def test_validate_above_expected_range(self, validator: CompressionValidator) -> None:
+        """Test validation with compression above expected range."""
+        # 75% compression - above 70% max for standard
+        result = validator.validate(100_000_000, 25_000_000)
+
+        assert result.valid is True  # Still valid but with warning
+        assert result.compression_ratio == 0.75
+        assert result.severity == CompressionSeverity.WARNING
+        assert "above expected range" in result.message.lower()
+
+    def test_validate_zero_converted_size(self, validator: CompressionValidator) -> None:
+        """Test validation with zero converted size (100% compression)."""
+        result = validator.validate(100_000_000, 0)
+
+        assert result.valid is True
+        assert result.compression_ratio == 1.0
+        assert result.severity == CompressionSeverity.WARNING
+        assert "quality loss" in result.message.lower()
+
+    def test_validate_invalid_original_size_zero(self, validator: CompressionValidator) -> None:
+        """Test that zero original_size raises ValueError."""
+        with pytest.raises(ValueError, match="original_size must be positive"):
+            validator.validate(0, 50_000_000)
+
+    def test_validate_invalid_original_size_negative(self, validator: CompressionValidator) -> None:
+        """Test that negative original_size raises ValueError."""
+        with pytest.raises(ValueError, match="original_size must be positive"):
+            validator.validate(-100, 50_000_000)
+
+    def test_validate_invalid_converted_size_negative(self, validator: CompressionValidator) -> None:
+        """Test that negative converted_size raises ValueError."""
+        with pytest.raises(ValueError, match="converted_size cannot be negative"):
+            validator.validate(100_000_000, -50)
+
+    def test_validate_expected_range_included(self, validator: CompressionValidator) -> None:
+        """Test that expected_range is included in result."""
+        result = validator.validate(100_000_000, 50_000_000)
+
+        assert result.expected_range is not None
+        assert result.expected_range.min_ratio == 0.30
+        assert result.expected_range.max_ratio == 0.70
+
+    def test_get_expected_range(self, validator: CompressionValidator) -> None:
+        """Test getting expected range for content type."""
+        range_ = validator.get_expected_range(ContentType.STANDARD)
+
+        assert range_ is not None
+        assert range_.min_ratio == 0.30
+        assert range_.max_ratio == 0.70
+
+    def test_get_expected_range_not_found(self) -> None:
+        """Test getting expected range for undefined content type."""
+        validator = CompressionValidator(ranges={})
+        range_ = validator.get_expected_range(ContentType.STANDARD)
+
+        assert range_ is None
+
+    def test_set_range(self, validator: CompressionValidator) -> None:
+        """Test setting custom range for content type."""
+        custom_range = CompressionRange(0.50, 0.90, ContentType.STANDARD)
+        validator.set_range(ContentType.STANDARD, custom_range)
+
+        assert validator.ranges[ContentType.STANDARD].min_ratio == 0.50
+        assert validator.ranges[ContentType.STANDARD].max_ratio == 0.90
+
+    def test_validate_with_custom_critical_thresholds(self) -> None:
+        """Test validation with custom critical thresholds."""
+        validator = CompressionValidator(critical_low=0.10, critical_high=0.90)
+
+        # 15% compression - would be error with default, but OK with custom
+        result = validator.validate(100_000_000, 85_000_000)
+
+        assert result.valid is True
+        assert result.severity == CompressionSeverity.WARNING
+
+    def test_validate_same_size(self, validator: CompressionValidator) -> None:
+        """Test validation when original and converted sizes are the same."""
+        result = validator.validate(100_000_000, 100_000_000)
+
+        assert result.valid is False
+        assert result.compression_ratio == 0.0
+        assert result.severity == CompressionSeverity.ERROR
+
+    def test_validate_high_motion_edge_cases(self, validator: CompressionValidator) -> None:
+        """Test high motion content at range boundaries."""
+        # Exactly at min boundary (20%)
+        result_min = validator.validate(100_000_000, 80_000_000, ContentType.HIGH_MOTION)
+        assert result_min.valid is True
+        assert result_min.severity == CompressionSeverity.NORMAL
+
+        # Exactly at max boundary (60%)
+        result_max = validator.validate(100_000_000, 40_000_000, ContentType.HIGH_MOTION)
+        assert result_max.valid is True
+        assert result_max.severity == CompressionSeverity.NORMAL
+
+    def test_validate_low_motion_edge_cases(self, validator: CompressionValidator) -> None:
+        """Test low motion content at range boundaries."""
+        # Exactly at min boundary (40%)
+        result_min = validator.validate(100_000_000, 60_000_000, ContentType.LOW_MOTION)
+        assert result_min.valid is True
+        assert result_min.severity == CompressionSeverity.NORMAL
+
+        # Exactly at max boundary (80%)
+        result_max = validator.validate(100_000_000, 20_000_000, ContentType.LOW_MOTION)
+        assert result_max.valid is True
+        assert result_max.severity == CompressionSeverity.NORMAL

@@ -1327,7 +1327,7 @@ class CompressionValidator:
         Returns:
             Tuple of (severity, valid, message).
         """
-        # File grew (negative compression)
+        # File grew (negative compression) - always an error
         if ratio < 0:
             return (
                 CompressionSeverity.ERROR,
@@ -1335,7 +1335,21 @@ class CompressionValidator:
                 f"File grew by {abs(ratio):.1%} - possible encoding issue",
             )
 
-        # Critical low compression
+        # Check if within expected range first (takes precedence over critical thresholds)
+        # Use small epsilon for floating point comparison
+        epsilon = 1e-9
+        if expected_range is not None:
+            in_expected_range = (
+                expected_range.min_ratio - epsilon <= ratio <= expected_range.max_ratio + epsilon
+            )
+            if in_expected_range:
+                return (
+                    CompressionSeverity.NORMAL,
+                    True,
+                    f"Compression ratio ({ratio:.1%}) is within expected range",
+                )
+
+        # Critical low compression (only if not in expected range)
         if ratio < self.critical_low:
             return (
                 CompressionSeverity.ERROR,
@@ -1351,7 +1365,7 @@ class CompressionValidator:
                 f"Very high compression ({ratio:.1%}) - possible quality loss",
             )
 
-        # Check against expected range
+        # Check against expected range (outside range warnings)
         if expected_range is not None:
             if ratio < expected_range.min_ratio:
                 return (
@@ -1370,11 +1384,11 @@ class CompressionValidator:
                     f"for {content_type.value} content",
                 )
 
-        # Within expected range
+        # Within acceptable range (no expected range defined)
         return (
             CompressionSeverity.NORMAL,
             True,
-            f"Compression ratio ({ratio:.1%}) is within expected range",
+            f"Compression ratio ({ratio:.1%}) is within acceptable range",
         )
 
     def get_expected_range(self, content_type: ContentType) -> CompressionRange | None:
