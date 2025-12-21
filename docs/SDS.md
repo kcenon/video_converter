@@ -141,7 +141,8 @@ video_converter/
 │       ├── core/
 │       │   ├── __init__.py
 │       │   ├── orchestrator.py        # SDS-C01-001
-│       │   └── config.py              # SDS-C01-002
+│       │   ├── config.py              # SDS-C01-002
+│       │   └── logger.py              # SDS-C01-003
 │       ├── extractors/
 │       │   ├── __init__.py
 │       │   ├── base.py                # SDS-E01-001
@@ -168,8 +169,7 @@ video_converter/
 │       └── utils/
 │           ├── __init__.py
 │           ├── command_runner.py      # SDS-U01-001
-│           ├── file_utils.py          # SDS-U01-002
-│           └── logging.py             # SDS-U01-003
+│           └── file_utils.py          # SDS-U01-002
 ├── tests/
 ├── config/
 │   └── defaults.json
@@ -281,6 +281,52 @@ Priority (high to low):
 3. User Config (~/.config/video_converter/config.json)
 4. Default Config (built-in)
 ```
+
+#### SDS-C01-003: Logger Design
+
+| Item | Content |
+|------|---------|
+| **SDS ID** | SDS-C01-003 |
+| **Module** | Logger |
+| **File** | `src/video_converter/core/logger.py` |
+| **SRS Trace** | SRS-101 (Logging System) |
+| **Responsibility** | Comprehensive logging with file and console output |
+| **Status** | ✅ Implemented |
+
+**Logger Architecture**:
+
+```python
+class LogLevel:
+    """Log level constants."""
+    DEBUG = logging.DEBUG      # Detailed debugging information
+    INFO = logging.INFO        # General operational information
+    WARNING = logging.WARNING  # Potential issues
+    ERROR = logging.ERROR      # Error that prevented operation
+    CRITICAL = logging.CRITICAL # Critical error
+
+def get_logger(name: str) -> logging.Logger:
+    """Get a configured logger instance."""
+    pass
+
+def configure_logging(
+    level: int | str = DEFAULT_LOG_LEVEL,
+    log_dir: Path | None = None,
+    console_output: bool = True,
+    file_output: bool = True,
+) -> None:
+    """Configure global logging settings."""
+    pass
+```
+
+**Key Features**:
+
+| Feature | Implementation |
+|---------|----------------|
+| File Output | RotatingFileHandler (10MB, 5 backups) |
+| Console Output | Rich library with colored output |
+| Log Format | `[%(asctime)s] %(levelname)-8s \| %(name)s \| %(message)s` |
+| Log Directory | `~/.local/share/video_converter/logs/` |
+| Rotation | Automatic rotation at 10MB with 5 backup files |
 
 ---
 
