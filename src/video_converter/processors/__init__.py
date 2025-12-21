@@ -1,13 +1,18 @@
 """Processor modules for video converter.
 
 This package provides video processing functionality including
-codec detection, metadata management, and quality validation.
+codec detection, metadata management, GPS handling, and quality validation.
 
 SDS Reference: SDS-P01
 """
 
-from video_converter.processors.metadata import (
+from video_converter.processors.gps import (
     GPSCoordinates,
+    GPSFormat,
+    GPSHandler,
+    GPSVerificationResult,
+)
+from video_converter.processors.metadata import (
     MetadataApplicationError,
     MetadataExtractionError,
     MetadataProcessor,
@@ -31,8 +36,12 @@ from video_converter.processors.quality_validator import (
 )
 
 __all__ = [
-    # Metadata processing
+    # GPS handling
     "GPSCoordinates",
+    "GPSFormat",
+    "GPSHandler",
+    "GPSVerificationResult",
+    # Metadata processing
     "MetadataApplicationError",
     "MetadataExtractionError",
     "MetadataProcessor",
