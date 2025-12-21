@@ -48,22 +48,20 @@ video-converter setup
 video-converter convert input.mp4 output.mp4 --mode hardware
 ```
 
-### Batch Conversion (Photos Library)
+### Batch Conversion (Folder)
 
 ```bash
-video-converter run --mode photos
-```
+# Convert all videos in a directory
+video-converter run --input-dir ~/Videos
 
-### Batch Conversion with Priority
+# Convert recursively (include subdirectories)
+video-converter run --input-dir ~/Videos -r
 
-```bash
-# Process smallest files first
-video-converter run --priority size_smallest
+# Dry run to see what would be converted
+video-converter run --input-dir ~/Videos --dry-run
 
-# Process oldest files first
-video-converter run --priority date_oldest
-
-# Available priorities: fifo, date_oldest, date_newest, size_smallest, size_largest
+# Specify custom output directory
+video-converter run --input-dir ~/Videos --output-dir ~/Converted
 ```
 
 ### Resume Interrupted Conversion
@@ -142,16 +140,34 @@ Commands:
   run               Batch conversion execution
   status            Service and conversion status
   stats             Conversion statistics
+  config            View current configuration
+  config-set        Modify configuration values
   setup             Initial setup wizard
   install-service   Install launchd automation service
   uninstall-service Remove launchd automation service
 
 Global Options:
-  --config      Config file path
-  --verbose     Detailed log output
-  --quiet       Minimal output
-  --version     Show version
-  --help        Show help
+  --config PATH  Custom config file path
+  -v, --verbose  Detailed log output (DEBUG level)
+  -q, --quiet    Minimal output (errors only)
+  --version      Show version
+  --help         Show help
+```
+
+### View and Modify Configuration
+
+```bash
+# View current configuration
+video-converter config
+
+# Set encoding mode to software
+video-converter config-set encoding.mode software
+
+# Set quality level
+video-converter config-set encoding.quality 60
+
+# Set max concurrent conversions
+video-converter config-set processing.max_concurrent 4
 ```
 
 ## Configuration

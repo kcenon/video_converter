@@ -2,13 +2,42 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
+import logging
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import click
+from rich.console import Console
+from rich.table import Table
 
+from video_converter import __version__
 from video_converter.automation import ServiceManager, ServiceState
+from video_converter.core.config import Config, DEFAULT_CONFIG_FILE
+from video_converter.core.logger import configure_logging, set_log_level
+from video_converter.core.orchestrator import Orchestrator, OrchestratorConfig
+from video_converter.core.types import ConversionMode, ConversionProgress
+from video_converter.converters.factory import ConverterFactory
+from video_converter.processors.codec_detector import CodecDetector
+
+# Rich console for formatted output
+console = Console()
+
+
+@dataclass
+class CLIContext:
+    """Context object passed between CLI commands."""
+
+    config: Config
+    verbose: bool
+    quiet: bool
+
+
+pass_context = click.make_pass_decorator(CLIContext, ensure=True)
 
 
 def parse_time(time_str: str) -> tuple[int, int]:
@@ -41,52 +70,526 @@ def parse_time(time_str: str) -> tuple[int, int]:
 
 
 @click.group()
-@click.version_option()
-def main() -> None:
-    """Video Converter - Automated H.264 to H.265 conversion for macOS."""
-    pass
+@click.version_option(version=__version__)
+@click.option(
+    "--config",
+    "config_path",
+    type=click.Path(exists=True, path_type=Path),
+    default=None,
+    help="Path to custom configuration file.",
+)
+@click.option(
+    "--verbose", "-v",
+    is_flag=True,
+    default=False,
+    help="Enable verbose output (DEBUG level logging).",
+)
+@click.option(
+    "--quiet", "-q",
+    is_flag=True,
+    default=False,
+    help="Minimal output (only errors and results).",
+)
+@click.pass_context
+def main(ctx: click.Context, config_path: Path | None, verbose: bool, quiet: bool) -> None:
+    """Video Converter - Automated H.264 to H.265 conversion for macOS.
+
+    A CLI tool for converting H.264 videos to H.265 (HEVC) format with
+    hardware acceleration support on macOS.
+    """
+    # Load configuration
+    config = Config.load()
+
+    # Configure logging based on verbosity
+    if verbose:
+        configure_logging(level=logging.DEBUG, console_output=True)
+    elif quiet:
+        configure_logging(level=logging.ERROR, console_output=True)
+    else:
+        configure_logging(level=logging.INFO, console_output=True)
+
+    # Store context for subcommands
+    ctx.ensure_object(dict)
+    ctx.obj = CLIContext(config=config, verbose=verbose, quiet=quiet)
+
+
+def _create_progress_callback(quiet: bool) -> Any:
+    """Create a progress callback for conversion.
+
+    Args:
+        quiet: Whether to suppress progress output.
+
+    Returns:
+        Progress callback function or None.
+    """
+    if quiet:
+        return None
+
+    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+
+    progress = Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
+    )
+    task_id = None
+
+    def callback(prog: ConversionProgress) -> None:
+        nonlocal task_id
+        if task_id is None:
+            progress.start()
+            task_id = progress.add_task(
+                f"Converting {prog.current_file}...",
+                total=100,
+            )
+        progress.update(task_id, completed=int(prog.stage_progress * 100))
+        if prog.stage_progress >= 1.0:
+            progress.stop()
+
+    return callback
 
 
 @main.command()
-@click.argument("input_file", type=click.Path(exists=True))
-@click.argument("output_file", type=click.Path())
+@click.argument("input_file", type=click.Path(exists=True, path_type=Path))
+@click.argument("output_file", type=click.Path(path_type=Path), required=False)
 @click.option(
     "--mode",
     type=click.Choice(["hardware", "software"]),
-    default="hardware",
-    help="Encoding mode (default: hardware)",
+    default=None,
+    help="Encoding mode. Uses config default if not specified.",
 )
 @click.option(
     "--quality",
     type=int,
-    default=45,
-    help="Quality setting 1-100 (default: 45)",
+    default=None,
+    help="Quality setting 1-100. Uses config default if not specified.",
 )
-def convert(input_file: str, output_file: str, mode: str, quality: int) -> None:
-    """Convert a single video file from H.264 to H.265."""
-    click.echo(f"Converting: {input_file} -> {output_file}")
-    click.echo(f"Mode: {mode}, Quality: {quality}")
-    # TODO: Implement conversion logic
+@click.option(
+    "--preserve-metadata/--no-preserve-metadata",
+    default=True,
+    help="Preserve original metadata (default: True).",
+)
+@click.option(
+    "--validate/--no-validate",
+    default=True,
+    help="Validate output file after conversion (default: True).",
+)
+@click.pass_context
+def convert(
+    ctx: click.Context,
+    input_file: Path,
+    output_file: Path | None,
+    mode: str | None,
+    quality: int | None,
+    preserve_metadata: bool,
+    validate: bool,
+) -> None:
+    """Convert a single video file from H.264 to H.265.
+
+    INPUT_FILE is the path to the video file to convert.
+    OUTPUT_FILE is optional; if not provided, a default name will be generated.
+
+    Examples:
+
+        # Basic conversion
+        video-converter convert video.mp4 video_h265.mp4
+
+        # Use software encoding
+        video-converter convert --mode software video.mp4
+
+        # Set quality
+        video-converter convert --quality 60 video.mp4 output.mp4
+    """
+    cli_ctx: CLIContext = ctx.obj
+    config = cli_ctx.config
+
+    # Check if input is already H.265
+    detector = CodecDetector()
+    codec_info = detector.detect(input_file)
+
+    if codec_info and codec_info.is_hevc:
+        console.print(f"[yellow]⚠ {input_file.name} is already H.265/HEVC. Skipping.[/yellow]")
+        return
+
+    # Generate output path if not provided
+    if output_file is None:
+        suffix = "_h265"
+        output_file = input_file.parent / f"{input_file.stem}{suffix}.mp4"
+
+    # Resolve conversion mode
+    conv_mode = ConversionMode.HARDWARE
+    if mode == "software":
+        conv_mode = ConversionMode.SOFTWARE
+    elif mode == "hardware":
+        conv_mode = ConversionMode.HARDWARE
+    elif config.encoding.mode == "software":
+        conv_mode = ConversionMode.SOFTWARE
+
+    # Resolve quality
+    conv_quality = quality if quality is not None else config.encoding.quality
+
+    if not cli_ctx.quiet:
+        console.print(f"[bold]Converting:[/bold] {input_file.name}")
+        console.print(f"[bold]Output:[/bold] {output_file}")
+        console.print(f"[bold]Mode:[/bold] {conv_mode.value}, [bold]Quality:[/bold] {conv_quality}")
+        console.print()
+
+    # Create orchestrator with config
+    orch_config = OrchestratorConfig(
+        mode=conv_mode,
+        quality=conv_quality,
+        crf=config.encoding.crf,
+        preset=config.encoding.preset,
+        preserve_metadata=preserve_metadata,
+        validate_output=validate,
+    )
+    orchestrator = Orchestrator(config=orch_config)
+
+    # Run conversion
+    try:
+        result = asyncio.run(
+            orchestrator.convert_single(
+                input_path=input_file,
+                output_path=output_file,
+            )
+        )
+
+        if result.success:
+            # Calculate size savings
+            original_mb = result.original_size / (1024 * 1024)
+            converted_mb = result.converted_size / (1024 * 1024)
+            saved_mb = original_mb - converted_mb
+            saved_pct = (saved_mb / original_mb) * 100 if original_mb > 0 else 0
+
+            console.print()
+            console.print(f"[green]✓ Conversion successful![/green]")
+            console.print(f"  Original:  {original_mb:.1f} MB")
+            console.print(f"  Converted: {converted_mb:.1f} MB")
+            console.print(f"  Saved:     {saved_mb:.1f} MB ({saved_pct:.1f}%)")
+
+            if result.warnings:
+                console.print()
+                console.print("[yellow]Warnings:[/yellow]")
+                for warning in result.warnings:
+                    console.print(f"  - {warning}")
+        else:
+            console.print(f"[red]✗ Conversion failed: {result.error_message}[/red]", err=True)
+            sys.exit(1)
+
+    except Exception as e:
+        console.print(f"[red]✗ Error: {e}[/red]", err=True)
+        sys.exit(1)
 
 
 @main.command()
 @click.option(
-    "--mode",
+    "--source",
     type=click.Choice(["photos", "folder"]),
-    default="photos",
-    help="Source mode (default: photos)",
+    default="folder",
+    help="Source mode (default: folder).",
+)
+@click.option(
+    "--input-dir",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    default=None,
+    help="Input directory for folder mode.",
+)
+@click.option(
+    "--output-dir",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=None,
+    help="Output directory for converted files.",
+)
+@click.option(
+    "--recursive", "-r",
+    is_flag=True,
+    help="Recursively scan subdirectories.",
 )
 @click.option(
     "--dry-run",
     is_flag=True,
-    help="Show what would be converted without actually converting",
+    help="Show what would be converted without actually converting.",
 )
-def run(mode: str, dry_run: bool) -> None:
-    """Run batch conversion."""
-    click.echo(f"Running batch conversion from: {mode}")
-    if dry_run:
-        click.echo("(Dry run - no files will be converted)")
-    # TODO: Implement batch conversion
+@click.option(
+    "--resume",
+    is_flag=True,
+    help="Resume a previously interrupted session.",
+)
+@click.pass_context
+def run(
+    ctx: click.Context,
+    source: str,
+    input_dir: Path | None,
+    output_dir: Path | None,
+    recursive: bool,
+    dry_run: bool,
+    resume: bool,
+) -> None:
+    """Run batch conversion on multiple videos.
+
+    Scans for H.264 videos and converts them to H.265 (HEVC) format.
+
+    Examples:
+
+        # Convert all videos in current directory
+        video-converter run --input-dir .
+
+        # Convert with recursive scan
+        video-converter run --input-dir ~/Videos -r
+
+        # Dry run to see what would be converted
+        video-converter run --input-dir ~/Videos --dry-run
+
+        # Resume an interrupted session
+        video-converter run --resume
+    """
+    cli_ctx: CLIContext = ctx.obj
+    config = cli_ctx.config
+
+    # Handle resume mode
+    if resume:
+        _run_resume_session(cli_ctx)
+        return
+
+    # Validate input directory for folder mode
+    if source == "folder":
+        if input_dir is None:
+            console.print("[red]✗ --input-dir is required for folder mode[/red]", err=True)
+            sys.exit(1)
+
+        # Scan for videos
+        video_files = _scan_for_videos(input_dir, recursive)
+
+        if not video_files:
+            console.print("[yellow]No H.264 videos found to convert.[/yellow]")
+            return
+
+        # Filter to only H.264 videos
+        detector = CodecDetector()
+        h264_videos = []
+        for video_path in video_files:
+            codec_info = detector.detect(video_path)
+            if codec_info and not codec_info.is_hevc:
+                h264_videos.append(video_path)
+
+        if not h264_videos:
+            console.print("[yellow]No H.264 videos found to convert.[/yellow]")
+            return
+
+        console.print(f"[bold]Found {len(h264_videos)} H.264 video(s) to convert[/bold]")
+        console.print()
+
+        if dry_run:
+            _display_dry_run(h264_videos, output_dir)
+            return
+
+        _run_batch_conversion(cli_ctx, h264_videos, output_dir)
+
+    elif source == "photos":
+        console.print("[yellow]Photos library integration is not yet implemented.[/yellow]")
+        console.print("Use --source folder --input-dir <path> instead.")
+        sys.exit(1)
+
+
+def _scan_for_videos(input_dir: Path, recursive: bool) -> list[Path]:
+    """Scan directory for video files.
+
+    Args:
+        input_dir: Directory to scan.
+        recursive: Whether to scan recursively.
+
+    Returns:
+        List of video file paths.
+    """
+    video_extensions = {".mov", ".mp4", ".m4v", ".avi", ".mkv", ".wmv", ".flv", ".webm"}
+    video_files: list[Path] = []
+
+    if recursive:
+        for ext in video_extensions:
+            video_files.extend(input_dir.rglob(f"*{ext}"))
+    else:
+        for ext in video_extensions:
+            video_files.extend(input_dir.glob(f"*{ext}"))
+
+    return sorted(video_files)
+
+
+def _display_dry_run(video_files: list[Path], output_dir: Path | None) -> None:
+    """Display what would be converted in dry run mode.
+
+    Args:
+        video_files: List of video files.
+        output_dir: Output directory.
+    """
+    table = Table(title="Videos to Convert (Dry Run)")
+    table.add_column("Input File", style="cyan")
+    table.add_column("Size", style="green")
+    table.add_column("Output", style="yellow")
+
+    total_size = 0
+    for video_path in video_files:
+        size_mb = video_path.stat().st_size / (1024 * 1024)
+        total_size += size_mb
+
+        if output_dir:
+            out_path = output_dir / f"{video_path.stem}_h265.mp4"
+        else:
+            out_path = video_path.parent / f"{video_path.stem}_h265.mp4"
+
+        table.add_row(
+            video_path.name,
+            f"{size_mb:.1f} MB",
+            str(out_path.name),
+        )
+
+    console.print(table)
+    console.print()
+    console.print(f"[bold]Total:[/bold] {len(video_files)} files, {total_size:.1f} MB")
+    console.print()
+    console.print("[dim]Run without --dry-run to start conversion.[/dim]")
+
+
+def _run_batch_conversion(
+    cli_ctx: CLIContext,
+    video_files: list[Path],
+    output_dir: Path | None,
+) -> None:
+    """Run batch conversion.
+
+    Args:
+        cli_ctx: CLI context.
+        video_files: List of video files to convert.
+        output_dir: Output directory.
+    """
+    config = cli_ctx.config
+
+    # Create output directory if specified
+    if output_dir:
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Resolve conversion mode
+    conv_mode = ConversionMode.HARDWARE
+    if config.encoding.mode == "software":
+        conv_mode = ConversionMode.SOFTWARE
+
+    # Create orchestrator
+    orch_config = OrchestratorConfig(
+        mode=conv_mode,
+        quality=config.encoding.quality,
+        crf=config.encoding.crf,
+        preset=config.encoding.preset,
+        preserve_metadata=True,
+        validate_output=config.processing.validate_quality,
+        max_concurrent=config.processing.max_concurrent,
+    )
+    orchestrator = Orchestrator(config=orch_config)
+
+    # Progress display
+    from rich.progress import (
+        Progress,
+        SpinnerColumn,
+        TextColumn,
+        BarColumn,
+        TaskProgressColumn,
+        TimeRemainingColumn,
+    )
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        TimeRemainingColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Converting...", total=len(video_files))
+
+        def on_progress(prog: ConversionProgress) -> None:
+            progress.update(
+                task,
+                completed=prog.current_index,
+                description=f"Converting {prog.current_file}...",
+            )
+
+        def on_complete(report: Any) -> None:
+            progress.update(task, completed=len(video_files))
+
+        # Run conversion
+        report = asyncio.run(
+            orchestrator.run(
+                input_paths=video_files,
+                output_dir=output_dir,
+                on_progress=on_progress,
+                on_complete=on_complete,
+            )
+        )
+
+    # Display results
+    console.print()
+    console.print("═" * 50)
+    console.print("[bold]Conversion Complete[/bold]")
+    console.print("═" * 50)
+    console.print()
+
+    console.print(f"  Total files:   {report.total_files}")
+    console.print(f"  [green]Successful:[/green]   {report.successful}")
+    console.print(f"  [red]Failed:[/red]       {report.failed}")
+    console.print(f"  [yellow]Skipped:[/yellow]      {report.skipped}")
+
+    if report.total_original_size > 0:
+        original_mb = report.total_original_size / (1024 * 1024)
+        converted_mb = report.total_converted_size / (1024 * 1024)
+        saved_mb = original_mb - converted_mb
+        saved_pct = (saved_mb / original_mb) * 100
+
+        console.print()
+        console.print(f"  Original:   {original_mb:.1f} MB")
+        console.print(f"  Converted:  {converted_mb:.1f} MB")
+        console.print(f"  [green]Saved:      {saved_mb:.1f} MB ({saved_pct:.1f}%)[/green]")
+
+    if report.duration:
+        console.print()
+        console.print(f"  Duration:   {report.duration}")
+
+    if report.failed > 0:
+        sys.exit(1)
+
+
+def _run_resume_session(cli_ctx: CLIContext) -> None:
+    """Resume a previously interrupted session.
+
+    Args:
+        cli_ctx: CLI context.
+    """
+    config = cli_ctx.config
+
+    # Resolve conversion mode
+    conv_mode = ConversionMode.HARDWARE
+    if config.encoding.mode == "software":
+        conv_mode = ConversionMode.SOFTWARE
+
+    orch_config = OrchestratorConfig(
+        mode=conv_mode,
+        quality=config.encoding.quality,
+        crf=config.encoding.crf,
+        preset=config.encoding.preset,
+    )
+    orchestrator = Orchestrator(config=orch_config)
+
+    if not orchestrator.has_resumable_session():
+        console.print("[yellow]No resumable session found.[/yellow]")
+        return
+
+    console.print("[bold]Resuming previous session...[/bold]")
+
+    report = asyncio.run(orchestrator.resume_session())
+
+    if report:
+        console.print(f"[green]✓ Session resumed: {report.successful} successful, {report.failed} failed[/green]")
+    else:
+        console.print("[yellow]Could not resume session.[/yellow]")
 
 
 @main.command()
@@ -132,19 +635,352 @@ def status() -> None:
 
 
 @main.command()
-def stats() -> None:
-    """Show conversion statistics."""
-    click.echo("Conversion Statistics")
-    click.echo("-" * 40)
-    # TODO: Implement statistics display
+@click.option(
+    "--period",
+    type=click.Choice(["today", "week", "month", "all"]),
+    default="all",
+    help="Time period for statistics (default: all).",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output statistics in JSON format.",
+)
+@click.pass_context
+def stats(ctx: click.Context, period: str, output_json: bool) -> None:
+    """Show conversion statistics.
+
+    Display cumulative statistics about video conversions including
+    total files converted, storage saved, and success rates.
+
+    Examples:
+
+        # Show all-time statistics
+        video-converter stats
+
+        # Show statistics for this week
+        video-converter stats --period week
+
+        # Export statistics as JSON
+        video-converter stats --json
+    """
+    from video_converter.core.session import SessionStateManager
+    from datetime import datetime, timedelta
+
+    # Get statistics from session manager
+    session_manager = SessionStateManager()
+    session_status = session_manager.get_session_status()
+
+    # Calculate statistics (placeholder values for now)
+    # In a full implementation, this would query historical data
+    stats_data = {
+        "period": period,
+        "total_converted": 0,
+        "total_failed": 0,
+        "success_rate": 0.0,
+        "total_original_bytes": 0,
+        "total_converted_bytes": 0,
+        "storage_saved_bytes": 0,
+        "storage_saved_percent": 0.0,
+    }
+
+    if session_status:
+        stats_data["total_converted"] = session_status.get("completed_count", 0)
+        stats_data["total_failed"] = session_status.get("failed_count", 0)
+        total = stats_data["total_converted"] + stats_data["total_failed"]
+        if total > 0:
+            stats_data["success_rate"] = (stats_data["total_converted"] / total) * 100
+
+    if output_json:
+        console.print(json.dumps(stats_data, indent=2))
+        return
+
+    # Display formatted statistics
+    console.print()
+    console.print("╭" + "─" * 48 + "╮")
+    console.print("│" + "Conversion Statistics".center(48) + "│")
+    console.print("├" + "─" * 48 + "┤")
+    console.print(f"│  Period: {period.capitalize():<38}│")
+    console.print("├" + "─" * 48 + "┤")
+
+    console.print(f"│  Videos Converted:     {stats_data['total_converted']:<23}│")
+    console.print(f"│  Videos Failed:        {stats_data['total_failed']:<23}│")
+    console.print(f"│  Success Rate:         {stats_data['success_rate']:.1f}%{' ' * 20}│")
+
+    if stats_data["total_original_bytes"] > 0:
+        original_gb = stats_data["total_original_bytes"] / (1024 ** 3)
+        converted_gb = stats_data["total_converted_bytes"] / (1024 ** 3)
+        saved_gb = stats_data["storage_saved_bytes"] / (1024 ** 3)
+        saved_pct = stats_data["storage_saved_percent"]
+
+        console.print("├" + "─" * 48 + "┤")
+        console.print(f"│  Total Original:       {original_gb:.1f} GB{' ' * 17}│")
+        console.print(f"│  Total Converted:      {converted_gb:.1f} GB{' ' * 17}│")
+        console.print(f"│  Storage Saved:        {saved_gb:.1f} GB ({saved_pct:.1f}%){' ' * 8}│")
+
+    console.print("╰" + "─" * 48 + "╯")
+    console.print()
+
+    if stats_data["total_converted"] == 0:
+        console.print("[dim]No conversions recorded yet. Run 'video-converter run' to start converting.[/dim]")
 
 
 @main.command()
-def setup() -> None:
-    """Run initial setup wizard."""
-    click.echo("Video Converter Setup")
-    click.echo("=" * 40)
-    # TODO: Implement setup wizard
+@click.pass_context
+def config(ctx: click.Context) -> None:
+    """View current configuration.
+
+    Display the current configuration settings including encoding options,
+    paths, and automation settings.
+
+    Examples:
+
+        # View current configuration
+        video-converter config
+
+        # View with verbose output
+        video-converter -v config
+    """
+    cli_ctx: CLIContext = ctx.obj
+    cfg = cli_ctx.config
+
+    console.print()
+    console.print("[bold]Video Converter Configuration[/bold]")
+    console.print("=" * 50)
+    console.print()
+
+    # Encoding settings
+    console.print("[bold cyan]Encoding[/bold cyan]")
+    console.print(f"  Mode:     {cfg.encoding.mode}")
+    console.print(f"  Quality:  {cfg.encoding.quality}")
+    console.print(f"  CRF:      {cfg.encoding.crf}")
+    console.print(f"  Preset:   {cfg.encoding.preset}")
+    console.print()
+
+    # Paths settings
+    console.print("[bold cyan]Paths[/bold cyan]")
+    console.print(f"  Output:     {cfg.paths.output}")
+    console.print(f"  Processed:  {cfg.paths.processed}")
+    console.print(f"  Failed:     {cfg.paths.failed}")
+    console.print()
+
+    # Processing settings
+    console.print("[bold cyan]Processing[/bold cyan]")
+    console.print(f"  Max Concurrent:    {cfg.processing.max_concurrent}")
+    console.print(f"  Validate Quality:  {cfg.processing.validate_quality}")
+    console.print(f"  Preserve Original: {cfg.processing.preserve_original}")
+    console.print()
+
+    # Automation settings
+    console.print("[bold cyan]Automation[/bold cyan]")
+    console.print(f"  Enabled:   {cfg.automation.enabled}")
+    console.print(f"  Schedule:  {cfg.automation.schedule}")
+    console.print(f"  Time:      {cfg.automation.time}")
+    console.print()
+
+    # Config file location
+    console.print("[bold cyan]Config File[/bold cyan]")
+    console.print(f"  Location:  {DEFAULT_CONFIG_FILE}")
+    console.print()
+
+    console.print("[dim]Edit the config file directly or use 'video-converter setup' to reconfigure.[/dim]")
+
+
+@main.command("config-set")
+@click.argument("key")
+@click.argument("value")
+@click.pass_context
+def config_set(ctx: click.Context, key: str, value: str) -> None:
+    """Set a configuration value.
+
+    KEY is the configuration key in dot notation (e.g., encoding.mode).
+    VALUE is the new value to set.
+
+    Examples:
+
+        # Set encoding mode
+        video-converter config-set encoding.mode software
+
+        # Set quality level
+        video-converter config-set encoding.quality 60
+
+        # Set max concurrent jobs
+        video-converter config-set processing.max_concurrent 4
+    """
+    cli_ctx: CLIContext = ctx.obj
+    cfg = cli_ctx.config
+
+    # Parse the key path
+    parts = key.split(".")
+    if len(parts) != 2:
+        console.print(f"[red]✗ Invalid key format: {key}[/red]", err=True)
+        console.print("[dim]Use format: section.key (e.g., encoding.mode)[/dim]")
+        sys.exit(1)
+
+    section, attr = parts
+
+    # Get the section
+    section_map = {
+        "encoding": cfg.encoding,
+        "paths": cfg.paths,
+        "processing": cfg.processing,
+        "automation": cfg.automation,
+        "photos": cfg.photos,
+        "notification": cfg.notification,
+    }
+
+    if section not in section_map:
+        console.print(f"[red]✗ Unknown section: {section}[/red]", err=True)
+        console.print(f"[dim]Available sections: {', '.join(section_map.keys())}[/dim]")
+        sys.exit(1)
+
+    section_obj = section_map[section]
+
+    if not hasattr(section_obj, attr):
+        console.print(f"[red]✗ Unknown attribute: {attr} in section {section}[/red]", err=True)
+        sys.exit(1)
+
+    # Convert value to appropriate type
+    current_value = getattr(section_obj, attr)
+    try:
+        if isinstance(current_value, bool):
+            new_value = value.lower() in ("true", "1", "yes", "on")
+        elif isinstance(current_value, int):
+            new_value = int(value)
+        elif isinstance(current_value, Path):
+            new_value = Path(value).expanduser()
+        else:
+            new_value = value
+
+        setattr(section_obj, attr, new_value)
+        cfg.save()
+
+        console.print(f"[green]✓ Set {key} = {new_value}[/green]")
+
+    except (ValueError, TypeError) as e:
+        console.print(f"[red]✗ Invalid value: {e}[/red]", err=True)
+        sys.exit(1)
+
+
+@main.command()
+@click.pass_context
+def setup(ctx: click.Context) -> None:
+    """Run initial setup wizard.
+
+    Interactive setup to configure the video converter for first-time use.
+    This will guide you through setting up encoding preferences, paths,
+    and optional automation.
+
+    Examples:
+
+        video-converter setup
+    """
+    cli_ctx: CLIContext = ctx.obj
+    cfg = cli_ctx.config
+
+    console.print()
+    console.print("[bold]Video Converter Setup Wizard[/bold]")
+    console.print("=" * 50)
+    console.print()
+    console.print("This wizard will help you configure the video converter.")
+    console.print()
+
+    # Check encoder availability
+    console.print("[bold]Checking system capabilities...[/bold]")
+    factory = ConverterFactory()
+
+    hw_available = factory.is_hardware_available()
+    sw_available = factory.is_software_available()
+
+    if hw_available:
+        console.print("  [green]✓[/green] Hardware encoding (VideoToolbox)")
+    else:
+        console.print("  [red]✗[/red] Hardware encoding (VideoToolbox)")
+
+    if sw_available:
+        console.print("  [green]✓[/green] Software encoding (libx265)")
+    else:
+        console.print("  [red]✗[/red] Software encoding (libx265)")
+
+    if not hw_available and not sw_available:
+        console.print()
+        console.print("[red]✗ No encoders available. Please install FFmpeg with HEVC support.[/red]")
+        sys.exit(1)
+
+    console.print()
+
+    # Encoding mode selection
+    if hw_available and sw_available:
+        mode = click.prompt(
+            "Encoding mode",
+            type=click.Choice(["hardware", "software"]),
+            default="hardware",
+        )
+    elif hw_available:
+        mode = "hardware"
+        console.print("Using hardware encoding (only available option)")
+    else:
+        mode = "software"
+        console.print("Using software encoding (only available option)")
+
+    # Quality setting
+    quality = click.prompt(
+        "Quality (1-100, higher = better quality, larger files)",
+        type=click.IntRange(1, 100),
+        default=45,
+    )
+
+    # Output directory
+    default_output = Path("~/Videos/Converted").expanduser()
+    output_dir = click.prompt(
+        "Output directory for converted files",
+        type=click.Path(),
+        default=str(default_output),
+    )
+
+    # Automation
+    enable_automation = click.confirm(
+        "Enable automatic scheduled conversion?",
+        default=False,
+    )
+
+    schedule_time = "03:00"
+    if enable_automation:
+        schedule_time = click.prompt(
+            "Schedule time (HH:MM)",
+            default="03:00",
+        )
+
+    console.print()
+    console.print("[bold]Saving configuration...[/bold]")
+
+    # Update configuration
+    cfg.encoding.mode = mode
+    cfg.encoding.quality = quality
+    cfg.paths.output = Path(output_dir).expanduser()
+    cfg.automation.enabled = enable_automation
+    cfg.automation.time = schedule_time
+
+    cfg.save()
+
+    console.print("[green]✓ Configuration saved![/green]")
+    console.print()
+
+    # Show summary
+    console.print("[bold]Configuration Summary:[/bold]")
+    console.print(f"  Mode:        {mode}")
+    console.print(f"  Quality:     {quality}")
+    console.print(f"  Output:      {output_dir}")
+    console.print(f"  Automation:  {'Enabled at ' + schedule_time if enable_automation else 'Disabled'}")
+    console.print()
+
+    if enable_automation:
+        console.print("To install the automation service, run:")
+        console.print("  video-converter install-service")
+        console.print()
+
+    console.print("[green]Setup complete![/green]")
 
 
 @main.command("install-service")
