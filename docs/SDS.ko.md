@@ -2318,6 +2318,7 @@ class ResourceMonitor:
 | SRS-301 | Photos 라이브러리 스캔 | SDS-E01-001 | PhotosExtractor | 매핑 |
 | SRS-302 | iCloud 비디오 다운로드 | SDS-E01-001 | PhotosExtractor._download_from_icloud | 매핑 |
 | SRS-303 | H.264 비디오 필터링 | SDS-P01-005 | PhotosVideoFilter | 매핑 |
+| SRS-304 | 비디오 내보내기 | SDS-P01-006 | VideoExporter | 매핑 |
 | **메타데이터 모듈** |
 | SRS-401 | 메타데이터 추출 | SDS-P01-002 | MetadataManager.extract | 매핑 |
 | SRS-402 | 메타데이터 검증 | SDS-P01-002 | MetadataManager.verify | 매핑 |
@@ -2347,6 +2348,7 @@ class ResourceMonitor:
 | SDS-P01-002 | MetadataManager | src/video_converter/processors/metadata.py | MetadataManager |
 | SDS-P01-003 | QualityValidator | src/video_converter/processors/validator.py | QualityValidator |
 | SDS-P01-005 | PhotosVideoFilter | src/video_converter/extractors/photos_extractor.py | PhotosVideoFilter |
+| SDS-P01-006 | VideoExporter | src/video_converter/extractors/photos_extractor.py | VideoExporter |
 | SDS-A01-001 | LaunchdManager | src/video_converter/automation/launchd.py | LaunchdManager |
 | SDS-R01-001 | MacOSNotifier | src/video_converter/reporters/notifier.py | MacOSNotifier |
 | SDS-D01-005 | ConversionHistory | src/video_converter/core/history.py | ConversionHistory |
@@ -2360,6 +2362,7 @@ class ResourceMonitor:
 | SDS-V01-002 | SoftwareConverter | tests/test_software_converter.py | test_crf_quality |
 | SDS-P01-002 | MetadataManager | tests/test_metadata.py | test_extract_gps, test_apply_metadata |
 | SDS-P01-003 | QualityValidator | tests/test_validator.py | test_integrity_check, test_properties_match |
+| SDS-P01-006 | VideoExporter | tests/unit/test_photos_extractor.py | TestVideoExporter (16 tests) |
 | SDS-A01-001 | LaunchdManager | tests/test_launchd.py | test_install_service, test_uninstall_service |
 
 ---
