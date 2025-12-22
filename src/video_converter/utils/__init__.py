@@ -46,6 +46,14 @@ from video_converter.utils.file_utils import (
     safe_delete,
     safe_move,
 )
+from video_converter.utils.applescript import (
+    AppleScriptError,
+    AppleScriptExecutionError,
+    AppleScriptResult,
+    AppleScriptRunner,
+    AppleScriptTimeoutError,
+    escape_applescript_string,
+)
 from video_converter.utils.progress_parser import (
     FFmpegProgress,
     FFmpegProgressParser,
@@ -101,4 +109,11 @@ __all__ = [
     # Progress parsing
     "FFmpegProgress",
     "FFmpegProgressParser",
+    # AppleScript execution
+    "AppleScriptRunner",
+    "AppleScriptResult",
+    "AppleScriptError",
+    "AppleScriptExecutionError",
+    "AppleScriptTimeoutError",
+    "escape_applescript_string",
 ]
