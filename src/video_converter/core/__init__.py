@@ -17,6 +17,15 @@ from video_converter.core.config import (
     PhotosConfig,
     ProcessingConfig,
 )
+from video_converter.core.history import (
+    ConversionHistory,
+    ConversionRecord,
+    HistoryCorruptedError,
+    HistoryError,
+    HistoryStatistics,
+    get_history,
+    reset_history,
+)
 from video_converter.core.logger import (
     LogLevel,
     configure_logging,
@@ -58,6 +67,14 @@ __all__ = [
     "PathsConfig",
     "PhotosConfig",
     "ProcessingConfig",
+    # History
+    "ConversionHistory",
+    "ConversionRecord",
+    "get_history",
+    "HistoryCorruptedError",
+    "HistoryError",
+    "HistoryStatistics",
+    "reset_history",
     # Logger
     "configure_logging",
     "get_log_dir",
