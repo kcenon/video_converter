@@ -51,6 +51,14 @@ from video_converter.processors.timestamp import (
     TimestampSynchronizer,
     TimestampVerificationResult,
 )
+from video_converter.processors.verification import (
+    CheckResult,
+    CheckStatus,
+    MetadataVerifier,
+    ToleranceSettings,
+    VerificationCategory,
+    VerificationResult,
+)
 
 __all__ = [
     # Codec detection
@@ -92,4 +100,11 @@ __all__ = [
     "ValidationStrictness",
     "VideoInfo",
     "VideoValidator",
+    # Metadata verification
+    "CheckResult",
+    "CheckStatus",
+    "MetadataVerifier",
+    "ToleranceSettings",
+    "VerificationCategory",
+    "VerificationResult",
 ]
