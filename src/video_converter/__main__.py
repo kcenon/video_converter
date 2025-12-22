@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import re
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -1264,7 +1265,7 @@ def install_service(
 
     manager = ServiceManager()
 
-    click.echo(f"Installing service...")
+    click.echo("Installing service...")
 
     result = manager.install(
         hour=schedule_hour,
@@ -1360,6 +1361,201 @@ def service_status() -> None:
     """
     # Delegate to status command
     status()
+
+
+@main.command("service-start")
+def service_start() -> None:
+    """Manually start the service.
+
+    Triggers an immediate run of the video conversion service,
+    regardless of the configured schedule.
+
+    Examples:
+
+        # Start the service immediately
+        video-converter service-start
+    """
+    manager = ServiceManager()
+    result = manager.start()
+
+    if result.success:
+        click.echo(click.style("✓ " + result.message, fg="green"))
+    else:
+        click.echo(click.style(f"✗ {result.message}", fg="red"), err=True)
+        if result.error:
+            click.echo(click.style(f"  Error: {result.error}", fg="red"), err=True)
+        sys.exit(1)
+
+
+@main.command("service-stop")
+def service_stop() -> None:
+    """Stop the running service.
+
+    Stops the currently running video conversion service.
+
+    Examples:
+
+        # Stop the running service
+        video-converter service-stop
+    """
+    manager = ServiceManager()
+    result = manager.stop()
+
+    if result.success:
+        click.echo(click.style("✓ " + result.message, fg="green"))
+    else:
+        click.echo(click.style(f"✗ {result.message}", fg="red"), err=True)
+        if result.error:
+            click.echo(click.style(f"  Error: {result.error}", fg="red"), err=True)
+        sys.exit(1)
+
+
+@main.command("service-load")
+def service_load() -> None:
+    """Load the service into launchd.
+
+    Loads the installed service plist into launchd. The service
+    must be installed first using 'install-service'.
+
+    Examples:
+
+        # Load the service
+        video-converter service-load
+    """
+    manager = ServiceManager()
+    result = manager.load()
+
+    if result.success:
+        click.echo(click.style("✓ " + result.message, fg="green"))
+    else:
+        click.echo(click.style(f"✗ {result.message}", fg="red"), err=True)
+        if result.error:
+            click.echo(click.style(f"  Error: {result.error}", fg="red"), err=True)
+        sys.exit(1)
+
+
+@main.command("service-unload")
+def service_unload() -> None:
+    """Unload the service from launchd.
+
+    Unloads the service from launchd. The plist file remains
+    installed but the service will not run until reloaded.
+
+    Examples:
+
+        # Unload the service
+        video-converter service-unload
+    """
+    manager = ServiceManager()
+    result = manager.unload()
+
+    if result.success:
+        click.echo(click.style("✓ " + result.message, fg="green"))
+    else:
+        click.echo(click.style(f"✗ {result.message}", fg="red"), err=True)
+        if result.error:
+            click.echo(click.style(f"  Error: {result.error}", fg="red"), err=True)
+        sys.exit(1)
+
+
+@main.command("service-restart")
+def service_restart() -> None:
+    """Restart the service.
+
+    Unloads and reloads the service from launchd.
+
+    Examples:
+
+        # Restart the service
+        video-converter service-restart
+    """
+    manager = ServiceManager()
+    result = manager.restart()
+
+    if result.success:
+        click.echo(click.style("✓ " + result.message, fg="green"))
+    else:
+        click.echo(click.style(f"✗ {result.message}", fg="red"), err=True)
+        if result.error:
+            click.echo(click.style(f"  Error: {result.error}", fg="red"), err=True)
+        sys.exit(1)
+
+
+@main.command("service-logs")
+@click.option(
+    "--lines", "-n",
+    type=int,
+    default=50,
+    help="Number of lines to display (default: 50).",
+)
+@click.option(
+    "--follow", "-f",
+    is_flag=True,
+    help="Follow log output (like tail -f).",
+)
+@click.option(
+    "--stderr",
+    is_flag=True,
+    help="Show stderr instead of stdout.",
+)
+def service_logs(lines: int, follow: bool, stderr: bool) -> None:
+    """View service log files.
+
+    Display recent log entries from the video converter service.
+    By default shows stdout logs; use --stderr for error logs.
+
+    Examples:
+
+        # View last 50 lines of logs
+        video-converter service-logs
+
+        # View last 100 lines
+        video-converter service-logs -n 100
+
+        # View error logs
+        video-converter service-logs --stderr
+
+        # Follow logs in real-time
+        video-converter service-logs -f
+    """
+    manager = ServiceManager()
+    stdout_path, stderr_path = manager.get_log_paths()
+    log_path = stderr_path if stderr else stdout_path
+
+    if not log_path.exists():
+        log_type = "stderr" if stderr else "stdout"
+        click.echo(f"No {log_type} log file found at: {log_path}")
+        click.echo()
+        click.echo("Logs are created when the service runs.")
+        return
+
+    if follow:
+        # Use tail -f for following logs
+        click.echo(f"Following {log_path.name} (Ctrl+C to exit)...")
+        click.echo("-" * 50)
+        try:
+            subprocess.run(
+                ["tail", "-f", str(log_path)],
+                check=False,
+            )
+        except KeyboardInterrupt:
+            click.echo()
+            click.echo("Stopped following logs.")
+    else:
+        # Read and display logs
+        logs = manager.read_logs(lines=lines)
+        log_content = logs["stderr"] if stderr else logs["stdout"]
+
+        if not log_content:
+            click.echo("Log file is empty.")
+            return
+
+        log_type = "stderr" if stderr else "stdout"
+        click.echo(f"=== {log_type.upper()} Log ({log_path}) ===")
+        click.echo()
+        click.echo(log_content)
+        click.echo()
+        click.echo(f"--- End of log ({lines} lines) ---")
 
 
 if __name__ == "__main__":
