@@ -151,6 +151,109 @@ def _create_progress_callback(quiet: bool) -> Any:
     return callback
 
 
+def _format_duration(seconds: float) -> str:
+    """Format duration in human-readable format.
+
+    Args:
+        seconds: Duration in seconds.
+
+    Returns:
+        Formatted duration string like "3 min 45 sec" or "1 hr 30 min".
+    """
+    if seconds < 60:
+        return f"{int(seconds)} sec"
+    elif seconds < 3600:
+        mins = int(seconds // 60)
+        secs = int(seconds % 60)
+        return f"{mins} min {secs} sec"
+    else:
+        hrs = int(seconds // 3600)
+        mins = int((seconds % 3600) // 60)
+        return f"{hrs} hr {mins} min"
+
+
+def _format_size(size_bytes: int) -> str:
+    """Format file size in human-readable format.
+
+    Args:
+        size_bytes: Size in bytes.
+
+    Returns:
+        Formatted size string like "1.50 GB" or "680 MB".
+    """
+    if size_bytes >= 1024 * 1024 * 1024:
+        return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
+    elif size_bytes >= 1024 * 1024:
+        return f"{size_bytes / (1024 * 1024):.0f} MB"
+    elif size_bytes >= 1024:
+        return f"{size_bytes / 1024:.0f} KB"
+    return f"{size_bytes} B"
+
+
+def _display_conversion_summary(
+    input_file: Path,
+    output_file: Path,
+    original_size: int,
+    converted_size: int,
+    duration_seconds: float,
+    speed_ratio: float,
+    encoder_mode: str,
+) -> None:
+    """Display formatted conversion summary.
+
+    Args:
+        input_file: Input file path.
+        output_file: Output file path.
+        original_size: Original file size in bytes.
+        converted_size: Converted file size in bytes.
+        duration_seconds: Conversion duration in seconds.
+        speed_ratio: Speed ratio (e.g., 6.0 means 6x realtime).
+        encoder_mode: Encoder mode used ("hardware" or "software").
+    """
+    saved_bytes = original_size - converted_size
+    saved_pct = (saved_bytes / original_size) * 100 if original_size > 0 else 0
+    codec_change = f"H.264 → H.265 ({encoder_mode})"
+
+    console.print()
+    console.print("╭──────────────────────────────────────────────╮")
+    console.print("│            [bold green]Conversion Complete[/bold green]              │")
+    console.print("├──────────────────────────────────────────────┤")
+    console.print(f"│  Input:      {input_file.name[:31]:<31} │")
+    console.print(f"│  Output:     {output_file.name[:31]:<31} │")
+    console.print(f"│  Codec:      {codec_change:<31} │")
+    console.print("├──────────────────────────────────────────────┤")
+    console.print(f"│  Original:   {_format_size(original_size):<31} │")
+    console.print(f"│  Converted:  {_format_size(converted_size):<31} │")
+    console.print(f"│  [green]Saved:      {_format_size(saved_bytes)} ({saved_pct:.1f}%)[/green]{' ' * (20 - len(f'{saved_pct:.1f}'))}│")
+    console.print("├──────────────────────────────────────────────┤")
+    console.print(f"│  Duration:   {_format_duration(duration_seconds):<31} │")
+    console.print(f"│  Speed:      {speed_ratio:.1f}x realtime{' ' * 20}│")
+    console.print("╰──────────────────────────────────────────────╯")
+
+
+def _display_conversion_error(
+    input_file: Path,
+    error_message: str,
+) -> None:
+    """Display formatted error message with suggestions.
+
+    Args:
+        input_file: Input file path.
+        error_message: Error message from conversion.
+    """
+    console.print()
+    console.print("[bold red]❌ Conversion Failed[/bold red]")
+    console.print()
+    console.print(f"[bold]Error:[/bold] {error_message}")
+    console.print(f"[bold]File:[/bold] {input_file}")
+    console.print()
+    console.print("[bold]Try:[/bold]")
+    console.print("  1. Verify the file plays in QuickTime Player")
+    console.print("  2. Check if the file is completely downloaded")
+    console.print(f"  3. Run: ffprobe {input_file}")
+    console.print("  4. Use --mode software for problematic files")
+
+
 @main.command()
 @click.argument("input_file", type=click.Path(exists=True, path_type=Path))
 @click.argument("output_file", type=click.Path(path_type=Path), required=False)
@@ -165,6 +268,17 @@ def _create_progress_callback(quiet: bool) -> Any:
     type=int,
     default=None,
     help="Quality setting 1-100. Uses config default if not specified.",
+)
+@click.option(
+    "--preset",
+    type=click.Choice(["fast", "medium", "slow"]),
+    default=None,
+    help="Encoder preset: fast, medium, slow. Uses config default if not specified.",
+)
+@click.option(
+    "--force", "-f",
+    is_flag=True,
+    help="Overwrite output file if exists.",
 )
 @click.option(
     "--preserve-metadata/--no-preserve-metadata",
@@ -183,6 +297,8 @@ def convert(
     output_file: Path | None,
     mode: str | None,
     quality: int | None,
+    preset: str | None,
+    force: bool,
     preserve_metadata: bool,
     validate: bool,
 ) -> None:
@@ -199,15 +315,25 @@ def convert(
         # Use software encoding
         video-converter convert --mode software video.mp4
 
-        # Set quality
-        video-converter convert --quality 60 video.mp4 output.mp4
+        # High quality software encoding
+        video-converter convert input.mov output.mov --mode software --quality 85
+
+        # Overwrite existing file
+        video-converter convert old.mp4 new.mp4 --force
+
+        # Quiet mode for scripts
+        video-converter -q convert input.mp4 output.mp4
     """
     cli_ctx: CLIContext = ctx.obj
     config = cli_ctx.config
 
     # Check if input is already H.265
     detector = CodecDetector()
-    codec_info = detector.detect(input_file)
+    try:
+        codec_info = detector.analyze(input_file)
+    except Exception as e:
+        _display_conversion_error(input_file, f"Cannot analyze video: {e}")
+        sys.exit(1)
 
     if codec_info and codec_info.is_hevc:
         console.print(f"[yellow]⚠ {input_file.name} is already H.265/HEVC. Skipping.[/yellow]")
@@ -218,6 +344,16 @@ def convert(
         suffix = "_h265"
         output_file = input_file.parent / f"{input_file.stem}{suffix}.mp4"
 
+    # Check if output exists
+    if output_file.exists() and not force:
+        console.print(f"[red]✗ Output file exists: {output_file}[/red]")
+        console.print("[dim]Use --force to overwrite.[/dim]")
+        sys.exit(1)
+
+    # Remove existing output if force
+    if output_file.exists() and force:
+        output_file.unlink()
+
     # Resolve conversion mode
     conv_mode = ConversionMode.HARDWARE
     if mode == "software":
@@ -227,13 +363,21 @@ def convert(
     elif config.encoding.mode == "software":
         conv_mode = ConversionMode.SOFTWARE
 
-    # Resolve quality
+    # Resolve quality and preset
     conv_quality = quality if quality is not None else config.encoding.quality
+    conv_preset = preset if preset is not None else config.encoding.preset
+
+    # Get encoder name for display
+    encoder_name = "hevc_videotoolbox" if conv_mode == ConversionMode.HARDWARE else "libx265"
 
     if not cli_ctx.quiet:
         console.print(f"[bold]Converting:[/bold] {input_file.name}")
-        console.print(f"[bold]Output:[/bold] {output_file}")
-        console.print(f"[bold]Mode:[/bold] {conv_mode.value}, [bold]Quality:[/bold] {conv_quality}")
+        console.print(f"[bold]Mode:[/bold] {conv_mode.value} ({encoder_name})")
+        console.print(
+            f"[bold]Input:[/bold] {_format_size(codec_info.size)} "
+            f"({codec_info.codec.upper()}, {codec_info.resolution_label}@{codec_info.fps:.0f}fps, "
+            f"{_format_duration(codec_info.duration)})"
+        )
         console.print()
 
     # Create orchestrator with config
@@ -241,45 +385,106 @@ def convert(
         mode=conv_mode,
         quality=conv_quality,
         crf=config.encoding.crf,
-        preset=config.encoding.preset,
+        preset=conv_preset,
         preserve_metadata=preserve_metadata,
         validate_output=validate,
     )
-    orchestrator = Orchestrator(config=orch_config)
+    orchestrator = Orchestrator(config=orch_config, enable_session_persistence=False)
 
-    # Run conversion
+    # Get converter for direct progress tracking
     try:
-        result = asyncio.run(
-            orchestrator.convert_single(
-                input_path=input_file,
-                output_path=output_file,
+        converter = orchestrator.converter_factory.get_converter(conv_mode)
+    except Exception as e:
+        _display_conversion_error(input_file, f"Encoder not available: {e}")
+        sys.exit(1)
+
+    # Create conversion request
+    from video_converter.core.types import ConversionRequest
+    request = ConversionRequest(
+        input_path=input_file,
+        output_path=output_file,
+        mode=conv_mode,
+        quality=conv_quality,
+        crf=config.encoding.crf,
+        preset=conv_preset,
+        preserve_metadata=preserve_metadata,
+    )
+
+    # Run conversion with progress bar
+    try:
+        if cli_ctx.quiet:
+            # Quiet mode - no progress display
+            result = asyncio.run(converter.convert(request))
+        else:
+            # Progress bar display
+            from rich.progress import (
+                Progress,
+                SpinnerColumn,
+                TextColumn,
+                BarColumn,
+                TaskProgressColumn,
+                TimeRemainingColumn,
             )
-        )
+
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(bar_width=40),
+                TaskProgressColumn(),
+                TextColumn("│"),
+                TextColumn("[cyan]{task.fields[size]}[/cyan]"),
+                TextColumn("│"),
+                TextColumn("ETA: [cyan]{task.fields[eta]}[/cyan]"),
+                console=console,
+            ) as progress:
+                task_id = progress.add_task(
+                    f"Converting {input_file.name}",
+                    total=100,
+                    size="0 MB",
+                    eta="calculating...",
+                )
+
+                def on_progress_info(info: Any) -> None:
+                    progress.update(
+                        task_id,
+                        completed=int(info.percentage),
+                        size=info.size_formatted,
+                        eta=info.eta_formatted,
+                    )
+
+                result = asyncio.run(converter.convert(request, on_progress_info=on_progress_info))
 
         if result.success:
-            # Calculate size savings
-            original_mb = result.original_size / (1024 * 1024)
-            converted_mb = result.converted_size / (1024 * 1024)
-            saved_mb = original_mb - converted_mb
-            saved_pct = (saved_mb / original_mb) * 100 if original_mb > 0 else 0
+            # Display summary
+            if not cli_ctx.quiet:
+                _display_conversion_summary(
+                    input_file=input_file,
+                    output_file=output_file,
+                    original_size=result.original_size,
+                    converted_size=result.converted_size,
+                    duration_seconds=result.duration_seconds,
+                    speed_ratio=result.speed_ratio,
+                    encoder_mode=conv_mode.value,
+                )
 
-            console.print()
-            console.print(f"[green]✓ Conversion successful![/green]")
-            console.print(f"  Original:  {original_mb:.1f} MB")
-            console.print(f"  Converted: {converted_mb:.1f} MB")
-            console.print(f"  Saved:     {saved_mb:.1f} MB ({saved_pct:.1f}%)")
-
-            if result.warnings:
+            if result.warnings and not cli_ctx.quiet:
                 console.print()
                 console.print("[yellow]Warnings:[/yellow]")
                 for warning in result.warnings:
                     console.print(f"  - {warning}")
         else:
-            console.print(f"[red]✗ Conversion failed: {result.error_message}[/red]", err=True)
+            _display_conversion_error(input_file, result.error_message or "Unknown error")
             sys.exit(1)
 
+    except KeyboardInterrupt:
+        console.print()
+        console.print("[yellow]Conversion cancelled by user.[/yellow]")
+        # Clean up partial output
+        if output_file.exists():
+            output_file.unlink()
+        sys.exit(130)
     except Exception as e:
-        console.print(f"[red]✗ Error: {e}[/red]", err=True)
+        _display_conversion_error(input_file, str(e))
         sys.exit(1)
 
 
