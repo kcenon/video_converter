@@ -49,6 +49,10 @@ from video_converter.core.concurrent import (
     AggregatedProgress,
     ConcurrentProcessor,
 )
+from video_converter.core.error_recovery import (
+    ErrorRecoveryManager,
+    FailureRecord,
+)
 from video_converter.core.session import SessionStateManager
 from video_converter.core.types import (
     BatchStatus,
@@ -60,8 +64,10 @@ from video_converter.core.types import (
     ConversionResult,
     ConversionStage,
     ConversionStatus,
+    ErrorCategory,
     ProgressCallback,
     QueuePriority,
+    RecoveryAction,
     SessionState,
     SessionStatus,
     VideoEntry,
@@ -108,6 +114,9 @@ class OrchestratorConfig:
         queue_priority: Priority ordering for batch queue.
         enable_retry: Whether to retry failed conversions.
         retry_config: Configuration for retry behavior.
+        check_disk_space: Whether to check disk space before processing.
+        min_free_space: Minimum free disk space in bytes (default 1GB).
+        pause_on_disk_full: Whether to pause on low disk space.
     """
 
     mode: ConversionMode = ConversionMode.HARDWARE
@@ -126,6 +135,9 @@ class OrchestratorConfig:
     queue_priority: QueuePriority = QueuePriority.FIFO
     enable_retry: bool = True
     retry_config: RetryConfig | None = None
+    check_disk_space: bool = True
+    min_free_space: int = 1024 * 1024 * 1024  # 1GB
+    pause_on_disk_full: bool = True
 
 
 @dataclass
@@ -175,6 +187,7 @@ class Orchestrator:
         session_manager: SessionStateManager | None = None,
         enable_session_persistence: bool = True,
         retry_manager: RetryManager | None = None,
+        error_recovery_manager: ErrorRecoveryManager | None = None,
     ) -> None:
         """Initialize the Orchestrator.
 
@@ -186,6 +199,7 @@ class Orchestrator:
             session_manager: Optional session state manager.
             enable_session_persistence: Whether to enable session persistence.
             retry_manager: Optional retry manager for failed conversions.
+            error_recovery_manager: Optional error recovery manager.
         """
         self.config = config or OrchestratorConfig()
         self.converter_factory = converter_factory or ConverterFactory()
@@ -204,9 +218,16 @@ class Orchestrator:
         else:
             self.retry_manager = None
 
+        # Initialize error recovery manager
+        self.error_recovery_manager = error_recovery_manager or ErrorRecoveryManager(
+            failed_dir=self.config.move_to_failed,
+            min_free_space=self.config.min_free_space,
+        )
+
         self._converter: BaseConverter | None = None
         self._cancelled = False
         self._paused = False
+        self._paused_reason: str | None = None
         self._pause_event = asyncio.Event()
         self._pause_event.set()  # Not paused initially
         self._batch_status = BatchStatus.IDLE
@@ -885,13 +906,16 @@ class Orchestrator:
         task: ConversionTask,
         result: ConversionResult,
         report: ConversionReport,
-    ) -> None:
+    ) -> RecoveryAction | None:
         """Handle the result of a conversion task.
 
         Args:
             task: The conversion task.
             result: The conversion result.
             report: The conversion report to update.
+
+        Returns:
+            RecoveryAction if failed and action is needed, None if successful.
         """
         task.result = result
         if result.success:
@@ -905,29 +929,52 @@ class Orchestrator:
                         result.original_size,
                         result.converted_size,
                     )
-        else:
-            task.status = ConversionStatus.FAILED
-            task.error = result.error_message
+            report.add_result(result)
+            return None
 
-            # Update session state
-            if self.session_manager and self._current_session:
-                video_entry = self._find_video_entry(task.input_path)
-                if video_entry:
-                    self.session_manager.mark_video_failed(
-                        video_entry,
-                        result.error_message or "Unknown error",
-                    )
+        # Handle failure with error recovery manager
+        task.status = ConversionStatus.FAILED
+        task.error = result.error_message
 
-            # Move to failed directory if configured
-            if self.config.move_to_failed and task.input_path.exists():
-                try:
-                    dest = self.config.move_to_failed / task.input_path.name
-                    self.config.move_to_failed.mkdir(parents=True, exist_ok=True)
-                    task.input_path.rename(dest)
-                except OSError as e:
-                    logger.warning(f"Could not move failed file: {e}")
+        # Classify the error
+        error_category = self.error_recovery_manager.classify_error(
+            result.error_message, result
+        )
+        recovery_action = self.error_recovery_manager.get_recovery_action(error_category)
+
+        # Update session state
+        if self.session_manager and self._current_session:
+            video_entry = self._find_video_entry(task.input_path)
+            if video_entry:
+                self.session_manager.mark_video_failed(
+                    video_entry,
+                    result.error_message or "Unknown error",
+                )
+
+        # Handle failure with error recovery manager
+        # This cleans up partial output and moves to failed directory if configured
+        self.error_recovery_manager.handle_failure(
+            input_path=task.input_path,
+            output_path=task.output_path,
+            category=error_category,
+            error_message=result.error_message or "Unknown error",
+            move_to_failed=self.config.move_to_failed is not None,
+        )
+
+        # Handle disk space error specially
+        if (
+            error_category == ErrorCategory.DISK_SPACE_ERROR
+            and self.config.pause_on_disk_full
+        ):
+            self._paused_reason = "Insufficient disk space"
+            self.pause()
+            logger.warning(
+                "Pausing batch conversion due to insufficient disk space. "
+                "Free up space and call resume() to continue."
+            )
 
         report.add_result(result)
+        return recovery_action
 
     def _find_video_entry(self, input_path: Path) -> VideoEntry | None:
         """Find a VideoEntry in the current session by input path.
@@ -1201,3 +1248,210 @@ class Orchestrator:
         return asyncio.run(
             self.run(input_paths, output_dir, on_progress, on_complete)
         )
+
+    # Error recovery and manual retry methods
+
+    def check_disk_space(self, path: Path | None = None) -> tuple[bool, dict]:
+        """Check if there is sufficient disk space for conversion.
+
+        Args:
+            path: Path to check. Uses output directory or home if None.
+
+        Returns:
+            Tuple of (has_sufficient_space, disk_info_dict).
+        """
+        check_path = path
+        if check_path is None:
+            if self._current_session and self._current_session.output_dir:
+                check_path = self._current_session.output_dir
+            else:
+                check_path = Path.home()
+
+        sufficient, info = self.error_recovery_manager.has_sufficient_space(check_path)
+        return sufficient, {
+            "path": str(info.path),
+            "total_bytes": info.total_bytes,
+            "free_bytes": info.free_bytes,
+            "used_bytes": info.used_bytes,
+            "free_percent": info.free_percent,
+            "sufficient": sufficient,
+            "required_bytes": self.config.min_free_space,
+        }
+
+    def get_failure_records(self) -> list[FailureRecord]:
+        """Get list of all recorded failures.
+
+        Returns:
+            List of FailureRecord objects from this session.
+        """
+        return self.error_recovery_manager.failure_records
+
+    def get_retryable_failures(self) -> list[FailureRecord]:
+        """Get list of failures that can be retried.
+
+        Returns:
+            List of retryable FailureRecord objects.
+        """
+        return self.error_recovery_manager.get_retryable_failures()
+
+    async def retry_failed(
+        self,
+        record: FailureRecord,
+        on_progress: ProgressCallback | None = None,
+    ) -> ConversionResult:
+        """Retry a failed conversion.
+
+        This method allows manual retry of a specific failed conversion.
+
+        Args:
+            record: The FailureRecord to retry.
+            on_progress: Optional progress callback.
+
+        Returns:
+            ConversionResult with retry outcome.
+        """
+        # Prepare the file for retry
+        input_path = self.error_recovery_manager.prepare_retry(record)
+        if input_path is None:
+            return ConversionResult(
+                success=False,
+                request=ConversionRequest(
+                    input_path=record.input_path,
+                    output_path=record.output_path,
+                ),
+                error_message=f"Cannot find file for retry: {record.input_path}",
+            )
+
+        # Check disk space before retry
+        if self.config.check_disk_space:
+            sufficient, _ = self.check_disk_space(record.output_path.parent)
+            if not sufficient:
+                return ConversionResult(
+                    success=False,
+                    request=ConversionRequest(
+                        input_path=input_path,
+                        output_path=record.output_path,
+                    ),
+                    error_message="Insufficient disk space for retry",
+                )
+
+        logger.info(
+            f"Retrying failed conversion: {input_path.name} "
+            f"(attempt {record.retry_count})"
+        )
+
+        # Perform the conversion
+        result = await self.convert_single(
+            input_path=input_path,
+            output_path=record.output_path,
+            on_progress=on_progress,
+        )
+
+        # Update failure record based on result
+        if result.success:
+            self.error_recovery_manager.mark_retry_success(record)
+
+        return result
+
+    async def retry_all_failed(
+        self,
+        on_progress: ProgressCallback | None = None,
+    ) -> ConversionReport:
+        """Retry all failed conversions that are retryable.
+
+        Args:
+            on_progress: Optional progress callback.
+
+        Returns:
+            ConversionReport with retry results.
+        """
+        retryable = self.get_retryable_failures()
+
+        if not retryable:
+            logger.info("No retryable failures found")
+            return ConversionReport(
+                session_id=self._current_session_id or "retry",
+                started_at=datetime.now(),
+                completed_at=datetime.now(),
+                total_files=0,
+            )
+
+        report = ConversionReport(
+            session_id=f"{self._current_session_id or 'manual'}_retry",
+            started_at=datetime.now(),
+            total_files=len(retryable),
+        )
+
+        logger.info(f"Retrying {len(retryable)} failed conversion(s)")
+
+        for i, record in enumerate(retryable):
+            self._emit_progress(
+                on_progress,
+                ConversionStage.CONVERT,
+                ConversionStatus.IN_PROGRESS,
+                current_file=record.input_path.name,
+                current_index=i,
+                total_files=len(retryable),
+                stage_progress=i / len(retryable),
+                message=f"Retrying {record.input_path.name} ({i + 1}/{len(retryable)})...",
+            )
+
+            result = await self.retry_failed(record)
+            report.add_result(result)
+
+        report.completed_at = datetime.now()
+        return report
+
+    def retry_failed_sync(
+        self,
+        record: FailureRecord,
+        on_progress: ProgressCallback | None = None,
+    ) -> ConversionResult:
+        """Synchronous wrapper for retry_failed.
+
+        Args:
+            record: The FailureRecord to retry.
+            on_progress: Optional progress callback.
+
+        Returns:
+            ConversionResult with retry outcome.
+        """
+        return asyncio.run(self.retry_failed(record, on_progress))
+
+    def retry_all_failed_sync(
+        self,
+        on_progress: ProgressCallback | None = None,
+    ) -> ConversionReport:
+        """Synchronous wrapper for retry_all_failed.
+
+        Args:
+            on_progress: Optional progress callback.
+
+        Returns:
+            ConversionReport with retry results.
+        """
+        return asyncio.run(self.retry_all_failed(on_progress))
+
+    def get_failure_summary(self) -> dict:
+        """Get summary of all recorded failures.
+
+        Returns:
+            Dictionary with failure statistics.
+        """
+        return self.error_recovery_manager.get_failure_summary()
+
+    def clear_failure_records(self) -> int:
+        """Clear all failure records.
+
+        Returns:
+            Number of records cleared.
+        """
+        return self.error_recovery_manager.clear_failures()
+
+    def get_pause_reason(self) -> str | None:
+        """Get the reason for pause if paused.
+
+        Returns:
+            Pause reason string, or None if not paused.
+        """
+        return self._paused_reason if self._paused else None
