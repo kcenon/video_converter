@@ -124,11 +124,15 @@ class PhotosConfig(BaseModel):
         include_albums: List of album names to include (empty = all).
         exclude_albums: List of album names to exclude.
         download_from_icloud: Whether to download videos from iCloud.
+        icloud_timeout: Maximum time to wait for iCloud downloads in seconds.
+        skip_cloud_only: Skip videos that are only in iCloud (don't download).
     """
 
     include_albums: list[str] = Field(default_factory=list)
     exclude_albums: list[str] = Field(default_factory=lambda: ["Screenshots"])
     download_from_icloud: bool = True
+    icloud_timeout: int = Field(default=3600, ge=60, le=86400)
+    skip_cloud_only: bool = False
 
 
 class ProcessingConfig(BaseModel):
