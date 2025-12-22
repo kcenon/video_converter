@@ -149,12 +149,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pre-configured tolerance profiles (strict, default, relaxed)
 - Comprehensive unit tests (43 test cases)
 
+#### Concurrent Processing Support (#31)
+- ConcurrentProcessor class for parallel video processing with configurable max concurrent jobs
+- ResourceMonitor for system resource tracking (CPU, memory utilization)
+- AggregatedProgress for combined progress tracking across concurrent jobs
+- Semaphore-based concurrency limiting to prevent system overload
+- Automatic switching between sequential and concurrent processing based on max_concurrent setting
+- Thread-safe job progress management
+- Comprehensive unit tests (32 test cases)
+
 ### Planned
 - Rich progress bar display
 - Statistics and reporting
 - macOS Notification Center integration
-- Concurrent processing support
-- Retry logic for failed conversions
 - VMAF quality measurement (optional)
 
 [1.0.0]: https://github.com/kcenon/video_converter/releases/tag/v1.0.0
