@@ -98,6 +98,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for both simple (float 0-1) and detailed (ProgressInfo) callbacks in BaseConverter
 - Human-readable size formatting (size_formatted property)
 
+#### Validation Retry Logic (#27)
+- RetryManager class with configurable retry strategies
+- Four-stage retry: same settings → switch encoder → adjust quality → final attempt
+- Automatic encoder fallback (Hardware ↔ Software) on encoder-related failures
+- CRF adjustment for compression issues with configurable step size
+- RetryConfig for customizing max attempts, encoder switching, quality adjustment
+- RetryAttempt tracking with timing and failure classification
+- RetryResult with comprehensive failure reporting
+- Retry tracking fields in ConversionResult (retry_count, retry_strategy_used, retry_history)
+- Enable/disable retry via OrchestratorConfig.enable_retry
+- 35 unit tests covering all retry scenarios
+
 #### iCloud Video Download Handling (#16)
 - iCloudHandler class for detecting and downloading iCloud-stored videos
 - CloudStatus enum (LOCAL, CLOUD_ONLY, DOWNLOADING, FAILED, UNKNOWN)
