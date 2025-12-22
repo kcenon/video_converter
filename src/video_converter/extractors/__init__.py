@@ -1,9 +1,20 @@
 """Video extractors package.
 
 This package provides modules for extracting videos from various sources,
-primarily the macOS Photos library.
+including the macOS Photos library and filesystem folders.
+
+SDS Reference: SDS-E01 (Extractors Module)
 """
 
+from video_converter.extractors.folder_extractor import (
+    FolderAccessDeniedError,
+    FolderExtractor,
+    FolderExtractorError,
+    FolderNotFoundError,
+    FolderStats,
+    FolderVideoInfo,
+    InvalidVideoFileError,
+)
 from video_converter.extractors.photos_extractor import (
     ExportError,
     LibraryStats,
@@ -20,6 +31,15 @@ from video_converter.extractors.photos_extractor import (
 )
 
 __all__ = [
+    # Folder extractor
+    "FolderAccessDeniedError",
+    "FolderExtractor",
+    "FolderExtractorError",
+    "FolderNotFoundError",
+    "FolderStats",
+    "FolderVideoInfo",
+    "InvalidVideoFileError",
+    # Photos extractor
     "ExportError",
     "LibraryStats",
     "MediaType",
