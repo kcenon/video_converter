@@ -108,6 +108,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Option to skip cloud-only videos (skip_cloud_only option)
 - Eviction support for freeing local storage space
 
+#### Conversion History for Duplicate Prevention (#18)
+- ConversionHistory class for tracking converted videos
+- ConversionRecord dataclass for storing conversion metadata
+- HistoryStatistics for aggregated conversion statistics
+- Support for UUID (Photos) and file hash identification
+- JSON persistence with atomic file writes
+- Export functionality (JSON, CSV formats)
+- Thread-safe operations with RLock
+- Comprehensive unit tests (41 test cases)
+
 ### Planned
 - Rich progress bar display
 - Statistics and reporting
