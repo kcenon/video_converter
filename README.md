@@ -63,6 +63,12 @@ video-converter convert input.mp4 output.mp4 --force
 
 # Quiet mode for scripts
 video-converter -q convert input.mp4 output.mp4
+
+# Enable VMAF quality measurement
+video-converter convert input.mp4 --vmaf
+
+# Set custom VMAF threshold (fail if below 80)
+video-converter convert input.mp4 --vmaf --vmaf-threshold 80
 ```
 
 #### Progress Display
@@ -95,6 +101,8 @@ After conversion, a formatted summary is displayed:
 ├──────────────────────────────────────────────┤
 │  Duration:   3 min 45 sec                    │
 │  Speed:      6.2x realtime                   │
+├──────────────────────────────────────────────┤
+│  VMAF: 94.2 (Visually Lossless)              │
 ╰──────────────────────────────────────────────╯
 ```
 
@@ -393,6 +401,11 @@ Options:
                     Preserve original metadata (default: True)
   --validate/--no-validate
                     Validate output file after conversion (default: True)
+  --vmaf/--no-vmaf  Measure VMAF quality score after conversion (default: False)
+  --vmaf-threshold FLOAT
+                    Minimum acceptable VMAF score (default: 93.0)
+  --vmaf-sample-interval INT
+                    Frame sampling interval for VMAF analysis (default: 30)
   --help            Show help
 ```
 
@@ -577,7 +590,7 @@ Photos Library ──▶ H.264 Detection ──▶ VideoToolbox ──▶ H.265 
 
 - [x] v0.1.0.0 - CLI with automation (Released 2025-12-22)
 - [ ] v0.2.0.0 - VMAF quality verification, enhanced features (In Development)
-  - VMAF quality analysis
+  - [x] VMAF quality analysis (integrated into conversion pipeline)
   - macOS Notification Center integration
   - Statistics and reporting
   - Concurrent processing
