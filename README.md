@@ -142,7 +142,33 @@ video-converter run --source photos --limit 10
 
 # Combine multiple filters
 video-converter run --source photos --albums "Travel" --from-date 2024-06-01 --limit 50
+
+# Re-import converted videos back to Photos library
+video-converter run --source photos --reimport
+
+# Re-import and archive originals (default behavior)
+video-converter run --source photos --reimport --archive-album "Old H.264 Videos"
+
+# Re-import and keep both original and converted
+video-converter run --source photos --reimport --keep-originals
+
+# Re-import and delete originals (requires confirmation)
+video-converter run --source photos --reimport --delete-originals --confirm-delete
 ```
+
+#### Re-import Options
+
+When using `--reimport`, converted videos are imported back to your Photos library:
+
+| Option | Description |
+|--------|-------------|
+| `--reimport` | Enable re-import of converted videos to Photos |
+| `--archive-album NAME` | Archive originals to this album (default: "Converted Originals") |
+| `--keep-originals` | Keep both original and converted versions |
+| `--delete-originals` | Delete original videos after successful re-import |
+| `--confirm-delete` | Required safety confirmation for `--delete-originals` |
+
+By default (without `--keep-originals` or `--delete-originals`), original videos are moved to an archive album for later review.
 
 #### Dry Run Output
 
