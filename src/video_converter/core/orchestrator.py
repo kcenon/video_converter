@@ -67,6 +67,7 @@ from video_converter.processors.quality_validator import (
     ValidationStrictness,
     VideoValidator,
 )
+from video_converter.processors.timestamp import TimestampSynchronizer
 
 if TYPE_CHECKING:
     pass
@@ -89,6 +90,7 @@ class OrchestratorConfig:
         preset: Encoding preset for software encoding.
         output_suffix: Suffix to add to output filenames.
         preserve_metadata: Whether to copy metadata from original.
+        preserve_timestamps: Whether to sync timestamps from original.
         validate_output: Whether to validate converted files.
         validation_strictness: How strictly to validate output.
         max_concurrent: Maximum concurrent conversions.
@@ -104,6 +106,7 @@ class OrchestratorConfig:
     preset: str = "medium"
     output_suffix: str = "_h265"
     preserve_metadata: bool = True
+    preserve_timestamps: bool = True
     validate_output: bool = True
     validation_strictness: ValidationStrictness = ValidationStrictness.STANDARD
     max_concurrent: int = 2
@@ -147,6 +150,7 @@ class Orchestrator:
         config: Orchestrator configuration.
         converter_factory: Factory for creating converters.
         validator: Video file validator.
+        timestamp_synchronizer: Timestamp synchronization handler.
         session_manager: Session state manager for persistence.
     """
 
@@ -155,6 +159,7 @@ class Orchestrator:
         config: OrchestratorConfig | None = None,
         converter_factory: ConverterFactory | None = None,
         validator: VideoValidator | None = None,
+        timestamp_synchronizer: TimestampSynchronizer | None = None,
         session_manager: SessionStateManager | None = None,
         enable_session_persistence: bool = True,
     ) -> None:
@@ -164,12 +169,14 @@ class Orchestrator:
             config: Optional configuration. Uses defaults if not provided.
             converter_factory: Optional converter factory.
             validator: Optional video validator.
+            timestamp_synchronizer: Optional timestamp synchronizer.
             session_manager: Optional session state manager.
             enable_session_persistence: Whether to enable session persistence.
         """
         self.config = config or OrchestratorConfig()
         self.converter_factory = converter_factory or ConverterFactory()
         self.validator = validator or VideoValidator()
+        self.timestamp_synchronizer = timestamp_synchronizer or TimestampSynchronizer()
         self._enable_session_persistence = enable_session_persistence
 
         if enable_session_persistence:
@@ -429,7 +436,36 @@ class Orchestrator:
 
             result.warnings.extend(validation.warnings)
 
-        # Stage 3: Cleanup
+        # Stage 3: Metadata - Sync timestamps
+        if self.config.preserve_timestamps:
+            self._emit_progress(
+                on_progress,
+                ConversionStage.METADATA,
+                ConversionStatus.IN_PROGRESS,
+                current_file=input_path.name,
+                message=f"Syncing timestamps for {output_path.name}...",
+            )
+
+            timestamp_result = self.timestamp_synchronizer.sync_from_file(
+                source=input_path,
+                dest=output_path,
+            )
+
+            if not timestamp_result.success:
+                result.warnings.append(
+                    f"Timestamp sync incomplete: {timestamp_result.warnings}"
+                )
+            elif timestamp_result.warnings:
+                result.warnings.extend(timestamp_result.warnings)
+
+            logger.debug(
+                "Timestamp sync result: birth=%s, mtime=%s, atime=%s",
+                timestamp_result.birth_time_synced,
+                timestamp_result.modification_time_synced,
+                timestamp_result.access_time_synced,
+            )
+
+        # Stage 4: Cleanup
         self._emit_progress(
             on_progress,
             ConversionStage.CLEANUP,
