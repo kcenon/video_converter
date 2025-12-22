@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Photos Library Permission Check and User Guidance (#96)
+- `--check-permissions` flag for verifying Photos library access before conversion
+- Rich panel display for permission errors with step-by-step instructions
+- `display_photos_permission_error()` function for access denied and not found errors
+- `display_photos_permission_success()` function for successful permission check
+- `display_photos_library_info()` function for library statistics display
+- Quick access command to open System Settings directly
+- Improved error handling with `PhotosLibraryNotFoundError` and `PhotosAccessDeniedError`
+
 #### Photos Library Re-Import Support (#101)
 - `PhotosImporter` class for importing converted videos back to Photos library
 - AppleScript integration via `osascript` command for Photos.app automation
