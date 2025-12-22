@@ -114,6 +114,62 @@ video-converter run --input-dir ~/Videos --dry-run
 video-converter run --input-dir ~/Videos --output-dir ~/Converted
 ```
 
+### Batch Conversion (Photos Library)
+
+Convert H.264 videos directly from your macOS Photos library:
+
+```bash
+# Convert all H.264 videos from Photos library
+video-converter run --source photos
+
+# Preview what would be converted (dry run)
+video-converter run --source photos --dry-run
+
+# Convert specific albums only
+video-converter run --source photos --albums "Vacation,Family"
+
+# Exclude certain albums
+video-converter run --source photos --exclude-albums "Screenshots,Bursts"
+
+# Filter by date range
+video-converter run --source photos --from-date 2024-01-01 --to-date 2024-12-31
+
+# Convert only favorite videos
+video-converter run --source photos --favorites-only
+
+# Limit number of videos to convert
+video-converter run --source photos --limit 10
+
+# Combine multiple filters
+video-converter run --source photos --albums "Travel" --from-date 2024-06-01 --limit 50
+```
+
+#### Dry Run Output
+
+```
+              Photos Videos to Convert (Dry Run)
+┏━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━┓
+┃ Filename               ┃ Size    ┃ Date       ┃ Album       ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━┩
+│ vacation_clip.mov      │ 245.3 MB│ 2024-07-15 │ Vacation    │
+│ family_dinner.mp4      │ 180.2 MB│ 2024-06-20 │ Family (+2) │
+│ birthday_party.mov     │ 520.8 MB│ 2024-05-10 │ Events      │
+└────────────────────────┴─────────┴────────────┴─────────────┘
+
+Total: 3 files, 946.3 MB
+
+Run without --dry-run to start conversion.
+```
+
+#### Photos Access Permission
+
+On first run, you'll need to grant Full Disk Access:
+
+1. Open **System Settings** → **Privacy & Security** → **Full Disk Access**
+2. Click the **+** button
+3. Add **Terminal.app** (or your terminal application)
+4. Enable the toggle and restart the application
+
 #### Concurrent Processing
 
 When converting multiple files, the converter supports concurrent processing for faster batch operations:
