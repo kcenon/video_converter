@@ -92,6 +92,8 @@ def mock_config_data() -> dict:
             "include_albums": [],
             "exclude_albums": ["Screenshots"],
             "download_from_icloud": True,
+            "icloud_timeout": 3600,
+            "skip_cloud_only": False,
         },
         "processing": {
             "max_concurrent": 2,

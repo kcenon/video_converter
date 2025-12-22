@@ -15,6 +15,14 @@ from video_converter.extractors.folder_extractor import (
     FolderVideoInfo,
     InvalidVideoFileError,
 )
+from video_converter.extractors.icloud_handler import (
+    CloudStatus,
+    DownloadProgress,
+    iCloudDownloadError,
+    iCloudError,
+    iCloudHandler,
+    iCloudTimeoutError,
+)
 from video_converter.extractors.photos_extractor import (
     ExportError,
     LibraryStats,
@@ -39,6 +47,13 @@ __all__ = [
     "FolderStats",
     "FolderVideoInfo",
     "InvalidVideoFileError",
+    # iCloud handler
+    "CloudStatus",
+    "DownloadProgress",
+    "iCloudDownloadError",
+    "iCloudError",
+    "iCloudHandler",
+    "iCloudTimeoutError",
     # Photos extractor
     "ExportError",
     "LibraryStats",
