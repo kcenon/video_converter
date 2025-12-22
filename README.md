@@ -434,6 +434,9 @@ Photos Library ──▶ H.264 Detection ──▶ VideoToolbox ──▶ H.265 
 
 | Document | Description |
 |----------|-------------|
+| [Quick Start](QUICK_START.md) | Get started in 5 minutes |
+| [Troubleshooting](TROUBLESHOOTING.md) | Common issues and solutions |
+| [Changelog](CHANGELOG.md) | Version history and changes |
 | [PRD](docs/PRD.md) | Product Requirements Document |
 | [SRS](docs/SRS.md) | Software Requirements Specification |
 | [SDS](docs/SDS.md) | Software Design Specification |
