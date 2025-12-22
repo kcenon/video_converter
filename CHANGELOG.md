@@ -12,6 +12,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Integration Tests for v0.2.0.0 Features (#115)
+- `test_vmaf_integration.py` - VMAF quality validation workflow (29 tests):
+  - VmafAnalyzer availability and analysis methods
+  - VmafQualityLevel thresholds (93 for lossless, 80 for high, 60 for good)
+  - VmafScores and VmafResult dataclasses
+  - Quick analyze and validation workflow integration
+- `test_concurrent_integration.py` - Concurrent processing support (24 tests):
+  - ResourceMonitor level categorization and concurrency recommendations
+  - ConcurrentProcessor batch processing with async/await
+  - JobProgress and AggregatedProgress tracking
+  - Adaptive concurrency under resource pressure
+- `test_error_recovery_integration.py` - Error recovery and retry strategies (34 tests):
+  - ErrorClassifier for categorizing error messages
+  - RecoveryAction mappings for different error categories
+  - FailureRecord tracking and RetryManager strategies
+  - Disk space checking and cleanup operations
+- `test_icloud_folder_integration.py` - iCloud folder support (31 tests):
+  - FolderExtractor iCloud stub detection (`.filename.icloud` format)
+  - iCloudHandler status checking, download triggering, and eviction
+  - CloudStatus enum and FolderVideoInfo iCloud properties
+  - Nested folder scanning with iCloud file handling
+- `test_statistics_integration.py` - Statistics reporting (47 tests):
+  - Size and duration formatting utilities
+  - StatisticsReporter summary, compact, and detailed formats
+  - JSON and CSV export with comment headers
+  - Period display formatting (today, week, month, all time)
+- `test_notification_integration.py` - macOS notification integration (49 tests):
+  - NotificationManager configuration and availability checking
+  - AppleScript-based notification sending
+  - Batch notification formatting and type determination
+  - Graceful degradation on non-macOS platforms
+
 #### Original Video Handling Options for Photos Re-import (#102)
 - `OriginalHandling` enum with three options:
   - `DELETE`: Permanently remove original video after successful re-import
