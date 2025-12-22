@@ -47,6 +47,51 @@ class ConversionMode(Enum):
     SOFTWARE = "software"
 
 
+class ErrorCategory(Enum):
+    """Category of conversion error for recovery action determination.
+
+    SDS Reference: SDS-C01-004
+    SRS Reference: SRS-605 (Failure Isolation)
+
+    Attributes:
+        INPUT_ERROR: Input file issue (missing, corrupt, unsupported format).
+        ENCODING_ERROR: Encoder failure during conversion.
+        VALIDATION_ERROR: Output file failed quality validation.
+        METADATA_ERROR: Metadata copy/sync failure (non-fatal).
+        DISK_SPACE_ERROR: Insufficient disk space.
+        PERMISSION_ERROR: File permission or access denied.
+        UNKNOWN_ERROR: Unclassified error.
+    """
+
+    INPUT_ERROR = "input_error"
+    ENCODING_ERROR = "encoding_error"
+    VALIDATION_ERROR = "validation_error"
+    METADATA_ERROR = "metadata_error"
+    DISK_SPACE_ERROR = "disk_space_error"
+    PERMISSION_ERROR = "permission_error"
+    UNKNOWN_ERROR = "unknown_error"
+
+
+class RecoveryAction(Enum):
+    """Recommended recovery action for an error category.
+
+    Attributes:
+        SKIP: Skip this file and continue with next.
+        RETRY_WITH_FALLBACK: Retry with alternative encoder/settings.
+        RETRY_ONCE: Retry one more time with same settings.
+        KEEP_VIDEO_LOG_WARNING: Keep converted video, log the warning.
+        PAUSE_NOTIFY_USER: Pause processing and notify user.
+        ABORT: Stop all processing.
+    """
+
+    SKIP = "skip"
+    RETRY_WITH_FALLBACK = "retry_with_fallback"
+    RETRY_ONCE = "retry_once"
+    KEEP_VIDEO_LOG_WARNING = "keep_video_log_warning"
+    PAUSE_NOTIFY_USER = "pause_notify_user"
+    ABORT = "abort"
+
+
 class QueuePriority(Enum):
     """Queue priority ordering for batch processing.
 

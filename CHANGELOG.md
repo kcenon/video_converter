@@ -76,6 +76,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Failure Isolation and Error Recovery (#32)
+- ErrorCategory enum for classifying conversion failures (input, encoding, validation, metadata, disk space, permission)
+- RecoveryAction enum for recommended recovery actions per error category
+- ErrorRecoveryManager class for centralized error handling
+- Automatic error classification based on error message patterns
+- Disk space monitoring with configurable minimum threshold
+- Automatic pause on low disk space with `pause_on_disk_full` option
+- Partial output file cleanup on conversion failure
+- FailureRecord dataclass for tracking failed conversions
+- Manual retry API: `retry_failed()`, `retry_all_failed()` methods
+- Failure summary with statistics by error category
+- Failed file movement with collision handling
+
 #### 10-bit HDR Encoding Support
 - Add `bit_depth` option for 8-bit and 10-bit encoding
 - Add `hdr` option for HDR10 (BT.2020 PQ) color space encoding

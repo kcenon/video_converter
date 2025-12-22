@@ -49,6 +49,13 @@ from video_converter.core.session import (
     SessionStateManager,
     get_session_manager,
 )
+from video_converter.core.error_recovery import (
+    DEFAULT_MIN_FREE_SPACE,
+    DiskSpaceInfo,
+    ERROR_RECOVERY_MAPPING,
+    ErrorRecoveryManager,
+    FailureRecord,
+)
 from video_converter.core.types import (
     BatchStatus,
     CompleteCallback,
@@ -59,8 +66,10 @@ from video_converter.core.types import (
     ConversionResult,
     ConversionStage,
     ConversionStatus,
+    ErrorCategory,
     ProgressCallback,
     QueuePriority,
+    RecoveryAction,
     SessionState,
     SessionStatus,
     VideoEntry,
@@ -82,6 +91,14 @@ __all__ = [
     "ResourceLevel",
     "ResourceMonitor",
     "ResourceStatus",
+    # Error Recovery
+    "DEFAULT_MIN_FREE_SPACE",
+    "DiskSpaceInfo",
+    "ERROR_RECOVERY_MAPPING",
+    "ErrorCategory",
+    "ErrorRecoveryManager",
+    "FailureRecord",
+    "RecoveryAction",
     # History
     "ConversionHistory",
     "ConversionRecord",
