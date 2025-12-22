@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -506,6 +507,41 @@ def convert(
     is_flag=True,
     help="Resume a previously interrupted session.",
 )
+@click.option(
+    "--albums",
+    type=str,
+    default=None,
+    help="Photos mode: Comma-separated list of albums to include.",
+)
+@click.option(
+    "--exclude-albums",
+    type=str,
+    default=None,
+    help="Photos mode: Comma-separated list of albums to exclude.",
+)
+@click.option(
+    "--from-date",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=None,
+    help="Photos mode: Only include videos from this date (YYYY-MM-DD).",
+)
+@click.option(
+    "--to-date",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=None,
+    help="Photos mode: Only include videos until this date (YYYY-MM-DD).",
+)
+@click.option(
+    "--favorites-only",
+    is_flag=True,
+    help="Photos mode: Only include favorite videos.",
+)
+@click.option(
+    "--limit",
+    type=int,
+    default=None,
+    help="Photos mode: Maximum number of videos to convert.",
+)
 @click.pass_context
 def run(
     ctx: click.Context,
@@ -515,6 +551,12 @@ def run(
     recursive: bool,
     dry_run: bool,
     resume: bool,
+    albums: str | None,
+    exclude_albums: str | None,
+    from_date: datetime | None,
+    to_date: datetime | None,
+    favorites_only: bool,
+    limit: int | None,
 ) -> None:
     """Run batch conversion on multiple videos.
 
@@ -533,6 +575,18 @@ def run(
 
         # Resume an interrupted session
         video-converter run --resume
+
+        # Convert from Photos library
+        video-converter run --source photos
+
+        # Convert specific albums from Photos
+        video-converter run --source photos --albums "Vacation,Family"
+
+        # Convert with date range from Photos
+        video-converter run --source photos --from-date 2024-01-01 --to-date 2024-12-31
+
+        # Dry run for Photos (preview only)
+        video-converter run --source photos --dry-run --limit 10
     """
     cli_ctx: CLIContext = ctx.obj
     config = cli_ctx.config
@@ -577,9 +631,17 @@ def run(
         _run_batch_conversion(cli_ctx, h264_videos, output_dir)
 
     elif source == "photos":
-        console.print("[yellow]Photos library integration is not yet implemented.[/yellow]")
-        console.print("Use --source folder --input-dir <path> instead.")
-        sys.exit(1)
+        _run_photos_conversion(
+            cli_ctx=cli_ctx,
+            output_dir=output_dir,
+            dry_run=dry_run,
+            albums=albums,
+            exclude_albums=exclude_albums,
+            from_date=from_date,
+            to_date=to_date,
+            favorites_only=favorites_only,
+            limit=limit,
+        )
 
 
 def _scan_for_videos(input_dir: Path, recursive: bool) -> list[Path]:
@@ -752,6 +814,284 @@ def _run_batch_conversion(
         console.print(f"  Duration:   {report.duration}")
 
     if report.failed > 0:
+        sys.exit(1)
+
+
+def _run_photos_conversion(
+    cli_ctx: CLIContext,
+    output_dir: Path | None,
+    dry_run: bool,
+    albums: str | None,
+    exclude_albums: str | None,
+    from_date: datetime | None,
+    to_date: datetime | None,
+    favorites_only: bool,
+    limit: int | None,
+) -> None:
+    """Run conversion on Photos library videos.
+
+    Args:
+        cli_ctx: CLI context.
+        output_dir: Output directory for converted files.
+        dry_run: Whether to only preview without converting.
+        albums: Comma-separated list of albums to include.
+        exclude_albums: Comma-separated list of albums to exclude.
+        from_date: Only include videos from this date.
+        to_date: Only include videos until this date.
+        favorites_only: Only include favorite videos.
+        limit: Maximum number of videos to convert.
+    """
+    from video_converter.handlers.photos_handler import (
+        PhotosConversionOptions,
+        PhotosSourceHandler,
+    )
+
+    config = cli_ctx.config
+
+    # Initialize handler
+    with PhotosSourceHandler() as handler:
+        # Check permissions
+        if not handler.check_permissions():
+            console.print("[red]✗ Photos library access denied[/red]", err=True)
+            console.print()
+            console.print(handler.get_permission_instructions())
+            sys.exit(1)
+
+        # Parse album options
+        albums_list = [a.strip() for a in albums.split(",")] if albums else None
+        exclude_list = (
+            [a.strip() for a in exclude_albums.split(",")]
+            if exclude_albums
+            else None
+        )
+
+        # Create conversion options
+        options = PhotosConversionOptions(
+            albums=albums_list,
+            exclude_albums=exclude_list,
+            from_date=from_date,
+            to_date=to_date,
+            favorites_only=favorites_only,
+            limit=limit,
+            dry_run=dry_run,
+        )
+
+        # Get conversion candidates
+        console.print("[bold]Scanning Photos library for H.264 videos...[/bold]")
+        candidates = handler.get_candidates(options)
+
+        if not candidates:
+            console.print("[yellow]No H.264 videos found to convert.[/yellow]")
+            return
+
+        console.print(
+            f"[bold]Found {len(candidates)} H.264 video(s) to convert[/bold]"
+        )
+        console.print()
+
+        if dry_run:
+            _display_photos_dry_run(candidates, output_dir)
+            return
+
+        # Run conversion
+        _run_photos_batch_conversion(cli_ctx, handler, candidates, output_dir)
+
+
+def _display_photos_dry_run(
+    candidates: list,
+    output_dir: Path | None,
+) -> None:
+    """Display what would be converted from Photos in dry run mode.
+
+    Args:
+        candidates: List of PhotosVideoInfo candidates.
+        output_dir: Output directory.
+    """
+    table = Table(title="Photos Videos to Convert (Dry Run)")
+    table.add_column("Filename", style="cyan")
+    table.add_column("Size", style="green")
+    table.add_column("Date", style="blue")
+    table.add_column("Album", style="yellow")
+
+    total_size = 0
+    for video in candidates:
+        size_mb = video.size / (1024 * 1024) if video.size else 0
+        total_size += size_mb
+
+        date_str = video.date.strftime("%Y-%m-%d") if video.date else "Unknown"
+        album_str = video.albums[0] if video.albums else "-"
+        if len(video.albums) > 1:
+            album_str += f" (+{len(video.albums) - 1})"
+
+        table.add_row(
+            video.filename[:40] + "..." if len(video.filename) > 40 else video.filename,
+            f"{size_mb:.1f} MB",
+            date_str,
+            album_str,
+        )
+
+    console.print(table)
+    console.print()
+    console.print(f"[bold]Total:[/bold] {len(candidates)} files, {total_size:.1f} MB")
+    console.print()
+    console.print("[dim]Run without --dry-run to start conversion.[/dim]")
+
+
+def _run_photos_batch_conversion(
+    cli_ctx: CLIContext,
+    handler,
+    candidates: list,
+    output_dir: Path | None,
+) -> None:
+    """Run batch conversion for Photos library videos.
+
+    Args:
+        cli_ctx: CLI context.
+        handler: PhotosSourceHandler instance.
+        candidates: List of PhotosVideoInfo to convert.
+        output_dir: Output directory for converted files.
+    """
+    config = cli_ctx.config
+
+    # Create output directory if specified
+    if output_dir:
+        output_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        # Use config default or temp directory
+        output_dir = config.paths.output
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Resolve conversion mode
+    conv_mode = ConversionMode.HARDWARE
+    if config.encoding.mode == "software":
+        conv_mode = ConversionMode.SOFTWARE
+
+    # Create orchestrator
+    orch_config = OrchestratorConfig(
+        mode=conv_mode,
+        quality=config.encoding.quality,
+        crf=config.encoding.crf,
+        preset=config.encoding.preset,
+        preserve_metadata=True,
+        validate_output=config.processing.validate_quality,
+    )
+    orchestrator = Orchestrator(config=orch_config, enable_session_persistence=False)
+
+    # Progress display
+    progress_manager = ProgressDisplayManager(quiet=cli_ctx.quiet, console=console)
+    batch_progress = progress_manager.create_batch_progress(total_files=len(candidates))
+    batch_progress.start()
+
+    # Statistics
+    successful = 0
+    failed = 0
+    total_original = 0
+    total_converted = 0
+    errors: list[str] = []
+
+    try:
+        for idx, video in enumerate(candidates):
+            batch_progress.start_file(
+                filename=video.filename,
+                file_index=idx + 1,
+                original_size=video.size,
+            )
+
+            try:
+                # Export video from Photos
+                exported_path = handler.export_video(video)
+                total_original += video.size
+
+                # Generate output path
+                output_path = output_dir / f"{exported_path.stem}_h265.mp4"
+
+                # Create conversion request
+                from video_converter.core.types import ConversionRequest
+                request = ConversionRequest(
+                    input_path=exported_path,
+                    output_path=output_path,
+                    mode=conv_mode,
+                    quality=config.encoding.quality,
+                    crf=config.encoding.crf,
+                    preset=config.encoding.preset,
+                    preserve_metadata=True,
+                )
+
+                # Get converter
+                converter = orchestrator.converter_factory.get_converter(conv_mode)
+
+                # Run conversion
+                def on_progress_info(info) -> None:
+                    if hasattr(info, "percentage"):
+                        batch_progress.update_file(
+                            percentage=info.percentage,
+                            current_size=0,
+                            eta=f"{int(info.eta)}s" if hasattr(info, "eta") and info.eta else "",
+                            speed=info.speed if hasattr(info, "speed") else 0.0,
+                        )
+
+                result = asyncio.run(
+                    converter.convert(request, on_progress_info=on_progress_info)
+                )
+
+                if result.success:
+                    successful += 1
+                    total_converted += result.converted_size
+                    batch_progress.complete_file(saved_bytes=result.size_saved)
+                else:
+                    failed += 1
+                    errors.append(f"{video.filename}: {result.error_message}")
+                    batch_progress.complete_file(saved_bytes=0)
+
+                # Cleanup exported file
+                handler.cleanup_exported(exported_path)
+
+            except Exception as e:
+                failed += 1
+                errors.append(f"{video.filename}: {e}")
+                batch_progress.complete_file(saved_bytes=0)
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to convert {video.filename}: {e}")
+
+    except KeyboardInterrupt:
+        console.print()
+        console.print("[yellow]Conversion cancelled by user.[/yellow]")
+        batch_progress.finish()
+        sys.exit(130)
+    finally:
+        batch_progress.finish()
+
+    # Display results
+    console.print()
+    console.print("═" * 50)
+    console.print("[bold]Photos Conversion Complete[/bold]")
+    console.print("═" * 50)
+    console.print()
+
+    console.print(f"  Total files:   {len(candidates)}")
+    console.print(f"  [green]Successful:[/green]   {successful}")
+    console.print(f"  [red]Failed:[/red]       {failed}")
+
+    if total_original > 0:
+        original_mb = total_original / (1024 * 1024)
+        converted_mb = total_converted / (1024 * 1024)
+        saved_mb = original_mb - converted_mb
+        saved_pct = (saved_mb / original_mb) * 100 if original_mb > 0 else 0
+
+        console.print()
+        console.print(f"  Original:   {original_mb:.1f} MB")
+        console.print(f"  Converted:  {converted_mb:.1f} MB")
+        console.print(f"  [green]Saved:      {saved_mb:.1f} MB ({saved_pct:.1f}%)[/green]")
+
+    if errors:
+        console.print()
+        console.print("[red]Errors:[/red]")
+        for error in errors[:5]:  # Show first 5 errors
+            console.print(f"  • {error}")
+        if len(errors) > 5:
+            console.print(f"  ... and {len(errors) - 5} more errors")
+
+    if failed > 0:
         sys.exit(1)
 
 
