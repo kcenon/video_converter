@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import plistlib
-import subprocess
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -422,6 +421,232 @@ class TestServiceManager:
 
         assert "Line 1" in logs["stdout"]
         assert "Error 1" in logs["stderr"]
+
+
+class TestLoadUnload:
+    """Tests for load/unload operations."""
+
+    @pytest.fixture
+    def temp_dir(self) -> Path:
+        """Create a temporary directory for tests."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    @pytest.fixture
+    def manager(self, temp_dir: Path) -> ServiceManager:
+        """Create a ServiceManager with temporary paths."""
+        plist_path = temp_dir / "test.plist"
+        log_dir = temp_dir / "logs"
+        return ServiceManager(plist_path=plist_path, log_dir=log_dir)
+
+    def test_load_not_installed(self, manager: ServiceManager) -> None:
+        """Test load when service is not installed."""
+        result = manager.load()
+
+        assert not result.success
+        assert "not installed" in result.message
+
+    @patch("subprocess.run")
+    def test_load_already_loaded(
+        self, mock_run: MagicMock, manager: ServiceManager
+    ) -> None:
+        """Test load when service is already loaded."""
+        # Create plist file
+        plist = {"Label": SERVICE_LABEL}
+        manager.plist_path.parent.mkdir(parents=True, exist_ok=True)
+        with manager.plist_path.open("wb") as f:
+            plistlib.dump(plist, f)
+
+        # Mock launchctl list to show service is loaded
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout=f"-\t0\t{SERVICE_LABEL}\n",
+        )
+
+        result = manager.load()
+
+        assert result.success
+        assert "already loaded" in result.message
+
+    @patch("subprocess.run")
+    def test_load_success(
+        self, mock_run: MagicMock, manager: ServiceManager
+    ) -> None:
+        """Test successful load."""
+        # Create plist file
+        plist = {"Label": SERVICE_LABEL}
+        manager.plist_path.parent.mkdir(parents=True, exist_ok=True)
+        with manager.plist_path.open("wb") as f:
+            plistlib.dump(plist, f)
+
+        # Mock launchctl list (not loaded) and load (success)
+        def mock_subprocess(cmd, **kwargs):
+            if "list" in cmd:
+                return MagicMock(returncode=0, stdout="")
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        mock_run.side_effect = mock_subprocess
+
+        result = manager.load()
+
+        assert result.success
+
+    def test_unload_not_installed(self, manager: ServiceManager) -> None:
+        """Test unload when service is not installed."""
+        result = manager.unload()
+
+        assert not result.success
+        assert "not installed" in result.message
+
+    @patch("subprocess.run")
+    def test_unload_not_loaded(
+        self, mock_run: MagicMock, manager: ServiceManager
+    ) -> None:
+        """Test unload when service is not loaded."""
+        # Create plist file
+        plist = {"Label": SERVICE_LABEL}
+        manager.plist_path.parent.mkdir(parents=True, exist_ok=True)
+        with manager.plist_path.open("wb") as f:
+            plistlib.dump(plist, f)
+
+        # Mock launchctl list to show service is not loaded
+        mock_run.return_value = MagicMock(returncode=0, stdout="")
+
+        result = manager.unload()
+
+        assert result.success
+        assert "already unloaded" in result.message
+
+    @patch("subprocess.run")
+    def test_unload_success(
+        self, mock_run: MagicMock, manager: ServiceManager
+    ) -> None:
+        """Test successful unload."""
+        # Create plist file
+        plist = {"Label": SERVICE_LABEL}
+        manager.plist_path.parent.mkdir(parents=True, exist_ok=True)
+        with manager.plist_path.open("wb") as f:
+            plistlib.dump(plist, f)
+
+        # Mock launchctl list (loaded) and unload (success)
+        def mock_subprocess(cmd, **kwargs):
+            if "list" in cmd:
+                return MagicMock(
+                    returncode=0,
+                    stdout=f"-\t0\t{SERVICE_LABEL}\n",
+                )
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        mock_run.side_effect = mock_subprocess
+
+        result = manager.unload()
+
+        assert result.success
+
+    @patch("subprocess.run")
+    def test_restart_success(
+        self, mock_run: MagicMock, manager: ServiceManager
+    ) -> None:
+        """Test successful restart."""
+        # Create plist file
+        plist = {"Label": SERVICE_LABEL}
+        manager.plist_path.parent.mkdir(parents=True, exist_ok=True)
+        with manager.plist_path.open("wb") as f:
+            plistlib.dump(plist, f)
+
+        call_count = 0
+
+        def mock_subprocess(cmd, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if "list" in cmd:
+                # First call: loaded, after unload: not loaded
+                if call_count <= 2:
+                    return MagicMock(
+                        returncode=0,
+                        stdout=f"-\t0\t{SERVICE_LABEL}\n",
+                    )
+                return MagicMock(returncode=0, stdout="")
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        mock_run.side_effect = mock_subprocess
+
+        result = manager.restart()
+
+        assert result.success
+        assert "restarted" in result.message
+
+    def test_restart_not_installed(self, manager: ServiceManager) -> None:
+        """Test restart when service is not installed."""
+        result = manager.restart()
+
+        assert not result.success
+        assert "not installed" in result.message
+
+
+class TestPermissions:
+    """Tests for permission checking."""
+
+    @pytest.fixture
+    def temp_dir(self) -> Path:
+        """Create a temporary directory for tests."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    @pytest.fixture
+    def manager(self, temp_dir: Path) -> ServiceManager:
+        """Create a ServiceManager with temporary paths."""
+        plist_path = temp_dir / "test.plist"
+        log_dir = temp_dir / "logs"
+        return ServiceManager(plist_path=plist_path, log_dir=log_dir)
+
+    def test_check_permissions_file_not_found(
+        self, manager: ServiceManager
+    ) -> None:
+        """Test permission check when file doesn't exist."""
+        result = manager._check_plist_permissions()
+
+        assert not result.success
+        assert "not exist" in result.message
+
+    def test_check_permissions_readable(self, manager: ServiceManager) -> None:
+        """Test permission check for readable file."""
+        import stat
+
+        # Create plist file with readable permissions
+        plist = {"Label": SERVICE_LABEL}
+        manager.plist_path.parent.mkdir(parents=True, exist_ok=True)
+        with manager.plist_path.open("wb") as f:
+            plistlib.dump(plist, f)
+
+        # Ensure file is readable
+        manager.plist_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+
+        result = manager._check_plist_permissions()
+
+        assert result.success
+
+    def test_check_permissions_world_writable(
+        self, manager: ServiceManager
+    ) -> None:
+        """Test permission check for world-writable file."""
+        import stat
+
+        # Create plist file
+        plist = {"Label": SERVICE_LABEL}
+        manager.plist_path.parent.mkdir(parents=True, exist_ok=True)
+        with manager.plist_path.open("wb") as f:
+            plistlib.dump(plist, f)
+
+        # Make file world-writable
+        manager.plist_path.chmod(
+            stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH | stat.S_IWOTH
+        )
+
+        result = manager._check_plist_permissions()
+
+        assert not result.success
+        assert "world-writable" in result.message
 
 
 class TestScheduleDescription:

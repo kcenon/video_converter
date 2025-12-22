@@ -415,6 +415,173 @@ class ServiceManager:
                 error=str(e),
             )
 
+    def load(self) -> ServiceResult:
+        """Load the service into launchd.
+
+        This is the public wrapper for loading the service plist into launchd.
+        The service must be installed (plist file exists) before loading.
+
+        Returns:
+            ServiceResult with success status and message.
+
+        Example:
+            >>> manager = ServiceManager()
+            >>> result = manager.load()
+            >>> if result.success:
+            ...     print("Service loaded into launchd")
+        """
+        status = self.get_status()
+
+        if not status.is_installed:
+            return ServiceResult(
+                success=False,
+                message="Service is not installed. Run 'install-service' first.",
+                error="Plist file not found",
+            )
+
+        if status.is_loaded:
+            return ServiceResult(
+                success=True,
+                message="Service is already loaded",
+            )
+
+        # Check plist file permissions
+        perm_result = self._check_plist_permissions()
+        if not perm_result.success:
+            return perm_result
+
+        return self._load_service()
+
+    def unload(self) -> ServiceResult:
+        """Unload the service from launchd.
+
+        This is the public wrapper for unloading the service from launchd.
+        The service will stop running but the plist file remains installed.
+
+        Returns:
+            ServiceResult with success status and message.
+
+        Example:
+            >>> manager = ServiceManager()
+            >>> result = manager.unload()
+            >>> if result.success:
+            ...     print("Service unloaded from launchd")
+        """
+        status = self.get_status()
+
+        if not status.is_installed:
+            return ServiceResult(
+                success=False,
+                message="Service is not installed",
+                error="Plist file not found",
+            )
+
+        if not status.is_loaded:
+            return ServiceResult(
+                success=True,
+                message="Service is already unloaded",
+            )
+
+        return self._unload_service()
+
+    def restart(self) -> ServiceResult:
+        """Restart the service.
+
+        Unloads and reloads the service from launchd.
+
+        Returns:
+            ServiceResult with success status and message.
+
+        Example:
+            >>> manager = ServiceManager()
+            >>> result = manager.restart()
+            >>> if result.success:
+            ...     print("Service restarted")
+        """
+        status = self.get_status()
+
+        if not status.is_installed:
+            return ServiceResult(
+                success=False,
+                message="Service is not installed",
+                error="Plist file not found",
+            )
+
+        # Unload if loaded
+        if status.is_loaded:
+            unload_result = self._unload_service()
+            if not unload_result.success:
+                return ServiceResult(
+                    success=False,
+                    message="Failed to restart service",
+                    error=f"Unload failed: {unload_result.error}",
+                )
+
+        # Load the service
+        load_result = self._load_service()
+        if not load_result.success:
+            return ServiceResult(
+                success=False,
+                message="Failed to restart service",
+                error=f"Load failed: {load_result.error}",
+            )
+
+        return ServiceResult(
+            success=True,
+            message="Service restarted successfully",
+        )
+
+    def _check_plist_permissions(self) -> ServiceResult:
+        """Check if plist file has correct permissions.
+
+        launchd requires plist files to have appropriate permissions
+        (readable by user, not world-writable).
+
+        Returns:
+            ServiceResult indicating if permissions are correct.
+        """
+        if not self.plist_path.exists():
+            return ServiceResult(
+                success=False,
+                message="Plist file does not exist",
+                error="File not found",
+            )
+
+        try:
+            import stat
+
+            file_stat = self.plist_path.stat()
+            mode = file_stat.st_mode
+
+            # Check if file is readable by owner
+            if not (mode & stat.S_IRUSR):
+                return ServiceResult(
+                    success=False,
+                    message="Plist file is not readable",
+                    error="Fix with: chmod u+r " + str(self.plist_path),
+                )
+
+            # Check if file is world-writable (security issue)
+            if mode & stat.S_IWOTH:
+                return ServiceResult(
+                    success=False,
+                    message="Plist file is world-writable (security risk)",
+                    error="Fix with: chmod o-w " + str(self.plist_path),
+                )
+
+            return ServiceResult(
+                success=True,
+                message="Plist file permissions are correct",
+            )
+
+        except Exception as e:
+            logger.warning(f"Failed to check plist permissions: {e}")
+            # Don't fail on permission check errors, let launchctl handle it
+            return ServiceResult(
+                success=True,
+                message="Permission check skipped",
+            )
+
     def _load_service(self) -> ServiceResult:
         """Load the service into launchd.
 
