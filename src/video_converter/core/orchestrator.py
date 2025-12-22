@@ -67,6 +67,10 @@ from video_converter.processors.quality_validator import (
     ValidationStrictness,
     VideoValidator,
 )
+from video_converter.processors.retry_manager import (
+    RetryConfig,
+    RetryManager,
+)
 from video_converter.processors.timestamp import TimestampSynchronizer
 
 if TYPE_CHECKING:
@@ -98,6 +102,8 @@ class OrchestratorConfig:
         move_to_processed: Directory to move processed originals.
         move_to_failed: Directory to move failed files.
         queue_priority: Priority ordering for batch queue.
+        enable_retry: Whether to retry failed conversions.
+        retry_config: Configuration for retry behavior.
     """
 
     mode: ConversionMode = ConversionMode.HARDWARE
@@ -114,6 +120,8 @@ class OrchestratorConfig:
     move_to_processed: Path | None = None
     move_to_failed: Path | None = None
     queue_priority: QueuePriority = QueuePriority.FIFO
+    enable_retry: bool = True
+    retry_config: RetryConfig | None = None
 
 
 @dataclass
@@ -162,6 +170,7 @@ class Orchestrator:
         timestamp_synchronizer: TimestampSynchronizer | None = None,
         session_manager: SessionStateManager | None = None,
         enable_session_persistence: bool = True,
+        retry_manager: RetryManager | None = None,
     ) -> None:
         """Initialize the Orchestrator.
 
@@ -172,6 +181,7 @@ class Orchestrator:
             timestamp_synchronizer: Optional timestamp synchronizer.
             session_manager: Optional session state manager.
             enable_session_persistence: Whether to enable session persistence.
+            retry_manager: Optional retry manager for failed conversions.
         """
         self.config = config or OrchestratorConfig()
         self.converter_factory = converter_factory or ConverterFactory()
@@ -183,6 +193,12 @@ class Orchestrator:
             self.session_manager = session_manager or SessionStateManager()
         else:
             self.session_manager = None
+
+        if self.config.enable_retry:
+            retry_config = self.config.retry_config or RetryConfig()
+            self.retry_manager = retry_manager or RetryManager(retry_config)
+        else:
+            self.retry_manager = None
 
         self._converter: BaseConverter | None = None
         self._cancelled = False
@@ -209,6 +225,78 @@ class Orchestrator:
                 fallback=True,
             )
         return self._converter
+
+    async def _retry_conversion(
+        self,
+        request: ConversionRequest,
+        failed_result: ConversionResult,
+        on_progress: ProgressCallback | None,
+        input_path: Path,
+    ) -> ConversionResult:
+        """Attempt to retry a failed conversion.
+
+        Args:
+            request: The original conversion request.
+            failed_result: The initial failed result.
+            on_progress: Optional progress callback.
+            input_path: Path to input file.
+
+        Returns:
+            ConversionResult with retry information.
+        """
+        if self.retry_manager is None:
+            return failed_result
+
+        self._emit_progress(
+            on_progress,
+            ConversionStage.CONVERT,
+            ConversionStatus.IN_PROGRESS,
+            current_file=input_path.name,
+            message=f"Retrying conversion for {input_path.name}...",
+        )
+
+        logger.info(f"Starting retry sequence for {input_path.name}")
+
+        validator = self.validator if self.config.validate_output else None
+        retry_result = await self.retry_manager.execute_with_retry(
+            request=request,
+            converter_factory=self.converter_factory,
+            validator=validator,
+        )
+
+        if retry_result.success and retry_result.final_result:
+            result = retry_result.final_result
+            result.retry_count = retry_result.total_attempts
+            result.retry_strategy_used = (
+                retry_result.final_strategy.value
+                if retry_result.final_strategy
+                else None
+            )
+            result.retry_history = [a.to_dict() for a in retry_result.attempts]
+            logger.info(
+                f"Retry succeeded for {input_path.name} after "
+                f"{retry_result.total_attempts} attempts"
+            )
+            return result
+
+        failed_result.retry_count = retry_result.total_attempts
+        failed_result.retry_strategy_used = (
+            retry_result.final_strategy.value
+            if retry_result.final_strategy
+            else None
+        )
+        failed_result.retry_history = [a.to_dict() for a in retry_result.attempts]
+
+        if retry_result.final_result:
+            failed_result.error_message = retry_result.final_result.error_message
+            failed_result.warnings.extend(retry_result.final_result.warnings)
+
+        logger.error(
+            f"All retry attempts failed for {input_path.name}: "
+            f"{retry_result.get_failure_report()}"
+        )
+
+        return failed_result
 
     def _generate_session_id(self) -> str:
         """Generate a unique session ID.
@@ -398,6 +486,10 @@ class Orchestrator:
         result = await converter.convert(request)
 
         if not result.success:
+            if self.retry_manager:
+                return await self._retry_conversion(
+                    request, result, on_progress, input_path
+                )
             return result
 
         if self._cancelled:
@@ -424,7 +516,20 @@ class Orchestrator:
             )
 
             if not validation.valid:
-                # Validation failed - clean up and report
+                # Validation failed - try retry if enabled
+                if self.retry_manager:
+                    if output_path.exists():
+                        output_path.unlink()
+                    result.success = False
+                    result.error_message = (
+                        f"Validation failed: {', '.join(validation.errors)}"
+                    )
+                    result.warnings.extend(validation.warnings)
+                    return await self._retry_conversion(
+                        request, result, on_progress, input_path
+                    )
+
+                # No retry - clean up and report
                 if output_path.exists():
                     output_path.unlink()
                 result.success = False
