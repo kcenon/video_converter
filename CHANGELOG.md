@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### macOS Notification Center Integration
+- `NotificationManager` class for sending macOS notifications
+- Automatic notifications on batch conversion completion
+- Support for success, partial success, and failure notification types
+- Summary statistics (videos converted, space saved) in notification body
+- `NotificationConfig` for customizing sound and grouping options
+- Orchestrator integration with `enable_notifications` option
+- Comprehensive unit tests for notification functionality
+
 #### Statistics and Reporting
 - Time-based filtering for conversion statistics (today, week, month, all)
 - `StatsPeriod` enum for period selection

@@ -370,10 +370,7 @@ class NotificationManager:
             NotificationResult indicating success or failure.
         """
         title = "Conversion Failed"
-        if file_name:
-            body = f"{file_name}: {error_message}"
-        else:
-            body = error_message
+        body = f"{file_name}: {error_message}" if file_name else error_message
 
         return self.send_notification(title=title, body=body)
 
