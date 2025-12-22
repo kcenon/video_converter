@@ -165,7 +165,7 @@ video_converter/
 | 3.2 | Video list query (filter: H.264) | High | 4h |
 | 3.3 | Video export (original quality) | High | 4h |
 | 3.4 | iCloud video download | Medium | 6h |
-| 3.5 | Folder extractor (folder_extractor.py) | Medium | 4h |
+| 3.5 | Folder extractor (folder_extractor.py) ✅ | Medium | 4h |
 | 3.6 | Conversion history (duplicate prevention) | Medium | 4h |
 
 **Deliverables**:
