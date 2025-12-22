@@ -76,6 +76,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### 10-bit HDR Encoding Support
+- Add `bit_depth` option for 8-bit and 10-bit encoding
+- Add `hdr` option for HDR10 (BT.2020 PQ) color space encoding
+- Software encoder (libx265) now supports 10-bit output with yuv420p10le pixel format
+- HDR x265-params for professional-grade HDR content preservation
+
 #### Folder Extractor
 - FolderExtractor class for direct video conversion from filesystem folders
 - Recursive directory scanning with include/exclude pattern filtering

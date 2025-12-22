@@ -40,6 +40,8 @@ class SoftwareConverter(BaseConverter):
     It's slower than hardware encoding but more widely compatible and
     offers more fine-grained control over encoding parameters.
 
+    Supports both 8-bit and 10-bit encoding for HDR content.
+
     Attributes:
         mode: Always SOFTWARE for this converter.
     """
@@ -63,6 +65,16 @@ class SoftwareConverter(BaseConverter):
         "placebo",
     ]
     DEFAULT_PRESET = "medium"
+
+    # Valid bit depths
+    VALID_BIT_DEPTHS = [8, 10]
+    DEFAULT_BIT_DEPTH = 8
+
+    # HDR x265 parameters for BT.2020 PQ (HDR10)
+    HDR_X265_PARAMS = (
+        "hdr-opt=1:repeat-headers=1:"
+        "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc"
+    )
 
     def __init__(self) -> None:
         """Initialize the software converter."""
@@ -123,6 +135,17 @@ class SoftwareConverter(BaseConverter):
             else self.DEFAULT_PRESET
         )
 
+        # Validate bit depth
+        bit_depth = (
+            request.bit_depth
+            if request.bit_depth in self.VALID_BIT_DEPTHS
+            else self.DEFAULT_BIT_DEPTH
+        )
+
+        # Select encoder based on bit depth
+        # libx265 handles both 8-bit and 10-bit natively
+        encoder = self.encoder_name
+
         command = [
             "ffmpeg",
             "-hide_banner",
@@ -131,24 +154,36 @@ class SoftwareConverter(BaseConverter):
             str(request.input_path),
             # Video encoding
             "-c:v",
-            self.encoder_name,
+            encoder,
             "-crf",
             str(crf),
             "-preset",
             preset,
             "-tag:v",
             "hvc1",  # Compatibility tag for Apple devices
-            # Audio handling
-            "-c:a",
-            request.audio_mode,
-            # Metadata handling
+        ]
+
+        # Add 10-bit encoding options
+        if bit_depth == 10:
+            command.extend(["-pix_fmt", "yuv420p10le"])
+
+            # Add HDR parameters if enabled
+            if request.hdr:
+                command.extend(["-x265-params", self.HDR_X265_PARAMS])
+
+        # Audio handling
+        command.extend(["-c:a", request.audio_mode])
+
+        # Metadata handling
+        command.extend([
             "-map_metadata",
             "0",  # Copy all metadata
             "-movflags",
             "+faststart+use_metadata_tags",  # Enable streaming and preserve metadata tags
-            # Output
-            str(request.output_path),
-        ]
+        ])
+
+        # Output
+        command.append(str(request.output_path))
 
         return command
 

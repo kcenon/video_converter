@@ -138,6 +138,8 @@ class ConversionRequest:
         preset: Encoding preset (speed vs compression trade-off).
         audio_mode: How to handle audio ("copy", "aac", etc.).
         preserve_metadata: Whether to copy metadata from original.
+        bit_depth: Output bit depth (8 or 10). 10-bit for HDR content.
+        hdr: Enable HDR encoding parameters for 10-bit content.
     """
 
     input_path: Path
@@ -148,6 +150,8 @@ class ConversionRequest:
     preset: str = "medium"
     audio_mode: str = "copy"
     preserve_metadata: bool = True
+    bit_depth: int = 8
+    hdr: bool = False
 
     def __post_init__(self) -> None:
         """Validate and normalize fields."""
