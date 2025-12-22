@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### iCloud Drive Folder Support (#88)
+- Automatic detection of iCloud stub files (`.filename.icloud` format) in `FolderExtractor`
+- `_is_icloud_stub()` and `_is_video_stub()` methods for stub file detection
+- `_get_original_path_from_stub()` for inferring actual filename from stub
+- `in_cloud` and `stub_path` properties in `FolderVideoInfo` dataclass
+- `scan()` method now includes iCloud files with `include_icloud` parameter
+- `get_video_info()` handles both local and iCloud stub files
+- `in_cloud` counter in `FolderStats` for iCloud file statistics
+- `_ensure_file_available()` in Orchestrator for automatic iCloud download
+- Integration with existing `iCloudHandler` for download management
+- New `FolderConfig` class with iCloud-specific settings:
+  - `auto_download_icloud`: Enable/disable automatic downloads (default: True)
+  - `icloud_timeout`: Download timeout in seconds (default: 3600)
+  - `skip_icloud_on_timeout`: Skip on timeout instead of error (default: True)
+  - `include_patterns` and `exclude_patterns` for file filtering
+- `OrchestratorConfig` extended with iCloud options
+- 15 comprehensive unit tests for iCloud folder support
+
 #### VMAF Quality Measurement (#26)
 - `VmafAnalyzer` class for perceptual video quality measurement
 - VMAF score calculation between original and converted videos
