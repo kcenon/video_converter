@@ -475,3 +475,69 @@ class TestBatchStatus:
                 BatchStatus.COMPLETED,
                 BatchStatus.CANCELLED,
             )
+
+
+class TestOrchestratorVmafIntegration:
+    """Tests for VMAF integration in Orchestrator."""
+
+    def test_vmaf_config_defaults(self) -> None:
+        """Test default VMAF configuration values."""
+        config = OrchestratorConfig()
+        assert config.enable_vmaf is False
+        assert config.vmaf_threshold == 93.0
+        assert config.vmaf_sample_interval == 30
+        assert config.vmaf_fail_action == "warn"
+
+    def test_vmaf_config_custom_values(self) -> None:
+        """Test custom VMAF configuration values."""
+        config = OrchestratorConfig(
+            enable_vmaf=True,
+            vmaf_threshold=80.0,
+            vmaf_sample_interval=10,
+            vmaf_fail_action="retry",
+        )
+        assert config.enable_vmaf is True
+        assert config.vmaf_threshold == 80.0
+        assert config.vmaf_sample_interval == 10
+        assert config.vmaf_fail_action == "retry"
+
+    def test_vmaf_analyzer_not_initialized_when_disabled(self) -> None:
+        """Test VMAF analyzer is not created when disabled."""
+        config = OrchestratorConfig(enable_vmaf=False)
+        orchestrator = Orchestrator(config=config)
+        assert orchestrator._vmaf_analyzer is None
+
+    def test_vmaf_analyzer_initialized_when_enabled(self) -> None:
+        """Test VMAF analyzer is created when enabled."""
+        config = OrchestratorConfig(enable_vmaf=True)
+        with patch(
+            "video_converter.core.orchestrator.VmafAnalyzer"
+        ) as MockVmafAnalyzer:
+            mock_analyzer = MagicMock()
+            mock_analyzer.is_available.return_value = True
+            MockVmafAnalyzer.return_value = mock_analyzer
+
+            orchestrator = Orchestrator(config=config)
+
+            MockVmafAnalyzer.assert_called_once()
+            assert orchestrator._vmaf_analyzer is not None
+
+    def test_vmaf_analyzer_set_to_none_when_unavailable(self) -> None:
+        """Test VMAF analyzer is None when libvmaf is unavailable."""
+        config = OrchestratorConfig(enable_vmaf=True)
+        with patch(
+            "video_converter.core.orchestrator.VmafAnalyzer"
+        ) as MockVmafAnalyzer:
+            mock_analyzer = MagicMock()
+            mock_analyzer.is_available.return_value = False
+            MockVmafAnalyzer.return_value = mock_analyzer
+
+            orchestrator = Orchestrator(config=config)
+
+            assert orchestrator._vmaf_analyzer is None
+
+    def test_vmaf_fail_action_validation(self) -> None:
+        """Test vmaf_fail_action accepts valid values."""
+        for action in ["warn", "retry", "fail"]:
+            config = OrchestratorConfig(vmaf_fail_action=action)
+            assert config.vmaf_fail_action == action

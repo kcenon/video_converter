@@ -583,4 +583,10 @@ class TestFailureType:
         assert FailureType.VALIDATION_ERROR.value == "validation_error"
         assert FailureType.COMPRESSION_ERROR.value == "compression_error"
         assert FailureType.ENCODER_ERROR.value == "encoder_error"
+        assert FailureType.VMAF_QUALITY_ERROR.value == "vmaf_quality_error"
         assert FailureType.UNKNOWN.value == "unknown"
+
+    def test_vmaf_quality_error_type(self) -> None:
+        """Test VMAF quality error type for low quality conversions."""
+        assert FailureType.VMAF_QUALITY_ERROR in FailureType
+        assert FailureType.VMAF_QUALITY_ERROR.value == "vmaf_quality_error"

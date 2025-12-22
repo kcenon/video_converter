@@ -226,6 +226,8 @@ class ConversionResult:
         retry_count: Number of retry attempts made (0 if no retries).
         retry_strategy_used: Final retry strategy that succeeded (or None).
         retry_history: Detailed history of all retry attempts.
+        vmaf_score: VMAF quality score (0-100) if measured.
+        vmaf_quality_level: Quality classification based on VMAF score.
     """
 
     success: bool
@@ -241,6 +243,8 @@ class ConversionResult:
     retry_count: int = 0
     retry_strategy_used: str | None = None
     retry_history: list[dict] = field(default_factory=list)
+    vmaf_score: float | None = None
+    vmaf_quality_level: str | None = None
 
     @property
     def compression_ratio(self) -> float:

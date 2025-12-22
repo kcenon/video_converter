@@ -86,6 +86,12 @@ from video_converter.processors.retry_manager import (
     RetryManager,
 )
 from video_converter.processors.timestamp import TimestampSynchronizer
+from video_converter.processors.vmaf_analyzer import (
+    VmafAnalyzer,
+    VmafAnalysisError,
+    VmafNotAvailableError,
+    VmafQualityLevel,
+)
 from video_converter.extractors.icloud_handler import (
     CloudStatus,
     DownloadProgress,
@@ -131,6 +137,10 @@ class OrchestratorConfig:
         auto_download_icloud: Whether to auto-download iCloud files for folders.
         icloud_timeout: Maximum time to wait for iCloud downloads in seconds.
         skip_icloud_on_timeout: Whether to skip files if download times out.
+        enable_vmaf: Whether to measure VMAF quality score after conversion.
+        vmaf_threshold: Minimum acceptable VMAF score (default 93.0 for visually lossless).
+        vmaf_sample_interval: Frame sampling interval for VMAF analysis (1=all, 30=faster).
+        vmaf_fail_action: Action when VMAF is below threshold ("warn", "retry", "fail").
     """
 
     mode: ConversionMode = ConversionMode.HARDWARE
@@ -157,6 +167,10 @@ class OrchestratorConfig:
     auto_download_icloud: bool = True
     icloud_timeout: int = 3600  # 1 hour
     skip_icloud_on_timeout: bool = True
+    enable_vmaf: bool = False
+    vmaf_threshold: float = 93.0
+    vmaf_sample_interval: int = 30
+    vmaf_fail_action: str = "warn"
 
 
 @dataclass
@@ -269,6 +283,17 @@ class Orchestrator:
             )
         else:
             self._notification_manager = None
+
+        # VMAF analyzer (lazy initialization for availability check)
+        self._vmaf_analyzer: VmafAnalyzer | None = None
+        if self.config.enable_vmaf:
+            self._vmaf_analyzer = VmafAnalyzer()
+            if not self._vmaf_analyzer.is_available():
+                logger.warning(
+                    "VMAF measurement requested but libvmaf is not available. "
+                    "VMAF analysis will be skipped."
+                )
+                self._vmaf_analyzer = None
 
     def _get_converter(self) -> BaseConverter:
         """Get or create the video converter.
@@ -731,6 +756,63 @@ class Orchestrator:
                 return result
 
             result.warnings.extend(validation.warnings)
+
+        # VMAF quality analysis (after validation, before metadata sync)
+        if self._vmaf_analyzer and output_path.exists():
+            try:
+                logger.info(f"Running VMAF analysis for {output_path.name}...")
+                vmaf_result = await self._vmaf_analyzer.analyze_async(
+                    original=input_path,
+                    converted=output_path,
+                    sample_interval=self.config.vmaf_sample_interval,
+                )
+                result.vmaf_score = vmaf_result.scores.mean
+                result.vmaf_quality_level = vmaf_result.quality_level.value
+
+                # Add VMAF warnings to result
+                result.warnings.extend(vmaf_result.warnings)
+
+                logger.info(
+                    f"VMAF score: {vmaf_result.scores.mean:.2f} "
+                    f"({vmaf_result.quality_level.value})"
+                )
+
+                # Handle VMAF threshold check
+                if vmaf_result.scores.mean < self.config.vmaf_threshold:
+                    vmaf_warning = (
+                        f"VMAF score {vmaf_result.scores.mean:.2f} is below "
+                        f"threshold {self.config.vmaf_threshold:.1f}"
+                    )
+
+                    if self.config.vmaf_fail_action == "fail":
+                        # Delete output and mark as failed
+                        if output_path.exists():
+                            output_path.unlink()
+                        result.success = False
+                        result.error_message = vmaf_warning
+                        return result
+
+                    elif self.config.vmaf_fail_action == "retry" and self.retry_manager:
+                        # Attempt retry with adjusted settings
+                        if output_path.exists():
+                            output_path.unlink()
+                        result.success = False
+                        result.error_message = vmaf_warning
+                        return await self._retry_conversion(
+                            request, result, on_progress, input_path
+                        )
+
+                    else:  # "warn" (default)
+                        result.warnings.append(vmaf_warning)
+
+            except VmafAnalysisError as e:
+                logger.warning(f"VMAF analysis failed: {e}")
+                result.warnings.append(f"VMAF analysis failed: {e.reason}")
+            except VmafNotAvailableError:
+                logger.warning("VMAF not available, skipping quality measurement")
+            except Exception as e:
+                logger.warning(f"Unexpected error during VMAF analysis: {e}")
+                result.warnings.append(f"VMAF analysis error: {e}")
 
         # Stage 3: Metadata - Sync timestamps
         if self.config.preserve_timestamps:
