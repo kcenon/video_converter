@@ -24,6 +24,7 @@ from video_converter.core.orchestrator import Orchestrator, OrchestratorConfig
 from video_converter.core.types import ConversionMode, ConversionProgress
 from video_converter.converters.factory import ConverterFactory
 from video_converter.processors.codec_detector import CodecDetector
+from video_converter.ui.progress import ProgressDisplayManager
 
 # Rich console for formatted output
 console = Console()
@@ -413,47 +414,29 @@ def convert(
 
     # Run conversion with progress bar
     try:
+        # Create progress display manager
+        progress_manager = ProgressDisplayManager(quiet=cli_ctx.quiet, console=console)
+
         if cli_ctx.quiet:
             # Quiet mode - no progress display
             result = asyncio.run(converter.convert(request))
         else:
-            # Progress bar display
-            from rich.progress import (
-                Progress,
-                SpinnerColumn,
-                TextColumn,
-                BarColumn,
-                TaskProgressColumn,
-                TimeRemainingColumn,
+            # Beautiful progress bar display
+            progress_display = progress_manager.create_single_file_progress(
+                filename=input_file.name,
+                original_size=codec_info.size if codec_info else 0,
             )
+            progress_display.start()
 
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(bar_width=40),
-                TaskProgressColumn(),
-                TextColumn("│"),
-                TextColumn("[cyan]{task.fields[size]}[/cyan]"),
-                TextColumn("│"),
-                TextColumn("ETA: [cyan]{task.fields[eta]}[/cyan]"),
-                console=console,
-            ) as progress:
-                task_id = progress.add_task(
-                    f"Converting {input_file.name}",
-                    total=100,
-                    size="0 MB",
-                    eta="calculating...",
+            def on_progress_info(info: Any) -> None:
+                progress_display.update_from_info(info)
+
+            try:
+                result = asyncio.run(
+                    converter.convert(request, on_progress_info=on_progress_info)
                 )
-
-                def on_progress_info(info: Any) -> None:
-                    progress.update(
-                        task_id,
-                        completed=int(info.percentage),
-                        size=info.size_formatted,
-                        eta=info.eta_formatted,
-                    )
-
-                result = asyncio.run(converter.convert(request, on_progress_info=on_progress_info))
+            finally:
+                progress_display.finish()
 
         if result.success:
             # Display summary
@@ -693,35 +676,42 @@ def _run_batch_conversion(
     orchestrator = Orchestrator(config=orch_config)
 
     # Progress display
-    from rich.progress import (
-        Progress,
-        SpinnerColumn,
-        TextColumn,
-        BarColumn,
-        TaskProgressColumn,
-        TimeRemainingColumn,
-    )
+    progress_manager = ProgressDisplayManager(quiet=cli_ctx.quiet, console=console)
+    batch_progress = progress_manager.create_batch_progress(total_files=len(video_files))
+    batch_progress.start()
 
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TaskProgressColumn(),
-        TimeRemainingColumn(),
-        console=console,
-    ) as progress:
-        task = progress.add_task("Converting...", total=len(video_files))
+    current_file_size: int = 0
 
-        def on_progress(prog: ConversionProgress) -> None:
-            progress.update(
-                task,
-                completed=prog.current_index,
-                description=f"Converting {prog.current_file}...",
+    def on_progress(prog: ConversionProgress) -> None:
+        nonlocal current_file_size
+        # Start new file tracking when file changes
+        if prog.stage_progress == 0.0 or prog.current_file:
+            current_file_size = prog.bytes_total if prog.bytes_total > 0 else 0
+            batch_progress.start_file(
+                filename=prog.current_file,
+                file_index=prog.current_index + 1,
+                original_size=current_file_size,
             )
+        # Update per-file progress
+        batch_progress.update_file(
+            percentage=prog.stage_progress * 100,
+            current_size=prog.bytes_processed,
+            eta=f"{int(prog.estimated_time_remaining or 0)}s"
+            if prog.estimated_time_remaining
+            else "calculating...",
+            speed=0.0,  # Speed calculated from FFmpeg output in detailed mode
+        )
 
-        def on_complete(report: Any) -> None:
-            progress.update(task, completed=len(video_files))
+    def on_complete(report: Any) -> None:
+        # Mark files as complete based on results
+        if hasattr(report, "results"):
+            for result in report.results:
+                if result.success:
+                    batch_progress.complete_file(saved_bytes=result.size_saved)
+                else:
+                    batch_progress.complete_file(saved_bytes=0)
 
+    try:
         # Run conversion
         report = asyncio.run(
             orchestrator.run(
@@ -731,6 +721,8 @@ def _run_batch_conversion(
                 on_complete=on_complete,
             )
         )
+    finally:
+        batch_progress.finish()
 
     # Display results
     console.print()
