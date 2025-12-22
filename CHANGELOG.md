@@ -21,6 +21,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Quick access command to open System Settings directly
 - Improved error handling with `PhotosLibraryNotFoundError` and `PhotosAccessDeniedError`
 
+#### Metadata Preservation for Photos Re-Import (#103)
+- `MetadataPreserver` class for preserving metadata during Photos re-import workflow
+- `VideoMetadataSnapshot` dataclass for capturing complete video metadata
+- `capture_metadata()` method to snapshot original video metadata (albums, favorites, date, location)
+- `embed_metadata_in_file()` method to embed date/GPS metadata via ExifTool before import
+- `apply_photos_metadata()` method to apply Albums/favorites via AppleScript after import
+- `verify_metadata()` method to validate metadata preservation with configurable tolerance
+- `MetadataTolerance` dataclass with default, strict, and relaxed presets
+- `VerificationResult` dataclass with detailed comparison results
+- Exception classes: `MetadataPreservationError`, `MetadataEmbedError`, `MetadataApplicationError`
+- Integration with existing `MetadataProcessor` for ExifTool operations
+- Support for preserving: albums, favorites, hidden status, date, location, description, keywords
+
 #### Photos Library Re-Import Support (#101)
 - `PhotosImporter` class for importing converted videos back to Photos library
 - AppleScript integration via `osascript` command for Photos.app automation

@@ -156,6 +156,10 @@ video_converter/
 │       │   ├── photos_extractor.py    # SDS-E01-001 (Photos 라이브러리 접근)
 │       │   ├── folder_extractor.py    # SDS-E01-002 (파일시스템 스캔)
 │       │   └── icloud_handler.py      # SDS-E01-003 (iCloud 파일 처리)
+│       ├── importers/
+│       │   ├── __init__.py
+│       │   ├── photos_importer.py         # SDS-P01-009 (Photos 재가져오기)
+│       │   └── metadata_preservation.py   # SDS-P01-010 (메타데이터 보존)
 │       ├── converters/
 │       │   ├── __init__.py
 │       │   ├── base.py                # SDS-V01-001 (추상 인터페이스)
