@@ -12,6 +12,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Photos CLI Unit Tests (#98)
+- `test_photos_handler.py` - Comprehensive tests for `PhotosSourceHandler` class:
+  - `PhotosConversionOptions` and `PhotosConversionResult` dataclass validation
+  - Permission checking flow with mock library and errors
+  - Candidate filtering by favorites, hidden status, date range, albums, and limit
+  - Video export and cleanup operations
+  - Context manager and lazy loading behavior
+- `test_photos_permissions.py` - Tests for permission handling and UI panels:
+  - Permission instructions and error message content
+  - Exception hierarchy (`PhotosLibraryError`, `PhotosAccessDeniedError`, `PhotosLibraryNotFoundError`)
+  - Permission check flow scenarios (success, denied, not found)
+  - Rich panel display functions for access denied and library not found errors
+- `test_photos_progress.py` - Tests for progress display components:
+  - `PhotosProgressDisplay` initialization and lifecycle
+  - Export and convert progress updates
+  - `_NullPhotosProgress` null object pattern for quiet mode
+  - Size formatting and summary display
+- `test_photos_cli.py` - CLI integration tests:
+  - `--source photos` option availability and execution
+  - Filtering options: `--albums`, `--exclude-albums`, `--from-date`, `--to-date`, `--favorites-only`, `--limit`
+  - `--dry-run` and `--check-permissions` options
+  - Error handling for invalid inputs
+
 #### Photos-Specific Progress Display (#97)
 - `PhotosProgressDisplay` class for Photos library conversion with rich UI
 - Library info panel showing path, video count, total size, and estimated savings
