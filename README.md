@@ -170,6 +170,36 @@ On first run, you'll need to grant Full Disk Access:
 3. Add **Terminal.app** (or your terminal application)
 4. Enable the toggle and restart the application
 
+You can verify permissions before running:
+
+```bash
+# Check Photos library access permission
+video-converter run --source photos --check-permissions
+```
+
+If permission is denied, you'll see a helpful panel with instructions:
+
+```
+╭───────────────── Photos Library Access Denied ──────────────────╮
+│                                                                  │
+│  Video Converter needs Full Disk Access to read your Photos     │
+│  library.                                                        │
+│                                                                  │
+│  To grant access:                                                │
+│    1. Open System Settings → Privacy & Security                  │
+│    2. Click Full Disk Access                                     │
+│    3. Click the + button                                         │
+│    4. Add Terminal.app (or your terminal application)            │
+│    5. Enable the toggle                                          │
+│    6. Restart your terminal and try again                        │
+│                                                                  │
+│  Quick access:                                                   │
+│    open "x-apple.systempreferences:com.apple.preference          │
+│    .security?Privacy_AllFiles"                                   │
+│                                                                  │
+╰──────────────────────────────────────────────────────────────────╯
+```
+
 #### Concurrent Processing
 
 When converting multiple files, the converter supports concurrent processing for faster batch operations:

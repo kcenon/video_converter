@@ -542,6 +542,11 @@ def convert(
     default=None,
     help="Photos mode: Maximum number of videos to convert.",
 )
+@click.option(
+    "--check-permissions",
+    is_flag=True,
+    help="Photos mode: Check Photos library access permission and exit.",
+)
 @click.pass_context
 def run(
     ctx: click.Context,
@@ -557,6 +562,7 @@ def run(
     to_date: datetime | None,
     favorites_only: bool,
     limit: int | None,
+    check_permissions: bool,
 ) -> None:
     """Run batch conversion on multiple videos.
 
@@ -587,9 +593,23 @@ def run(
 
         # Dry run for Photos (preview only)
         video-converter run --source photos --dry-run --limit 10
+
+        # Check Photos library permissions before running
+        video-converter run --source photos --check-permissions
     """
     cli_ctx: CLIContext = ctx.obj
     config = cli_ctx.config
+
+    # Handle check-permissions mode for Photos
+    if check_permissions:
+        if source != "photos":
+            console.print(
+                "[yellow]--check-permissions is only valid for Photos mode[/yellow]",
+                err=True,
+            )
+            sys.exit(1)
+        _check_photos_permissions(cli_ctx)
+        return
 
     # Handle resume mode
     if resume:
@@ -817,6 +837,82 @@ def _run_batch_conversion(
         sys.exit(1)
 
 
+def _check_photos_permissions(cli_ctx: CLIContext) -> None:
+    """Check Photos library permissions and display status.
+
+    This function checks if the application has Full Disk Access
+    permission to read the Photos library and displays appropriate
+    feedback using Rich panels.
+
+    Args:
+        cli_ctx: CLI context.
+    """
+    from video_converter.extractors.photos_extractor import (
+        PhotosAccessDeniedError,
+        PhotosLibraryNotFoundError,
+    )
+    from video_converter.handlers.photos_handler import PhotosSourceHandler
+    from video_converter.ui.panels import (
+        display_photos_library_info,
+        display_photos_permission_error,
+        display_photos_permission_success,
+    )
+
+    try:
+        with PhotosSourceHandler() as handler:
+            if handler.check_permissions():
+                display_photos_permission_success(console)
+
+                # Show library info if permission granted
+                try:
+                    stats = handler.get_stats()
+                    library_info = handler.get_library_info()
+                    library_path = library_info.get("path", "")
+                    total_size_gb = stats.total_size_h264 / (1024 * 1024 * 1024)
+
+                    display_photos_library_info(
+                        console=console,
+                        library_path=str(library_path) if library_path else None,
+                        video_count=stats.total,
+                        h264_count=stats.h264,
+                        total_size_gb=total_size_gb,
+                    )
+                except Exception:
+                    # Library info is optional, ignore errors
+                    pass
+
+                sys.exit(0)
+            else:
+                error_msg = handler.get_permission_error()
+                if error_msg and "not found" in error_msg.lower():
+                    display_photos_permission_error(
+                        console=console,
+                        error_type="not_found",
+                    )
+                else:
+                    display_photos_permission_error(
+                        console=console,
+                        error_type="access_denied",
+                    )
+                sys.exit(1)
+    except PhotosLibraryNotFoundError as e:
+        display_photos_permission_error(
+            console=console,
+            error_type="not_found",
+            library_path=str(e),
+        )
+        sys.exit(1)
+    except PhotosAccessDeniedError:
+        display_photos_permission_error(
+            console=console,
+            error_type="access_denied",
+        )
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error checking permissions: {e}[/red]", err=True)
+        sys.exit(1)
+
+
 def _run_photos_conversion(
     cli_ctx: CLIContext,
     output_dir: Path | None,
@@ -841,60 +937,86 @@ def _run_photos_conversion(
         favorites_only: Only include favorite videos.
         limit: Maximum number of videos to convert.
     """
+    from video_converter.extractors.photos_extractor import (
+        PhotosAccessDeniedError,
+        PhotosLibraryNotFoundError,
+    )
     from video_converter.handlers.photos_handler import (
         PhotosConversionOptions,
         PhotosSourceHandler,
     )
+    from video_converter.ui.panels import display_photos_permission_error
 
     config = cli_ctx.config
 
     # Initialize handler
-    with PhotosSourceHandler() as handler:
-        # Check permissions
-        if not handler.check_permissions():
-            console.print("[red]✗ Photos library access denied[/red]", err=True)
+    try:
+        with PhotosSourceHandler() as handler:
+            # Check permissions
+            if not handler.check_permissions():
+                error_msg = handler.get_permission_error()
+                if error_msg and "not found" in error_msg.lower():
+                    display_photos_permission_error(
+                        console=console,
+                        error_type="not_found",
+                    )
+                else:
+                    display_photos_permission_error(
+                        console=console,
+                        error_type="access_denied",
+                    )
+                sys.exit(1)
+
+            # Parse album options
+            albums_list = [a.strip() for a in albums.split(",")] if albums else None
+            exclude_list = (
+                [a.strip() for a in exclude_albums.split(",")]
+                if exclude_albums
+                else None
+            )
+
+            # Create conversion options
+            options = PhotosConversionOptions(
+                albums=albums_list,
+                exclude_albums=exclude_list,
+                from_date=from_date,
+                to_date=to_date,
+                favorites_only=favorites_only,
+                limit=limit,
+                dry_run=dry_run,
+            )
+
+            # Get conversion candidates
+            console.print("[bold]Scanning Photos library for H.264 videos...[/bold]")
+            candidates = handler.get_candidates(options)
+
+            if not candidates:
+                console.print("[yellow]No H.264 videos found to convert.[/yellow]")
+                return
+
+            console.print(
+                f"[bold]Found {len(candidates)} H.264 video(s) to convert[/bold]"
+            )
             console.print()
-            console.print(handler.get_permission_instructions())
-            sys.exit(1)
 
-        # Parse album options
-        albums_list = [a.strip() for a in albums.split(",")] if albums else None
-        exclude_list = (
-            [a.strip() for a in exclude_albums.split(",")]
-            if exclude_albums
-            else None
+            if dry_run:
+                _display_photos_dry_run(candidates, output_dir)
+                return
+
+            # Run conversion
+            _run_photos_batch_conversion(cli_ctx, handler, candidates, output_dir)
+    except PhotosLibraryNotFoundError:
+        display_photos_permission_error(
+            console=console,
+            error_type="not_found",
         )
-
-        # Create conversion options
-        options = PhotosConversionOptions(
-            albums=albums_list,
-            exclude_albums=exclude_list,
-            from_date=from_date,
-            to_date=to_date,
-            favorites_only=favorites_only,
-            limit=limit,
-            dry_run=dry_run,
+        sys.exit(1)
+    except PhotosAccessDeniedError:
+        display_photos_permission_error(
+            console=console,
+            error_type="access_denied",
         )
-
-        # Get conversion candidates
-        console.print("[bold]Scanning Photos library for H.264 videos...[/bold]")
-        candidates = handler.get_candidates(options)
-
-        if not candidates:
-            console.print("[yellow]No H.264 videos found to convert.[/yellow]")
-            return
-
-        console.print(
-            f"[bold]Found {len(candidates)} H.264 video(s) to convert[/bold]"
-        )
-        console.print()
-
-        if dry_run:
-            _display_photos_dry_run(candidates, output_dir)
-            return
-
-        # Run conversion
-        _run_photos_batch_conversion(cli_ctx, handler, candidates, output_dir)
+        sys.exit(1)
 
 
 def _display_photos_dry_run(
