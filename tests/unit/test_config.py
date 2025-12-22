@@ -14,6 +14,7 @@ from video_converter.core.config import (
     AutomationConfig,
     Config,
     EncodingConfig,
+    FolderConfig,
     NotificationConfig,
     PathsConfig,
     PhotosConfig,
@@ -409,3 +410,69 @@ class TestConfigValidation:
         # Quality must be between 1-100
         with pytest.raises(ValueError):
             config.encoding = EncodingConfig(quality=150)
+
+
+class TestFolderConfig:
+    """Tests for FolderConfig model."""
+
+    def test_default_values(self) -> None:
+        """Test default folder config values."""
+        config = FolderConfig()
+        assert config.recursive is True
+        assert config.auto_download_icloud is True
+        assert config.icloud_timeout == 3600
+        assert config.skip_icloud_on_timeout is True
+        assert config.include_patterns == []
+        assert "*.tmp" in config.exclude_patterns
+        assert "._*" in config.exclude_patterns
+
+    def test_custom_values(self) -> None:
+        """Test folder config with custom values."""
+        config = FolderConfig(
+            recursive=False,
+            auto_download_icloud=False,
+            icloud_timeout=1800,
+            skip_icloud_on_timeout=False,
+            include_patterns=["vacation*"],
+            exclude_patterns=["*.tmp"],
+        )
+        assert config.recursive is False
+        assert config.auto_download_icloud is False
+        assert config.icloud_timeout == 1800
+        assert config.skip_icloud_on_timeout is False
+        assert config.include_patterns == ["vacation*"]
+        assert config.exclude_patterns == ["*.tmp"]
+
+    def test_icloud_timeout_validation(self) -> None:
+        """Test icloud_timeout validation bounds."""
+        # Minimum is 60 seconds
+        with pytest.raises(ValueError):
+            FolderConfig(icloud_timeout=30)
+
+        # Maximum is 86400 seconds (24 hours)
+        with pytest.raises(ValueError):
+            FolderConfig(icloud_timeout=100000)
+
+        # Valid boundaries
+        config_min = FolderConfig(icloud_timeout=60)
+        assert config_min.icloud_timeout == 60
+
+        config_max = FolderConfig(icloud_timeout=86400)
+        assert config_max.icloud_timeout == 86400
+
+
+class TestConfigWithFolder:
+    """Tests for Config including FolderConfig."""
+
+    def test_config_has_folder_section(self) -> None:
+        """Test that Config includes folder section."""
+        config = Config.load()
+        assert hasattr(config, "folder")
+        assert isinstance(config.folder, FolderConfig)
+
+    def test_to_dict_includes_folder(self) -> None:
+        """Test that to_dict includes folder section."""
+        config = Config.load()
+        result = config.to_dict()
+        assert "folder" in result
+

@@ -86,9 +86,14 @@ from video_converter.processors.retry_manager import (
     RetryManager,
 )
 from video_converter.processors.timestamp import TimestampSynchronizer
+from video_converter.extractors.icloud_handler import (
+    CloudStatus,
+    DownloadProgress,
+    iCloudHandler,
+)
 
 if TYPE_CHECKING:
-    pass
+    from video_converter.extractors.folder_extractor import FolderVideoInfo
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +128,9 @@ class OrchestratorConfig:
         pause_on_disk_full: Whether to pause on low disk space.
         enable_notifications: Whether to send macOS notifications.
         notification_config: Configuration for notification behavior.
+        auto_download_icloud: Whether to auto-download iCloud files for folders.
+        icloud_timeout: Maximum time to wait for iCloud downloads in seconds.
+        skip_icloud_on_timeout: Whether to skip files if download times out.
     """
 
     mode: ConversionMode = ConversionMode.HARDWARE
@@ -146,6 +154,9 @@ class OrchestratorConfig:
     pause_on_disk_full: bool = True
     enable_notifications: bool = True
     notification_config: NotificationConfig | None = None
+    auto_download_icloud: bool = True
+    icloud_timeout: int = 3600  # 1 hour
+    skip_icloud_on_timeout: bool = True
 
 
 @dataclass
@@ -274,6 +285,117 @@ class Orchestrator:
                 fallback=True,
             )
         return self._converter
+
+    async def _ensure_file_available(
+        self,
+        input_path: Path,
+        video_info: FolderVideoInfo | None = None,
+        on_progress: ProgressCallback | None = None,
+    ) -> tuple[bool, str | None]:
+        """Ensure file is available locally, download from iCloud if necessary.
+
+        This method checks if a file exists locally or is stored in iCloud.
+        For iCloud files, it triggers download and waits for completion.
+
+        Args:
+            input_path: Path to the video file.
+            video_info: Optional FolderVideoInfo with iCloud status.
+                       If not provided, iCloud status is detected from path.
+            on_progress: Optional progress callback for download updates.
+
+        Returns:
+            Tuple of (success: bool, error_message: str | None).
+            Success is True if file is available locally.
+        """
+        # Check if auto-download is disabled
+        if not self.config.auto_download_icloud:
+            if video_info and video_info.in_cloud:
+                return False, "iCloud auto-download is disabled"
+            return True, None
+
+        # If no video_info provided, detect iCloud status from path
+        if video_info is None:
+            # Check if file exists locally
+            if input_path.exists():
+                return True, None
+
+            # Check for iCloud stub
+            stub_path = input_path.parent / f".{input_path.name}.icloud"
+            if not stub_path.exists():
+                return False, f"File not found: {input_path}"
+
+            # File is in iCloud
+            in_cloud = True
+            stub_path_found = stub_path
+        else:
+            # Use provided video_info
+            if not video_info.in_cloud:
+                if input_path.exists():
+                    return True, None
+                return False, f"File not found: {input_path}"
+
+            in_cloud = True
+            stub_path_found = video_info.stub_path
+
+        # File is in iCloud, need to download
+        logger.info(f"File is in iCloud, initiating download: {input_path.name}")
+
+        self._emit_progress(
+            on_progress,
+            ConversionStage.EXPORT,  # Using EXPORT stage for download
+            ConversionStatus.IN_PROGRESS,
+            current_file=input_path.name,
+            message=f"Downloading from iCloud: {input_path.name}...",
+        )
+
+        # Create iCloud handler
+        handler = iCloudHandler(
+            timeout=self.config.icloud_timeout,
+            poll_interval=1.0,
+        )
+
+        # Create a minimal video info object for iCloudHandler
+        # iCloudHandler expects PhotosVideoInfo, but we can use duck typing
+        # by creating a simple object with required attributes
+        class _MinimalVideoInfo:
+            def __init__(self, path: Path, in_cloud: bool) -> None:
+                self.path = path
+                self.in_cloud = in_cloud
+                self.filename = path.name
+
+        minimal_info = _MinimalVideoInfo(input_path, in_cloud)
+
+        def on_download_progress(progress: DownloadProgress) -> None:
+            """Handle download progress updates."""
+            if on_progress:
+                msg = f"Downloading: {progress.filename}"
+                if progress.progress >= 0:
+                    msg += f" ({progress.progress:.0f}%)"
+                self._emit_progress(
+                    on_progress,
+                    ConversionStage.EXPORT,
+                    ConversionStatus.IN_PROGRESS,
+                    current_file=progress.filename,
+                    stage_progress=progress.progress / 100 if progress.progress >= 0 else 0,
+                    message=msg,
+                )
+
+        # Trigger download and wait
+        success = handler.download_and_wait(
+            minimal_info,  # type: ignore[arg-type]
+            on_progress=on_download_progress,
+        )
+
+        if not success:
+            error_msg = f"Failed to download from iCloud: {input_path.name}"
+            if self.config.skip_icloud_on_timeout:
+                logger.warning(f"{error_msg} (will skip)")
+            else:
+                logger.error(error_msg)
+            return False, error_msg
+
+        logger.info(f"Download complete: {input_path.name}")
+        return True, None
 
     async def _retry_conversion(
         self,
@@ -475,33 +597,53 @@ class Orchestrator:
         input_path: Path,
         output_path: Path | None = None,
         on_progress: ProgressCallback | None = None,
+        video_info: FolderVideoInfo | None = None,
     ) -> ConversionResult:
         """Convert a single video file through the full pipeline.
+
+        Handles both local files and iCloud files. For iCloud files,
+        automatically downloads before conversion if auto_download_icloud is enabled.
 
         Args:
             input_path: Path to the input video.
             output_path: Path for the output video. Auto-generated if None.
             on_progress: Optional progress callback.
+            video_info: Optional FolderVideoInfo with iCloud status.
 
         Returns:
             ConversionResult with success status and statistics.
         """
         self._cancelled = False
 
-        # Validate input
+        # Generate output path if needed (before validation)
+        if output_path is None:
+            output_path = self._create_output_path(input_path)
+
+        # Ensure file is available (handles iCloud download)
+        available, error = await self._ensure_file_available(
+            input_path, video_info, on_progress
+        )
+
+        if not available:
+            return ConversionResult(
+                success=False,
+                request=ConversionRequest(
+                    input_path=input_path,
+                    output_path=output_path,
+                ),
+                error_message=error or f"Input file not available: {input_path}",
+            )
+
+        # Validate input (file should exist after download)
         if not input_path.exists():
             return ConversionResult(
                 success=False,
                 request=ConversionRequest(
                     input_path=input_path,
-                    output_path=output_path or self._create_output_path(input_path),
+                    output_path=output_path,
                 ),
-                error_message=f"Input file not found: {input_path}",
+                error_message=f"Input file not found after download: {input_path}",
             )
-
-        # Generate output path if needed
-        if output_path is None:
-            output_path = self._create_output_path(input_path)
 
         # Create conversion request
         request = ConversionRequest(

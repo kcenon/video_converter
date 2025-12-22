@@ -96,7 +96,7 @@ class FolderVideoInfo:
     """Information about a video file in a folder.
 
     Attributes:
-        path: Absolute path to the video file.
+        path: Absolute path to the video file (original path, not stub).
         filename: Name of the video file.
         size: File size in bytes.
         modified_time: Last modification time.
@@ -108,6 +108,8 @@ class FolderVideoInfo:
         fps: Frames per second.
         bitrate: Video bitrate in bits per second.
         container: Container format (e.g., "mp4", "mov").
+        in_cloud: Whether file is stored in iCloud (stub file exists locally).
+        stub_path: Path to iCloud stub file if in_cloud is True.
     """
 
     path: Path
@@ -122,6 +124,8 @@ class FolderVideoInfo:
     fps: float = 0.0
     bitrate: int = 0
     container: str = ""
+    in_cloud: bool = False
+    stub_path: Path | None = None
 
     # Codec name variations for identification
     H264_CODECS = frozenset({"h264", "avc", "avc1", "x264"})
@@ -220,6 +224,7 @@ class FolderStats:
         errors: Number of files that could not be analyzed.
         total_size: Total size of all videos in bytes.
         h264_size: Total size of H.264 videos in bytes.
+        in_cloud: Number of videos stored in iCloud (stub files only).
     """
 
     total: int = 0
@@ -229,6 +234,7 @@ class FolderStats:
     errors: int = 0
     total_size: int = 0
     h264_size: int = 0
+    in_cloud: int = 0
 
     @property
     def estimated_savings(self) -> int:
@@ -264,7 +270,8 @@ class FolderExtractor:
     """Extract videos from filesystem folders.
 
     This class provides video extraction from regular filesystem directories,
-    with support for recursive scanning, file filtering, and codec detection.
+    with support for recursive scanning, file filtering, codec detection,
+    and iCloud stub file detection.
 
     SDS Reference: SDS-E01-003
     SRS Reference: SRS-304 (Folder-based Video Extraction)
@@ -277,7 +284,7 @@ class FolderExtractor:
         ... )
         >>> candidates = extractor.get_conversion_candidates()
         >>> for video in candidates:
-        ...     print(f"{video.filename}: {video.codec}")
+        ...     print(f"{video.filename}: {video.codec} (in_cloud={video.in_cloud})")
 
     Attributes:
         root_path: Root directory for scanning.
@@ -291,6 +298,10 @@ class FolderExtractor:
 
     # Default patterns to exclude (temporary files, macOS resource forks)
     DEFAULT_EXCLUDE_PATTERNS = frozenset({"*.tmp", "._*", ".DS_Store", "*.part"})
+
+    # iCloud stub file markers
+    ICLOUD_STUB_PREFIX = "."
+    ICLOUD_STUB_SUFFIX = ".icloud"
 
     def __init__(
         self,
@@ -377,6 +388,67 @@ class FolderExtractor:
             self._codec_detector = CodecDetector()
         return self._codec_detector
 
+    def _is_icloud_stub(self, path: Path) -> bool:
+        """Check if a path is an iCloud stub file.
+
+        iCloud stub files have the format: .filename.icloud
+        For example: .IMG_0001.MOV.icloud
+
+        Args:
+            path: Path to check.
+
+        Returns:
+            True if the path is an iCloud stub file.
+        """
+        name = path.name
+        return (
+            name.startswith(self.ICLOUD_STUB_PREFIX)
+            and name.endswith(self.ICLOUD_STUB_SUFFIX)
+        )
+
+    def _is_video_stub(self, path: Path) -> bool:
+        """Check if a path is an iCloud stub file for a video.
+
+        Args:
+            path: Path to check.
+
+        Returns:
+            True if the path is an iCloud stub file for a video.
+        """
+        if not self._is_icloud_stub(path):
+            return False
+
+        # Extract original filename to check extension
+        original_path = self._get_original_path_from_stub(path)
+        return original_path.suffix.lower() in self._video_extensions
+
+    def _get_original_path_from_stub(self, stub_path: Path) -> Path:
+        """Infer the original file path from an iCloud stub file path.
+
+        iCloud stub format: .filename.icloud -> filename
+
+        Args:
+            stub_path: Path to the iCloud stub file.
+
+        Returns:
+            Path to the original file (may not exist locally).
+        """
+        name = stub_path.name
+        # Remove leading '.' and trailing '.icloud'
+        original_name = name[len(self.ICLOUD_STUB_PREFIX):-len(self.ICLOUD_STUB_SUFFIX)]
+        return stub_path.parent / original_name
+
+    def _get_stub_path(self, original_path: Path) -> Path:
+        """Get the iCloud stub file path for an original file path.
+
+        Args:
+            original_path: Path to the original file.
+
+        Returns:
+            Path to the corresponding iCloud stub file.
+        """
+        return original_path.parent / f"{self.ICLOUD_STUB_PREFIX}{original_path.name}{self.ICLOUD_STUB_SUFFIX}"
+
     def _is_video_file(self, path: Path) -> bool:
         """Check if a path is a video file.
 
@@ -417,13 +489,19 @@ class FolderExtractor:
         logger.debug(f"Not matched by include patterns: {filename}")
         return False
 
-    def scan(self) -> Iterator[Path]:
+    def scan(self, *, include_icloud: bool = True) -> Iterator[Path]:
         """Scan for video files in the root directory.
 
         Yields video file paths that match the configured filters.
+        When iCloud stub files are found, the original file path is yielded
+        instead of the stub path.
+
+        Args:
+            include_icloud: Whether to include iCloud stub files in scan.
+                           Default is True.
 
         Yields:
-            Path to each video file found.
+            Path to each video file found (original path for iCloud files).
 
         Example:
             >>> extractor = FolderExtractor(Path("~/Videos"))
@@ -435,37 +513,112 @@ class FolderExtractor:
         pattern = "**/*" if self._recursive else "*"
 
         count = 0
+        icloud_count = 0
+        seen_paths: set[Path] = set()
+
         for path in self._root_path.glob(pattern):
             # Skip directories
             if not path.is_file():
+                continue
+
+            # Check for iCloud stub files
+            if include_icloud and self._is_video_stub(path):
+                original_path = self._get_original_path_from_stub(path)
+
+                # Skip if we've already seen this file (as local file)
+                if original_path in seen_paths:
+                    continue
+
+                # Apply filters to original filename
+                if not self._passes_filters(original_path):
+                    continue
+
+                seen_paths.add(original_path)
+                count += 1
+                icloud_count += 1
+                logger.debug(f"Found iCloud stub: {path.name} -> {original_path.name}")
+                yield original_path
                 continue
 
             # Skip non-video files
             if not self._is_video_file(path):
                 continue
 
+            # Skip if we've already seen this file (as stub)
+            if path in seen_paths:
+                continue
+
             # Apply filters
             if not self._passes_filters(path):
                 continue
 
+            seen_paths.add(path)
             count += 1
             yield path
 
-        logger.info(f"Scan complete: found {count} video files")
+        logger.info(
+            f"Scan complete: found {count} video files "
+            f"({icloud_count} in iCloud)"
+        )
 
     def get_video_info(self, path: Path) -> FolderVideoInfo:
         """Get video information for a single file.
 
+        Handles both local files and iCloud stub files. For iCloud files,
+        the path parameter should be the original file path (not stub path).
+
         Args:
-            path: Path to the video file.
+            path: Path to the video file (original path, not stub).
 
         Returns:
             FolderVideoInfo with file and video properties.
+            For iCloud files, in_cloud=True and stub_path is set.
 
         Raises:
-            FileNotFoundError: If the file does not exist.
+            FileNotFoundError: If neither the file nor its stub exists.
             InvalidVideoFileError: If the file cannot be analyzed.
         """
+        # Check for iCloud stub
+        stub_path = self._get_stub_path(path)
+        in_cloud = stub_path.exists() and not path.exists()
+
+        if in_cloud:
+            # File is in iCloud, get info from stub
+            logger.debug(f"File is in iCloud: {path.name}")
+            try:
+                stat = stub_path.stat()
+                # Stub file size is not the actual video size, set to 0
+                size = 0
+                modified_time = datetime.fromtimestamp(stat.st_mtime)
+                try:
+                    created_time = datetime.fromtimestamp(stat.st_birthtime)
+                except AttributeError:
+                    created_time = None
+            except OSError as e:
+                logger.warning(f"Failed to get stub file stats for {path}: {e}")
+                size = 0
+                modified_time = datetime.now()
+                created_time = None
+
+            # Cannot analyze codec for iCloud-only files
+            return FolderVideoInfo(
+                path=path,
+                filename=path.name,
+                size=size,
+                modified_time=modified_time,
+                created_time=created_time,
+                codec=None,
+                duration=0.0,
+                width=0,
+                height=0,
+                fps=0.0,
+                bitrate=0,
+                container=path.suffix.lstrip(".").lower(),
+                in_cloud=True,
+                stub_path=stub_path,
+            )
+
+        # File exists locally
         if not path.exists():
             raise FileNotFoundError(f"Video file not found: {path}")
 
@@ -509,6 +662,8 @@ class FolderExtractor:
             fps=codec_info.fps if codec_info else 0.0,
             bitrate=codec_info.bitrate if codec_info else 0,
             container=codec_info.container if codec_info else "",
+            in_cloud=False,
+            stub_path=None,
         )
 
     def get_videos(self) -> list[FolderVideoInfo]:
@@ -585,16 +740,17 @@ class FolderExtractor:
     def get_stats(self) -> FolderStats:
         """Get statistics about videos in the folder.
 
-        Analyzes all videos to provide statistics about codec distribution
-        and potential storage savings.
+        Analyzes all videos to provide statistics about codec distribution,
+        potential storage savings, and iCloud status.
 
         Returns:
-            FolderStats with codec distribution and size information.
+            FolderStats with codec distribution, size, and iCloud information.
 
         Example:
             >>> extractor = FolderExtractor(Path("~/Videos"))
             >>> stats = extractor.get_stats()
             >>> print(f"Found {stats.h264} H.264 videos")
+            >>> print(f"In iCloud: {stats.in_cloud}")
             >>> print(f"Estimated savings: {stats.estimated_savings_gb:.1f} GB")
         """
         logger.info("Analyzing folder statistics...")
@@ -604,14 +760,20 @@ class FolderExtractor:
             stats.total += 1
 
             try:
-                stat = path.stat()
-                size = stat.st_size
-                stats.total_size += size
-            except OSError:
-                size = 0
-
-            try:
                 video_info = self.get_video_info(path)
+
+                # Track iCloud status
+                if video_info.in_cloud:
+                    stats.in_cloud += 1
+                    # Cannot get size for iCloud-only files
+                    size = 0
+                else:
+                    try:
+                        stat = path.stat()
+                        size = stat.st_size
+                        stats.total_size += size
+                    except OSError:
+                        size = 0
 
                 if video_info.is_h264:
                     stats.h264 += 1
@@ -629,7 +791,8 @@ class FolderExtractor:
 
         logger.info(
             f"Folder stats: {stats.total} total, {stats.h264} H.264, "
-            f"{stats.hevc} HEVC, {stats.other} other, {stats.errors} errors"
+            f"{stats.hevc} HEVC, {stats.other} other, "
+            f"{stats.in_cloud} in iCloud, {stats.errors} errors"
         )
         return stats
 

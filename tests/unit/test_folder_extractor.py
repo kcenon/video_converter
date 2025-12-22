@@ -897,3 +897,235 @@ class TestFolderExtractorEdgeCases:
 
         assert len(files) == 1
         assert files[0].name == "vacation_video.mp4"
+
+
+class TestFolderExtractorICloud:
+    """Tests for iCloud stub file handling in FolderExtractor."""
+
+    def test_is_icloud_stub_valid_stub(self, tmp_path: Path) -> None:
+        """Test _is_icloud_stub detects valid stub files."""
+        stub_file = tmp_path / ".video.mp4.icloud"
+        stub_file.touch()
+
+        extractor = FolderExtractor(tmp_path)
+
+        assert extractor._is_icloud_stub(stub_file) is True
+
+    def test_is_icloud_stub_regular_file(self, tmp_path: Path) -> None:
+        """Test _is_icloud_stub returns False for regular files."""
+        regular_file = tmp_path / "video.mp4"
+        regular_file.touch()
+
+        extractor = FolderExtractor(tmp_path)
+
+        assert extractor._is_icloud_stub(regular_file) is False
+
+    def test_is_icloud_stub_dot_file(self, tmp_path: Path) -> None:
+        """Test _is_icloud_stub returns False for dot files that aren't stubs."""
+        dot_file = tmp_path / ".hidden_video.mp4"
+        dot_file.touch()
+
+        extractor = FolderExtractor(tmp_path)
+
+        assert extractor._is_icloud_stub(dot_file) is False
+
+    def test_is_video_stub_valid_video_stub(self, tmp_path: Path) -> None:
+        """Test _is_video_stub detects video stub files."""
+        stub_file = tmp_path / ".vacation.mov.icloud"
+        stub_file.touch()
+
+        extractor = FolderExtractor(tmp_path)
+
+        assert extractor._is_video_stub(stub_file) is True
+
+    def test_is_video_stub_non_video_stub(self, tmp_path: Path) -> None:
+        """Test _is_video_stub returns False for non-video stub files."""
+        stub_file = tmp_path / ".document.pdf.icloud"
+        stub_file.touch()
+
+        extractor = FolderExtractor(tmp_path)
+
+        assert extractor._is_video_stub(stub_file) is False
+
+    def test_get_original_path_from_stub(self, tmp_path: Path) -> None:
+        """Test _get_original_path_from_stub extracts original filename."""
+        stub_file = tmp_path / ".vacation.mp4.icloud"
+        stub_file.touch()
+
+        extractor = FolderExtractor(tmp_path)
+        original_path = extractor._get_original_path_from_stub(stub_file)
+
+        assert original_path == tmp_path / "vacation.mp4"
+
+    def test_get_stub_path(self, tmp_path: Path) -> None:
+        """Test _get_stub_path generates correct stub path."""
+        original_file = tmp_path / "video.mp4"
+
+        extractor = FolderExtractor(tmp_path)
+        stub_path = extractor._get_stub_path(original_file)
+
+        assert stub_path == tmp_path / ".video.mp4.icloud"
+
+    def test_scan_includes_icloud_stubs(self, tmp_path: Path) -> None:
+        """Test scan includes iCloud stub files."""
+        # Create a local video file
+        (tmp_path / "local_video.mp4").touch()
+        # Create an iCloud stub file
+        (tmp_path / ".cloud_video.mov.icloud").touch()
+
+        extractor = FolderExtractor(tmp_path)
+        files = list(extractor.scan(include_icloud=True))
+
+        assert len(files) == 2
+        filenames = [f.name for f in files]
+        assert "local_video.mp4" in filenames
+        assert "cloud_video.mov" in filenames  # Original name, not stub
+
+    def test_scan_excludes_icloud_stubs_when_disabled(self, tmp_path: Path) -> None:
+        """Test scan excludes iCloud stub files when include_icloud=False."""
+        # Create a local video file
+        (tmp_path / "local_video.mp4").touch()
+        # Create an iCloud stub file
+        (tmp_path / ".cloud_video.mov.icloud").touch()
+
+        extractor = FolderExtractor(tmp_path)
+        files = list(extractor.scan(include_icloud=False))
+
+        assert len(files) == 1
+        assert files[0].name == "local_video.mp4"
+
+    def test_scan_deduplicates_local_and_stub(self, tmp_path: Path) -> None:
+        """Test scan doesn't return duplicates when both local and stub exist."""
+        # Create both local file and stub (shouldn't happen normally, but test anyway)
+        (tmp_path / "video.mp4").touch()
+        (tmp_path / ".video.mp4.icloud").touch()
+
+        extractor = FolderExtractor(tmp_path)
+        files = list(extractor.scan(include_icloud=True))
+
+        # Should only return one entry
+        assert len(files) == 1
+        assert files[0].name == "video.mp4"
+
+    def test_get_video_info_icloud_file(self, tmp_path: Path) -> None:
+        """Test get_video_info returns correct info for iCloud stub files."""
+        # Create only the stub file (original doesn't exist locally)
+        stub_file = tmp_path / ".cloud_video.mp4.icloud"
+        stub_file.touch()
+
+        extractor = FolderExtractor(tmp_path)
+        original_path = tmp_path / "cloud_video.mp4"
+        info = extractor.get_video_info(original_path)
+
+        assert info.filename == "cloud_video.mp4"
+        assert info.in_cloud is True
+        assert info.stub_path == stub_file
+        assert info.codec is None  # Cannot detect codec for iCloud files
+        assert info.size == 0  # Size is 0 for iCloud files
+
+    def test_get_video_info_local_file(self, tmp_path: Path) -> None:
+        """Test get_video_info returns in_cloud=False for local files."""
+        video_file = tmp_path / "local_video.mp4"
+        video_file.write_bytes(b"x" * 1000)
+
+        mock_info = MagicMock()
+        mock_info.codec = "h264"
+        mock_info.duration = 60.0
+        mock_info.width = 1920
+        mock_info.height = 1080
+        mock_info.fps = 30.0
+        mock_info.bitrate = 5000000
+        mock_info.container = "mp4"
+
+        mock_detector = MagicMock()
+        mock_detector.analyze.return_value = mock_info
+
+        extractor = FolderExtractor(tmp_path)
+        extractor._codec_detector = mock_detector
+
+        mock_codec_module = MagicMock()
+        mock_codec_module.InvalidVideoError = Exception
+        mock_codec_module.CorruptedVideoError = Exception
+        with patch.dict(
+            "sys.modules",
+            {"video_converter.processors.codec_detector": mock_codec_module},
+        ):
+            info = extractor.get_video_info(video_file)
+
+        assert info.filename == "local_video.mp4"
+        assert info.in_cloud is False
+        assert info.stub_path is None
+        assert info.size == 1000
+
+    def test_get_video_info_nonexistent_no_stub(self, tmp_path: Path) -> None:
+        """Test get_video_info raises FileNotFoundError when no file or stub exists."""
+        extractor = FolderExtractor(tmp_path)
+
+        with pytest.raises(FileNotFoundError):
+            extractor.get_video_info(tmp_path / "nonexistent.mp4")
+
+    def test_folder_video_info_in_cloud_property(self) -> None:
+        """Test FolderVideoInfo has in_cloud property."""
+        video = FolderVideoInfo(
+            path=Path("/video.mp4"),
+            filename="video.mp4",
+            size=0,
+            modified_time=datetime.now(),
+            in_cloud=True,
+            stub_path=Path("/.video.mp4.icloud"),
+        )
+
+        assert video.in_cloud is True
+        assert video.stub_path == Path("/.video.mp4.icloud")
+
+    def test_folder_video_info_default_in_cloud(self) -> None:
+        """Test FolderVideoInfo defaults in_cloud to False."""
+        video = FolderVideoInfo(
+            path=Path("/video.mp4"),
+            filename="video.mp4",
+            size=1000,
+            modified_time=datetime.now(),
+        )
+
+        assert video.in_cloud is False
+        assert video.stub_path is None
+
+    def test_folder_stats_in_cloud_counter(self) -> None:
+        """Test FolderStats has in_cloud counter."""
+        stats = FolderStats(
+            total=10,
+            h264=5,
+            hevc=3,
+            other=1,
+            in_cloud=3,
+        )
+
+        assert stats.in_cloud == 3
+
+    @requires_full_deps
+    def test_get_stats_counts_icloud_files(self, tmp_path: Path) -> None:
+        """Test get_stats correctly counts iCloud files."""
+        # Create local video file
+        (tmp_path / "local_video.mp4").write_bytes(b"x" * 1000)
+        # Create iCloud stub file
+        (tmp_path / ".cloud_video.mov.icloud").touch()
+
+        mock_info = MagicMock()
+        mock_info.codec = "h264"
+        mock_info.duration = 60.0
+        mock_info.width = 1920
+        mock_info.height = 1080
+        mock_info.fps = 30.0
+        mock_info.bitrate = 5000000
+        mock_info.container = "mp4"
+
+        mock_detector = MagicMock()
+        mock_detector.analyze.return_value = mock_info
+
+        extractor = FolderExtractor(tmp_path)
+        extractor._codec_detector = mock_detector
+
+        stats = extractor.get_stats()
+
+        assert stats.total == 2
+        assert stats.in_cloud == 1  # One file is in iCloud

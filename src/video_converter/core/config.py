@@ -135,6 +135,33 @@ class PhotosConfig(BaseModel):
     skip_cloud_only: bool = False
 
 
+class FolderConfig(BaseModel):
+    """Folder-based video scanning settings.
+
+    Settings for scanning videos from filesystem directories,
+    including iCloud Drive folders with stub files.
+
+    SRS Reference: SRS-304 (Folder-based Video Extraction)
+
+    Attributes:
+        recursive: Whether to scan subdirectories.
+        auto_download_icloud: Whether to auto-download iCloud stub files.
+        icloud_timeout: Maximum time to wait for iCloud downloads in seconds.
+        skip_icloud_on_timeout: Skip file if download times out.
+        include_patterns: Glob patterns to include (e.g., ["vacation*"]).
+        exclude_patterns: Glob patterns to exclude (e.g., ["*.tmp", "._*"]).
+    """
+
+    recursive: bool = True
+    auto_download_icloud: bool = True
+    icloud_timeout: int = Field(default=3600, ge=60, le=86400)
+    skip_icloud_on_timeout: bool = True
+    include_patterns: list[str] = Field(default_factory=list)
+    exclude_patterns: list[str] = Field(
+        default_factory=lambda: ["*.tmp", "._*", ".DS_Store", "*.part"]
+    )
+
+
 class ProcessingConfig(BaseModel):
     """Processing settings for conversion workflow.
 
@@ -205,6 +232,7 @@ class Config(BaseSettings):
     paths: PathsConfig = Field(default_factory=PathsConfig)
     automation: AutomationConfig = Field(default_factory=AutomationConfig)
     photos: PhotosConfig = Field(default_factory=PhotosConfig)
+    folder: FolderConfig = Field(default_factory=FolderConfig)
     processing: ProcessingConfig = Field(default_factory=ProcessingConfig)
     notification: NotificationConfig = Field(default_factory=NotificationConfig)
 
@@ -401,6 +429,7 @@ __all__ = [
     "PathsConfig",
     "AutomationConfig",
     "PhotosConfig",
+    "FolderConfig",
     "ProcessingConfig",
     "NotificationConfig",
     "DEFAULT_CONFIG_DIR",
