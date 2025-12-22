@@ -10,7 +10,12 @@ from video_converter.utils.command_runner import (
     CommandNotFoundError,
     CommandResult,
     CommandRunner,
+    CommandTimeoutError,
+    ExifToolRunner,
     FFprobeRunner,
+    run_command,
+    run_exiftool,
+    run_ffprobe,
 )
 from video_converter.utils.progress_parser import (
     FFmpegProgress,
@@ -18,11 +23,20 @@ from video_converter.utils.progress_parser import (
 )
 
 __all__ = [
+    # Command execution
     "CommandResult",
     "CommandRunner",
     "CommandNotFoundError",
     "CommandExecutionError",
+    "CommandTimeoutError",
+    # Specialized runners
     "FFprobeRunner",
+    "ExifToolRunner",
+    # Convenience functions
+    "run_command",
+    "run_ffprobe",
+    "run_exiftool",
+    # Progress parsing
     "FFmpegProgress",
     "FFmpegProgressParser",
 ]
