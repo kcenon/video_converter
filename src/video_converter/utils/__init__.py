@@ -17,6 +17,13 @@ from video_converter.utils.command_runner import (
     run_exiftool,
     run_ffprobe,
 )
+from video_converter.utils.dependency_checker import (
+    DependencyChecker,
+    DependencyCheckResult,
+    DependencyInfo,
+    DependencyStatus,
+    compare_versions,
+)
 from video_converter.utils.progress_parser import (
     FFmpegProgress,
     FFmpegProgressParser,
@@ -36,6 +43,12 @@ __all__ = [
     "run_command",
     "run_ffprobe",
     "run_exiftool",
+    # Dependency checking
+    "DependencyChecker",
+    "DependencyCheckResult",
+    "DependencyInfo",
+    "DependencyStatus",
+    "compare_versions",
     # Progress parsing
     "FFmpegProgress",
     "FFmpegProgressParser",
