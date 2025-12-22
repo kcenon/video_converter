@@ -98,6 +98,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for both simple (float 0-1) and detailed (ProgressInfo) callbacks in BaseConverter
 - Human-readable size formatting (size_formatted property)
 
+#### iCloud Video Download Handling (#16)
+- iCloudHandler class for detecting and downloading iCloud-stored videos
+- CloudStatus enum (LOCAL, CLOUD_ONLY, DOWNLOADING, FAILED, UNKNOWN)
+- Automatic iCloud status detection using stub file analysis
+- Download triggering via macOS brctl command (requires macOS 12+)
+- Download progress tracking with DownloadProgress dataclass
+- Configurable download timeout (icloud_timeout option)
+- Option to skip cloud-only videos (skip_cloud_only option)
+- Eviction support for freeing local storage space
+
 ### Planned
 - Rich progress bar display
 - Statistics and reporting
