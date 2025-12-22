@@ -800,9 +800,29 @@ def _run_resume_session(cli_ctx: CLIContext) -> None:
 
 @main.command()
 def status() -> None:
-    """Show service status."""
+    """Show service status.
+
+    Displays comprehensive status information about the video converter
+    service including:
+    - Installation and running status
+    - Schedule configuration
+    - Next scheduled run time
+    - Last run time and result
+    - Cumulative conversion statistics
+
+    Examples:
+
+        # Show service status
+        video-converter status
+    """
+    from video_converter.automation.service_manager import (
+        DetailedServiceStatus,
+        format_bytes,
+    )
+
     manager = ServiceManager()
-    service_status = manager.get_status()
+    detailed = manager.get_detailed_status()
+    service_status = detailed.basic_status
 
     click.echo()
     click.echo("╭" + "─" * 46 + "╮")
@@ -820,21 +840,39 @@ def status() -> None:
         status_text = f"✗ Error (exit: {service_status.last_exit_status})"
         status_style = "red"
     else:
-        status_text = "○ Idle"
+        status_text = "✓ Installed, Idle"
         status_style = "yellow"
 
-    click.echo(f"│  Status:     {click.style(status_text, fg=status_style):<35}│")
+    click.echo(f"│  Status:       {click.style(status_text, fg=status_style):<31}│")
 
     # Schedule line
     if service_status.schedule:
-        click.echo(f"│  Schedule:   {service_status.schedule:<33}│")
+        schedule_display = service_status.schedule
+        if len(schedule_display) > 29:
+            schedule_display = schedule_display[:26] + "..."
+        click.echo(f"│  Schedule:     {schedule_display:<29}│")
 
-    # Plist path
-    if service_status.plist_path:
-        plist_display = str(service_status.plist_path)
-        if len(plist_display) > 33:
-            plist_display = "..." + plist_display[-30:]
-        click.echo(f"│  Plist:      {plist_display:<33}│")
+    # Next run line
+    if service_status.state != ServiceState.NOT_INSTALLED:
+        next_run_display = detailed.next_run_relative
+        if len(next_run_display) > 29:
+            next_run_display = next_run_display[:26] + "..."
+        click.echo(f"│  Next Run:     {next_run_display:<29}│")
+
+    # Last run line
+    if detailed.last_run.timestamp is not None:
+        last_run_text = f"{detailed.last_run.relative_time} ({detailed.last_run.result_text})"
+        if len(last_run_text) > 29:
+            last_run_text = last_run_text[:26] + "..."
+        click.echo(f"│  Last Run:     {last_run_text:<29}│")
+
+    # Conversion statistics
+    if detailed.total_videos_converted > 0 or service_status.state != ServiceState.NOT_INSTALLED:
+        saved_display = format_bytes(detailed.total_storage_saved_bytes)
+        stats_text = f"{detailed.total_videos_converted} videos, {saved_display} saved"
+        if len(stats_text) > 29:
+            stats_text = stats_text[:26] + "..."
+        click.echo(f"│  Converted:    {stats_text:<29}│")
 
     click.echo("╰" + "─" * 46 + "╯")
     click.echo()

@@ -27,8 +27,8 @@ from __future__ import annotations
 
 import logging
 import subprocess
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -96,6 +96,84 @@ class ServiceResult:
     message: str
     error: str | None = None
     plist_path: Path | None = None
+
+
+@dataclass
+class LastRunInfo:
+    """Information about the last service run.
+
+    Attributes:
+        timestamp: When the service last ran.
+        success: Whether the last run was successful.
+        videos_converted: Number of videos converted in last run.
+        storage_saved_bytes: Bytes saved in last run.
+        error_message: Error message if last run failed.
+    """
+
+    timestamp: datetime | None = None
+    success: bool | None = None
+    videos_converted: int = 0
+    storage_saved_bytes: int = 0
+    error_message: str | None = None
+
+    @property
+    def relative_time(self) -> str:
+        """Get relative time description (e.g., 'Today', 'Yesterday').
+
+        Returns:
+            Human-readable relative time string.
+        """
+        if self.timestamp is None:
+            return "Never"
+
+        now = datetime.now()
+        diff = now - self.timestamp
+
+        if diff.days == 0:
+            return f"Today, {self.timestamp.strftime('%H:%M')}"
+        elif diff.days == 1:
+            return f"Yesterday, {self.timestamp.strftime('%H:%M')}"
+        elif diff.days < 7:
+            return f"{diff.days} days ago"
+        else:
+            return self.timestamp.strftime("%Y-%m-%d %H:%M")
+
+    @property
+    def result_text(self) -> str:
+        """Get result description.
+
+        Returns:
+            Human-readable result string.
+        """
+        if self.success is None:
+            return "Unknown"
+        elif self.success:
+            return "Success"
+        else:
+            return "Failed"
+
+
+@dataclass
+class DetailedServiceStatus:
+    """Extended status information including history and next run.
+
+    Attributes:
+        basic_status: Basic ServiceStatus information.
+        next_run: Estimated next run time.
+        next_run_relative: Human-readable next run description.
+        last_run: Information about the last run.
+        total_videos_converted: Total videos converted (all time).
+        total_storage_saved_bytes: Total storage saved (all time).
+        success_rate: Overall success rate (0.0-1.0).
+    """
+
+    basic_status: ServiceStatus
+    next_run: datetime | None = None
+    next_run_relative: str = "Unknown"
+    last_run: LastRunInfo = field(default_factory=LastRunInfo)
+    total_videos_converted: int = 0
+    total_storage_saved_bytes: int = 0
+    success_rate: float = 0.0
 
 
 class ServiceManager:
@@ -809,10 +887,228 @@ class ServiceManager:
 
         return logs
 
+    def calculate_next_run(self) -> tuple[datetime | None, str]:
+        """Calculate the next scheduled run time.
+
+        Parses the plist file to determine when the service will next run
+        based on StartCalendarInterval settings.
+
+        Returns:
+            Tuple of (next_run_datetime, human_readable_description).
+            Returns (None, "Not scheduled") if no schedule is configured.
+
+        Example:
+            >>> manager = ServiceManager()
+            >>> next_run, description = manager.calculate_next_run()
+            >>> print(f"Next run: {description}")
+        """
+        if not self.plist_path.exists():
+            return None, "Not installed"
+
+        try:
+            import plistlib
+
+            with self.plist_path.open("rb") as f:
+                plist = plistlib.load(f)
+
+            # Check StartCalendarInterval
+            if "StartCalendarInterval" not in plist:
+                # Check for WatchPaths only
+                if "WatchPaths" in plist:
+                    return None, "Triggered by folder changes"
+                return None, "Not scheduled"
+
+            interval = plist["StartCalendarInterval"]
+            hour = interval.get("Hour")
+            minute = interval.get("Minute", 0)
+            weekday = interval.get("Weekday")
+
+            if hour is None:
+                return None, "No time specified"
+
+            now = datetime.now()
+            next_run = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+            if weekday is not None:
+                # Weekly schedule
+                days_ahead = weekday - now.weekday()
+                if days_ahead < 0:
+                    days_ahead += 7
+                elif days_ahead == 0 and next_run <= now:
+                    days_ahead = 7
+                next_run += timedelta(days=days_ahead)
+            else:
+                # Daily schedule
+                if next_run <= now:
+                    next_run += timedelta(days=1)
+
+            # Generate human-readable description
+            diff = next_run - now
+            if diff.days == 0:
+                description = f"Today, {next_run.strftime('%H:%M')}"
+            elif diff.days == 1:
+                description = f"Tomorrow, {next_run.strftime('%H:%M')}"
+            else:
+                day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+                day_name = day_names[next_run.weekday()]
+                description = f"{day_name}, {next_run.strftime('%H:%M')}"
+
+            return next_run, description
+
+        except Exception as e:
+            logger.warning(f"Failed to calculate next run: {e}")
+            return None, "Unknown"
+
+    def get_last_run_info(self) -> LastRunInfo:
+        """Get information about the last service run.
+
+        Determines last run time from log file modification times and
+        parses log content for success/failure information.
+
+        Returns:
+            LastRunInfo with timestamp, success status, and statistics.
+
+        Example:
+            >>> manager = ServiceManager()
+            >>> last_run = manager.get_last_run_info()
+            >>> print(f"Last run: {last_run.relative_time} ({last_run.result_text})")
+        """
+        info = LastRunInfo()
+        stdout_path, stderr_path = self.get_log_paths()
+
+        # Get timestamp from log file
+        try:
+            if stdout_path.exists():
+                mtime = stdout_path.stat().st_mtime
+                info.timestamp = datetime.fromtimestamp(mtime)
+
+                # Parse log for success/failure and statistics
+                content = stdout_path.read_text()
+                lines = content.splitlines()
+
+                # Look for completion indicators
+                for line in reversed(lines[-100:]):
+                    line_lower = line.lower()
+                    if "completed" in line_lower or "success" in line_lower:
+                        info.success = True
+                        break
+                    elif "failed" in line_lower or "error" in line_lower:
+                        info.success = False
+                        break
+
+                # Look for statistics in log
+                for line in reversed(lines[-50:]):
+                    if "converted" in line.lower():
+                        # Try to extract number of videos
+                        import re
+                        match = re.search(r"(\d+)\s*videos?\s*converted", line, re.I)
+                        if match:
+                            info.videos_converted = int(match.group(1))
+                    if "saved" in line.lower():
+                        # Try to extract bytes saved
+                        import re
+                        match = re.search(r"(\d+\.?\d*)\s*(GB|MB|KB|B)\s*saved", line, re.I)
+                        if match:
+                            value = float(match.group(1))
+                            unit = match.group(2).upper()
+                            multipliers = {"B": 1, "KB": 1024, "MB": 1024**2, "GB": 1024**3}
+                            info.storage_saved_bytes = int(value * multipliers.get(unit, 1))
+
+            # Check stderr for errors
+            if stderr_path.exists():
+                stderr_content = stderr_path.read_text().strip()
+                if stderr_content:
+                    # Only mark as failed if there's actual error content
+                    last_lines = stderr_content.splitlines()[-5:]
+                    error_indicators = ["error", "failed", "exception", "traceback"]
+                    for line in last_lines:
+                        if any(ind in line.lower() for ind in error_indicators):
+                            info.success = False
+                            info.error_message = line.strip()[:200]
+                            break
+
+        except Exception as e:
+            logger.warning(f"Failed to get last run info: {e}")
+
+        return info
+
+    def get_detailed_status(self) -> DetailedServiceStatus:
+        """Get comprehensive status including history and scheduling.
+
+        Combines basic service status with conversion history statistics
+        and next run calculations.
+
+        Returns:
+            DetailedServiceStatus with all status information.
+
+        Example:
+            >>> manager = ServiceManager()
+            >>> status = manager.get_detailed_status()
+            >>> print(f"Status: {status.basic_status.state}")
+            >>> print(f"Next run: {status.next_run_relative}")
+            >>> print(f"Last run: {status.last_run.relative_time}")
+            >>> print(f"Total converted: {status.total_videos_converted}")
+        """
+        # Get basic status
+        basic_status = self.get_status()
+
+        # Calculate next run
+        next_run, next_run_relative = self.calculate_next_run()
+
+        # Get last run info
+        last_run = self.get_last_run_info()
+
+        # Get conversion history statistics
+        total_converted = 0
+        total_saved = 0
+        success_rate = 0.0
+
+        try:
+            from video_converter.core.history import get_history
+            history = get_history()
+            stats = history.get_statistics()
+            total_converted = stats.total_converted
+            total_saved = stats.total_saved_bytes
+            success_rate = stats.success_rate
+        except Exception as e:
+            logger.debug(f"Could not load conversion history: {e}")
+
+        return DetailedServiceStatus(
+            basic_status=basic_status,
+            next_run=next_run,
+            next_run_relative=next_run_relative,
+            last_run=last_run,
+            total_videos_converted=total_converted,
+            total_storage_saved_bytes=total_saved,
+            success_rate=success_rate,
+        )
+
+
+def format_bytes(bytes_value: int) -> str:
+    """Format bytes into human-readable string.
+
+    Args:
+        bytes_value: Number of bytes.
+
+    Returns:
+        Formatted string like "1.5 GB" or "256 MB".
+    """
+    if bytes_value < 1024:
+        return f"{bytes_value} B"
+    elif bytes_value < 1024**2:
+        return f"{bytes_value / 1024:.1f} KB"
+    elif bytes_value < 1024**3:
+        return f"{bytes_value / 1024**2:.1f} MB"
+    else:
+        return f"{bytes_value / 1024**3:.1f} GB"
+
 
 __all__ = [
     "ServiceState",
     "ServiceStatus",
     "ServiceResult",
+    "LastRunInfo",
+    "DetailedServiceStatus",
     "ServiceManager",
+    "format_bytes",
 ]
