@@ -74,6 +74,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `CommandTimeoutError` exception for explicit timeout handling in command execution
+- `run_with_streaming` method for real-time output streaming with callback support
+- `ExifToolRunner` class for comprehensive metadata operations (read, write, copy)
+- Convenience functions: `run_command`, `run_ffprobe`, `run_exiftool`
+- Logging integration for command execution debugging
+
 ### Planned
 - Rich progress bar display
 - Statistics and reporting
