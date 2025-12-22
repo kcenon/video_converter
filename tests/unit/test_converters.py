@@ -219,6 +219,82 @@ class TestSoftwareConverter:
             preset_idx = command.index("-preset") + 1
             assert command[preset_idx] == preset
 
+    def test_build_command_10bit_encoding(self) -> None:
+        """Test 10-bit encoding adds correct pixel format."""
+        converter = SoftwareConverter()
+        request = ConversionRequest(
+            input_path=Path("input.mov"),
+            output_path=Path("output.mp4"),
+            bit_depth=10,
+        )
+        command = converter.build_command(request)
+
+        assert "-pix_fmt" in command
+        pix_fmt_idx = command.index("-pix_fmt") + 1
+        assert command[pix_fmt_idx] == "yuv420p10le"
+
+    def test_build_command_10bit_with_hdr(self) -> None:
+        """Test 10-bit HDR encoding adds x265-params."""
+        converter = SoftwareConverter()
+        request = ConversionRequest(
+            input_path=Path("input.mov"),
+            output_path=Path("output.mp4"),
+            bit_depth=10,
+            hdr=True,
+        )
+        command = converter.build_command(request)
+
+        assert "-pix_fmt" in command
+        assert "-x265-params" in command
+        x265_idx = command.index("-x265-params") + 1
+        assert "hdr-opt=1" in command[x265_idx]
+        assert "colorprim=bt2020" in command[x265_idx]
+
+    def test_build_command_8bit_no_hdr_params(self) -> None:
+        """Test 8-bit encoding does not add 10-bit specific options."""
+        converter = SoftwareConverter()
+        request = ConversionRequest(
+            input_path=Path("input.mov"),
+            output_path=Path("output.mp4"),
+            bit_depth=8,
+        )
+        command = converter.build_command(request)
+
+        assert "-pix_fmt" not in command
+        assert "-x265-params" not in command
+
+    def test_build_command_hdr_requires_10bit(self) -> None:
+        """Test HDR flag alone does not add x265-params without 10-bit."""
+        converter = SoftwareConverter()
+        request = ConversionRequest(
+            input_path=Path("input.mov"),
+            output_path=Path("output.mp4"),
+            bit_depth=8,
+            hdr=True,
+        )
+        command = converter.build_command(request)
+
+        # HDR params should not be added for 8-bit content
+        assert "-x265-params" not in command
+
+    def test_build_command_invalid_bit_depth_defaults_to_8(self) -> None:
+        """Test invalid bit depth falls back to 8-bit."""
+        converter = SoftwareConverter()
+        request = ConversionRequest(
+            input_path=Path("input.mov"),
+            output_path=Path("output.mp4"),
+            bit_depth=12,  # Invalid, should default to 8
+        )
+        command = converter.build_command(request)
+
+        # Should not have 10-bit options
+        assert "-pix_fmt" not in command
+
+    def test_valid_bit_depths(self) -> None:
+        """Test valid bit depths constant is correct."""
+        assert SoftwareConverter.VALID_BIT_DEPTHS == [8, 10]
+        assert SoftwareConverter.DEFAULT_BIT_DEPTH == 8
+
 
 class TestConverterFactory:
     """Tests for ConverterFactory."""
