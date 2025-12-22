@@ -113,6 +113,25 @@ video-converter run --input-dir ~/Videos --dry-run
 video-converter run --input-dir ~/Videos --output-dir ~/Converted
 ```
 
+#### Concurrent Processing
+
+When converting multiple files, the converter supports concurrent processing for faster batch operations:
+
+```bash
+# Set max concurrent conversions (default: 2)
+video-converter config-set processing.max_concurrent 4
+
+# Or use environment variable
+export VIDEO_CONVERTER_PROCESSING__MAX_CONCURRENT=4
+video-converter run --input-dir ~/Videos
+```
+
+The concurrent processing system:
+- Processes multiple videos in parallel up to the configured limit
+- Monitors system resources (CPU, memory) when available
+- Shows aggregated progress across all active conversions
+- Maintains order of results matching input order
+
 ### Resume Interrupted Conversion
 
 If a conversion is interrupted (system crash, restart, or manual pause), you can resume from where it left off:
