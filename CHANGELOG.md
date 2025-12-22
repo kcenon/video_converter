@@ -90,6 +90,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive error handling (FolderNotFoundError, FolderAccessDeniedError, InvalidVideoFileError)
 - Unit tests with 62 test cases covering all functionality
 
+#### Real-time Progress Monitoring (#11)
+- ProgressInfo dataclass with ETA calculation properties (eta_seconds, eta_formatted)
+- ProgressParser for parsing FFmpeg stderr output
+- ProgressMonitor for callback-based progress updates with throttling
+- create_simple_callback helper for console progress display
+- Support for both simple (float 0-1) and detailed (ProgressInfo) callbacks in BaseConverter
+- Human-readable size formatting (size_formatted property)
+
 ### Planned
 - Rich progress bar display
 - Statistics and reporting
