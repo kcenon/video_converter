@@ -178,6 +178,9 @@ class ConversionResult:
         warnings: Non-critical issues encountered.
         started_at: When conversion started.
         completed_at: When conversion finished.
+        retry_count: Number of retry attempts made (0 if no retries).
+        retry_strategy_used: Final retry strategy that succeeded (or None).
+        retry_history: Detailed history of all retry attempts.
     """
 
     success: bool
@@ -190,6 +193,9 @@ class ConversionResult:
     warnings: list[str] = field(default_factory=list)
     started_at: datetime | None = None
     completed_at: datetime | None = None
+    retry_count: int = 0
+    retry_strategy_used: str | None = None
+    retry_history: list[dict] = field(default_factory=list)
 
     @property
     def compression_ratio(self) -> float:
