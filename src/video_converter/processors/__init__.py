@@ -59,6 +59,14 @@ from video_converter.processors.verification import (
     VerificationCategory,
     VerificationResult,
 )
+from video_converter.processors.vmaf_analyzer import (
+    VmafAnalysisError,
+    VmafAnalyzer,
+    VmafNotAvailableError,
+    VmafQualityLevel,
+    VmafResult,
+    VmafScores,
+)
 
 __all__ = [
     # Codec detection
@@ -107,4 +115,11 @@ __all__ = [
     "ToleranceSettings",
     "VerificationCategory",
     "VerificationResult",
+    # VMAF quality measurement
+    "VmafAnalysisError",
+    "VmafAnalyzer",
+    "VmafNotAvailableError",
+    "VmafQualityLevel",
+    "VmafResult",
+    "VmafScores",
 ]

@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### VMAF Quality Measurement (#26)
+- `VmafAnalyzer` class for perceptual video quality measurement
+- VMAF score calculation between original and converted videos
+- `VmafScores` dataclass with min, mean, max, 5th/95th percentile statistics
+- `VmafQualityLevel` enum for score interpretation (visually lossless >= 93)
+- Support for frame sampling via `sample_interval` for faster analysis
+- Graceful handling when libvmaf is not available (`is_available()` check)
+- `quick_analyze()` method for fast quality estimation (1:30 sampling)
+- Human-readable quality assessment via `get_quality_assessment()`
+- Async support with `analyze_async()` method
+- 46 comprehensive unit tests
+- Exported from `video_converter.processors` package
+
 #### macOS Notification Center Integration
 - `NotificationManager` class for sending macOS notifications
 - Automatic notifications on batch conversion completion
@@ -228,7 +241,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rich progress bar display
 - Statistics and reporting
 - macOS Notification Center integration
-- VMAF quality measurement (optional)
 
 [1.0.0]: https://github.com/kcenon/video_converter/releases/tag/v1.0.0
 [Unreleased]: https://github.com/kcenon/video_converter/compare/v1.0.0...HEAD
