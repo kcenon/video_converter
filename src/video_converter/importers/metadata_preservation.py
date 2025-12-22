@@ -4,7 +4,7 @@ This module provides classes and functions for preserving metadata
 when re-importing converted videos to the Photos library, including
 album membership, favorites status, date/time, location, and other metadata.
 
-SDS Reference: SDS-P01-009
+SDS Reference: SDS-P01-010
 SRS Reference: SRS-306 (Metadata Preservation)
 
 Example:
@@ -218,7 +218,7 @@ class MetadataPreserver:
     This class provides methods to capture, embed, apply, and verify
     metadata during the Photos re-import workflow.
 
-    SDS Reference: SDS-P01-009
+    SDS Reference: SDS-P01-010
 
     Example:
         >>> preserver = MetadataPreserver()

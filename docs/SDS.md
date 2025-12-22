@@ -158,7 +158,8 @@ video_converter/
 │       │   └── icloud_handler.py      # SDS-E01-003 (iCloud file handling)
 │       ├── importers/
 │       │   ├── __init__.py
-│       │   └── photos_importer.py     # SDS-P01-009 (Photos re-import)
+│       │   ├── photos_importer.py         # SDS-P01-009 (Photos re-import)
+│       │   └── metadata_preservation.py   # SDS-P01-010 (Metadata preservation)
 │       ├── converters/
 │       │   ├── __init__.py
 │       │   ├── base.py                # SDS-V01-001 (Abstract interface)
