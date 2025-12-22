@@ -1073,6 +1073,10 @@ def _run_photos_batch_conversion(
         candidates: List of PhotosVideoInfo to convert.
         output_dir: Output directory for converted files.
     """
+    import time
+
+    from video_converter.ui.progress import PhotosLibraryInfo
+
     config = cli_ctx.config
 
     # Create output directory if specified
@@ -1099,10 +1103,34 @@ def _run_photos_batch_conversion(
     )
     orchestrator = Orchestrator(config=orch_config, enable_session_persistence=False)
 
-    # Progress display
+    # Calculate total size
+    total_size = sum(v.size for v in candidates)
+    estimated_savings = int(total_size * 0.5)  # ~50% savings estimate
+
+    # Progress display - use Photos-specific progress
     progress_manager = ProgressDisplayManager(quiet=cli_ctx.quiet, console=console)
-    batch_progress = progress_manager.create_batch_progress(total_files=len(candidates))
-    batch_progress.start()
+    photos_progress = progress_manager.create_photos_progress(
+        total_videos=len(candidates),
+        total_size=total_size,
+    )
+
+    # Show library info panel
+    try:
+        library_info = handler.get_library_info()
+        library_path = str(library_info.get("path", ""))
+    except Exception:
+        library_path = "~/Pictures/Photos Library.photoslibrary"
+
+    photos_progress.show_library_info(
+        PhotosLibraryInfo(
+            library_path=library_path,
+            total_videos=len(candidates),
+            total_size=total_size,
+            estimated_savings=estimated_savings,
+        )
+    )
+
+    photos_progress.start()
 
     # Statistics
     successful = 0
@@ -1110,18 +1138,29 @@ def _run_photos_batch_conversion(
     total_original = 0
     total_converted = 0
     errors: list[str] = []
+    start_time = time.time()
 
     try:
         for idx, video in enumerate(candidates):
-            batch_progress.start_file(
+            # Format album and date info
+            album = video.albums[0] if video.albums else None
+            date_str = video.date.strftime("%Y-%m-%d") if video.date else None
+
+            photos_progress.start_video(
                 filename=video.filename,
-                file_index=idx + 1,
+                video_index=idx + 1,
+                album=album,
+                date=date_str,
                 original_size=video.size,
             )
 
             try:
-                # Export video from Photos
-                exported_path = handler.export_video(video)
+                # Export video from Photos with progress callback
+                def on_export_progress(progress: float) -> None:
+                    photos_progress.update_export_progress(progress * 100)
+
+                exported_path = handler.export_video(video, on_progress=on_export_progress)
+                photos_progress.update_export_progress(100)  # Mark export complete
                 total_original += video.size
 
                 # Generate output path
@@ -1142,14 +1181,18 @@ def _run_photos_batch_conversion(
                 # Get converter
                 converter = orchestrator.converter_factory.get_converter(conv_mode)
 
-                # Run conversion
+                # Run conversion with progress callback
                 def on_progress_info(info) -> None:
                     if hasattr(info, "percentage"):
-                        batch_progress.update_file(
+                        eta_str = (
+                            f"{int(info.eta)}s"
+                            if hasattr(info, "eta") and info.eta
+                            else "calculating..."
+                        )
+                        photos_progress.update_convert_progress(
                             percentage=info.percentage,
-                            current_size=0,
-                            eta=f"{int(info.eta)}s" if hasattr(info, "eta") and info.eta else "",
                             speed=info.speed if hasattr(info, "speed") else 0.0,
+                            eta=eta_str,
                         )
 
                 result = asyncio.run(
@@ -1159,11 +1202,11 @@ def _run_photos_batch_conversion(
                 if result.success:
                     successful += 1
                     total_converted += result.converted_size
-                    batch_progress.complete_file(saved_bytes=result.size_saved)
+                    photos_progress.complete_video(success=True, saved_bytes=result.size_saved)
                 else:
                     failed += 1
                     errors.append(f"{video.filename}: {result.error_message}")
-                    batch_progress.complete_file(saved_bytes=0)
+                    photos_progress.complete_video(success=False)
 
                 # Cleanup exported file
                 handler.cleanup_exported(exported_path)
@@ -1171,39 +1214,29 @@ def _run_photos_batch_conversion(
             except Exception as e:
                 failed += 1
                 errors.append(f"{video.filename}: {e}")
-                batch_progress.complete_file(saved_bytes=0)
+                photos_progress.complete_video(success=False)
                 logger = logging.getLogger(__name__)
                 logger.warning(f"Failed to convert {video.filename}: {e}")
 
     except KeyboardInterrupt:
         console.print()
         console.print("[yellow]Conversion cancelled by user.[/yellow]")
-        batch_progress.finish()
+        photos_progress.finish()
         sys.exit(130)
     finally:
-        batch_progress.finish()
+        photos_progress.finish()
 
-    # Display results
-    console.print()
-    console.print("═" * 50)
-    console.print("[bold]Photos Conversion Complete[/bold]")
-    console.print("═" * 50)
-    console.print()
+    # Calculate elapsed time
+    elapsed_time = time.time() - start_time
+    total_saved = total_original - total_converted
 
-    console.print(f"  Total files:   {len(candidates)}")
-    console.print(f"  [green]Successful:[/green]   {successful}")
-    console.print(f"  [red]Failed:[/red]       {failed}")
-
-    if total_original > 0:
-        original_mb = total_original / (1024 * 1024)
-        converted_mb = total_converted / (1024 * 1024)
-        saved_mb = original_mb - converted_mb
-        saved_pct = (saved_mb / original_mb) * 100 if original_mb > 0 else 0
-
-        console.print()
-        console.print(f"  Original:   {original_mb:.1f} MB")
-        console.print(f"  Converted:  {converted_mb:.1f} MB")
-        console.print(f"  [green]Saved:      {saved_mb:.1f} MB ({saved_pct:.1f}%)[/green]")
+    # Display results using Photos-specific summary
+    photos_progress.show_summary(
+        successful=successful,
+        failed=failed,
+        total_saved=max(0, total_saved),
+        elapsed_time=elapsed_time,
+    )
 
     if errors:
         console.print()
