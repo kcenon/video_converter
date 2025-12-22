@@ -76,6 +76,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Rich Progress Bar Display (#38)
+- New `ui/progress.py` module with Rich-based progress display components
+- `SingleFileProgressDisplay` class showing filename, progress bar, size (original -> current), ETA, and encoding speed
+- `BatchProgressDisplay` class with combined overall and per-file progress tracking
+- `IndeterminateSpinner` class for operations with unknown duration
+- `ProgressDisplayManager` for unified progress creation with quiet mode support
+- Null object pattern implementations for quiet mode (no output pollution)
+- Custom Rich columns: `SizeProgressColumn`, `SpeedColumn`, `ETAColumn`
+- Integration with existing `ProgressInfo` from `converters/progress.py`
+- 35 unit tests for all progress display components
+
 #### Service Status Query (#36)
 - `calculate_next_run()` method for computing next scheduled execution time
 - `get_last_run_info()` method for parsing service logs to get last run details
