@@ -32,6 +32,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from video_converter.converters.progress import ProgressInfo, ProgressParser
 from video_converter.core.types import (
     ConversionMode,
     ConversionRequest,
@@ -43,7 +44,6 @@ from video_converter.utils.command_runner import (
     CommandRunner,
     FFprobeRunner,
 )
-from video_converter.utils.progress_parser import FFmpegProgressParser
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -137,12 +137,15 @@ class BaseConverter(ABC):
         self,
         request: ConversionRequest,
         on_progress: Callable[[float], None] | None = None,
+        on_progress_info: Callable[[ProgressInfo], None] | None = None,
     ) -> ConversionResult:
         """Convert a video file.
 
         Args:
             request: The conversion request.
-            on_progress: Optional callback for progress updates (0.0-1.0).
+            on_progress: Optional callback for simple progress updates (0.0-1.0).
+            on_progress_info: Optional callback for detailed progress updates
+                             with ProgressInfo containing ETA and other metrics.
 
         Returns:
             ConversionResult with success status and statistics.
@@ -150,6 +153,11 @@ class BaseConverter(ABC):
         Raises:
             ConversionError: If conversion fails.
             EncoderNotAvailableError: If the encoder is not available.
+
+        Note:
+            If both callbacks are provided, both will be called.
+            on_progress_info provides more detailed information including
+            eta_seconds, eta_formatted, and current encoding speed.
         """
         self._cancelled = False
         started_at = datetime.now()
@@ -179,7 +187,7 @@ class BaseConverter(ABC):
 
         # Get video duration for progress calculation
         video_duration = self._get_video_duration(request.input_path)
-        progress_parser = FFmpegProgressParser(total_duration=video_duration)
+        progress_parser = ProgressParser(total_duration=video_duration)
 
         # Ensure output directory exists
         request.output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -213,11 +221,17 @@ class BaseConverter(ABC):
                 stderr_output.append(line_str)
 
                 # Parse progress from FFmpeg output
-                if progress := progress_parser.parse_line(line_str):
-                    last_speed = progress.speed
+                if progress_info := progress_parser.parse_line(line_str):
+                    last_speed = progress_info.speed
+                    # Call detailed progress callback with ProgressInfo
+                    if on_progress_info:
+                        try:
+                            on_progress_info(progress_info)
+                        except Exception:
+                            pass  # Swallow callback errors
+                    # Call simple progress callback with ratio (0.0-1.0)
                     if on_progress and video_duration > 0:
-                        # Callback with progress ratio (0.0-1.0)
-                        on_progress(progress.percentage / 100.0)
+                        on_progress(progress_info.percentage / 100.0)
 
             # Wait for process to complete
             await self._current_process.wait()
@@ -329,14 +343,17 @@ class BaseConverter(ABC):
         self,
         request: ConversionRequest,
         on_progress: Callable[[float], None] | None = None,
+        on_progress_info: Callable[[ProgressInfo], None] | None = None,
     ) -> ConversionResult:
         """Synchronous wrapper for convert.
 
         Args:
             request: The conversion request.
-            on_progress: Optional callback for progress updates.
+            on_progress: Optional callback for simple progress updates (0.0-1.0).
+            on_progress_info: Optional callback for detailed progress updates
+                             with ProgressInfo containing ETA and other metrics.
 
         Returns:
             ConversionResult with success status and statistics.
         """
-        return asyncio.run(self.convert(request, on_progress))
+        return asyncio.run(self.convert(request, on_progress, on_progress_info))
