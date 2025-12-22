@@ -1,8 +1,8 @@
 # Video Converter - Product Requirements Document (PRD)
 
-**문서 버전**: 1.0.0
-**작성일**: 2025-12-21
-**상태**: Draft
+**문서 버전**: 1.1.0
+**작성일**: 2025-12-23
+**상태**: Active
 **작성자**: Product Team
 
 ---
@@ -684,7 +684,7 @@ Converting: vacation_2024.mp4
 
 ```json
 {
-  "version": "1.0.0",
+  "version": "0.1.0.0",
   "encoding": {
     "mode": "hardware",
     "quality": 45,
@@ -920,6 +920,7 @@ Converting: vacation_2024.mp4
 | 버전 | 날짜 | 작성자 | 변경 내용 |
 |------|------|--------|----------|
 | 1.0.0 | 2025-12-21 | - | 최초 작성 |
+| 1.1.0 | 2025-12-23 | - | v1.0.0 릴리스 및 v1.1.0 개발 상태를 반영하여 릴리스 로드맵 업데이트 |
 
 ---
 

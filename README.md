@@ -358,7 +358,7 @@ Configuration file location: `~/.config/video_converter/config.json`
 
 ```json
 {
-  "version": "1.0.0",
+  "version": "0.1.0.0",
   "encoding": {
     "mode": "hardware",
     "quality": 45,
@@ -461,10 +461,18 @@ Photos Library ──▶ H.264 Detection ──▶ VideoToolbox ──▶ H.265 
 
 ## Roadmap
 
-- [x] v1.0.0 - CLI with automation (Current)
-- [x] v1.1.0 - VMAF quality verification
-- [ ] v1.2.0 - GUI application
-- [ ] v2.0.0 - AV1 codec support
+> **Note**: This project uses 0.x.x.x versioning to indicate active development status.
+
+- [x] v0.1.0.0 - CLI with automation (Released 2025-12-22)
+- [ ] v0.2.0.0 - VMAF quality verification, enhanced features (In Development)
+  - VMAF quality analysis
+  - macOS Notification Center integration
+  - Statistics and reporting
+  - Concurrent processing
+  - Error recovery and retry logic
+  - Rich progress display
+- [ ] v0.3.0.0 - GUI application
+- [ ] v0.4.0.0 - AV1 codec support
 
 ## Contributing
 

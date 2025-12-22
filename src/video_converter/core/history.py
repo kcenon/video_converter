@@ -337,7 +337,7 @@ class ConversionHistory:
         """Save history to file."""
         try:
             data = {
-                "version": "1.0.0",
+                "version": "0.1.0.0",
                 "updated_at": datetime.now().isoformat(),
                 "records": {k: v.to_dict() for k, v in self._records.items()},
             }

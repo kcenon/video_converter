@@ -1,8 +1,8 @@
 # Video Converter - Software Design Specification (SDS)
 
-**문서 버전**: 1.0.0
-**작성일**: 2025-12-21
-**상태**: Draft
+**문서 버전**: 1.1.0
+**작성일**: 2025-12-23
+**상태**: Active
 **기준 문서**: SRS v1.0.0
 
 ---
@@ -22,6 +22,7 @@
 | 버전 | 날짜 | 작성자 | 변경 내용 |
 |------|------|--------|----------|
 | 1.0.0 | 2025-12-21 | - | 최초 작성 |
+| 1.1.0 | 2025-12-23 | - | 구현에 맞게 디렉토리 구조 업데이트, 새 모듈 추가 (ui, vmaf_analyzer, concurrent, session, error_recovery 등) |
 
 ---
 
@@ -52,8 +53,10 @@
 | 항목 | 내용 |
 |------|------|
 | 시스템 명 | Video Converter |
-| 대상 버전 | v1.0.0 |
+| 대상 버전 | v0.1.0.0+ |
 | 설계 범위 | 전체 시스템 (코어 모듈, 자동화, CLI) |
+
+> **참고**: 본 프로젝트는 활발한 개발 상태를 나타내기 위해 0.x.x.x 버전 체계를 사용합니다.
 
 ### 1.3 설계 원칙
 
@@ -130,7 +133,77 @@ SDS-{Module}-{Number}
 | SDS-R01-001 | `video_converter.reporters` | 통계 및 알림 | SRS-603 |
 | SDS-U01-001 | `video_converter.utils` | 공통 유틸리티 | - |
 
-### 2.3 의존성 다이어그램
+### 2.3 디렉토리 구조
+
+```
+video_converter/
+├── src/
+│   └── video_converter/
+│       ├── __init__.py
+│       ├── __main__.py                # CLI 엔트리 포인트
+│       ├── core/
+│       │   ├── __init__.py
+│       │   ├── orchestrator.py        # SDS-C01-001 (메인 워크플로우 조율)
+│       │   ├── config.py              # SDS-C01-002 (설정 관리)
+│       │   ├── logger.py              # SDS-C01-003 (로깅 시스템)
+│       │   ├── types.py               # SDS-C01-004 (핵심 데이터 클래스)
+│       │   ├── session.py             # SDS-C01-005 (세션 영속성)
+│       │   ├── history.py             # SDS-C01-006 (변환 이력)
+│       │   ├── error_recovery.py      # SDS-C01-007 (에러 처리)
+│       │   └── concurrent.py          # SDS-C01-008 (병렬 처리)
+│       ├── extractors/
+│       │   ├── __init__.py
+│       │   ├── photos_extractor.py    # SDS-E01-001 (Photos 라이브러리 접근)
+│       │   ├── folder_extractor.py    # SDS-E01-002 (파일시스템 스캔)
+│       │   └── icloud_handler.py      # SDS-E01-003 (iCloud 파일 처리)
+│       ├── converters/
+│       │   ├── __init__.py
+│       │   ├── base.py                # SDS-V01-001 (추상 인터페이스)
+│       │   ├── hardware.py            # SDS-V01-002 (VideoToolbox 인코더)
+│       │   ├── software.py            # SDS-V01-003 (libx265 인코더)
+│       │   ├── factory.py             # SDS-V01-004 (컨버터 팩토리)
+│       │   └── progress.py            # SDS-V01-005 (FFmpeg 진행률 파싱)
+│       ├── processors/
+│       │   ├── __init__.py
+│       │   ├── codec_detector.py      # SDS-P01-001 (코덱 감지)
+│       │   ├── metadata.py            # SDS-P01-002 (ExifTool 메타데이터)
+│       │   ├── quality_validator.py   # SDS-P01-003 (품질 검증)
+│       │   ├── gps.py                 # SDS-P01-004 (GPS 좌표)
+│       │   ├── vmaf_analyzer.py       # SDS-P01-005 (VMAF 분석)
+│       │   ├── verification.py        # SDS-P01-006 (출력 검증)
+│       │   ├── timestamp.py           # SDS-P01-007 (파일 타임스탬프)
+│       │   └── retry_manager.py       # SDS-P01-008 (재시도 로직)
+│       ├── automation/
+│       │   ├── __init__.py
+│       │   ├── service_manager.py     # SDS-A01-001 (launchd 서비스)
+│       │   ├── launchd.py             # SDS-A01-002 (plist 생성)
+│       │   └── notification.py        # SDS-A01-003 (macOS 알림)
+│       ├── reporters/
+│       │   ├── __init__.py
+│       │   ├── statistics_reporter.py # SDS-R01-001 (통계 포맷팅)
+│       │   └── batch_reporter.py      # SDS-R01-002 (배치 보고)
+│       ├── ui/
+│       │   ├── __init__.py
+│       │   └── progress.py            # SDS-UI-001 (Rich 진행률 표시)
+│       └── utils/
+│           ├── __init__.py
+│           ├── command_runner.py      # SDS-U01-001 (외부 도구 실행)
+│           ├── progress_parser.py     # SDS-U01-002 (FFmpeg 출력 파싱)
+│           ├── file_utils.py          # SDS-U01-003 (파일 작업)
+│           └── dependency_checker.py  # SDS-U01-004 (시스템 의존성 확인)
+├── tests/
+│   ├── unit/                          # 단위 테스트 (31개 파일)
+│   ├── integration/                   # 통합 테스트
+│   └── conftest.py                    # Pytest 픽스처
+├── config/
+│   ├── default.json                   # 기본 설정
+│   └── launchd/                       # 서비스 템플릿
+└── scripts/
+    ├── install.sh
+    └── uninstall.sh
+```
+
+### 2.4 의존성 다이어그램
 
 ```
                     ┌─────────────┐

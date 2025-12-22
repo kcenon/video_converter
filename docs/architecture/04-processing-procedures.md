@@ -509,7 +509,7 @@ mkdir -p "$CONFIG_DIR"
 if [ ! -f "$CONFIG_DIR/config.json" ]; then
     cat > "$CONFIG_DIR/config.json" << 'EOF'
 {
-  "version": "1.0.0",
+  "version": "0.1.0.0",
   "encoding": {
     "mode": "hardware",
     "quality": 45

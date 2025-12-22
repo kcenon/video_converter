@@ -1,8 +1,8 @@
 # Video Converter - Software Design Specification (SDS)
 
-**Document Version**: 1.0.0
-**Date**: 2025-12-21
-**Status**: Draft
+**Document Version**: 1.1.0
+**Date**: 2025-12-23
+**Status**: Active
 **Reference Document**: SRS v1.0.0
 
 ---
@@ -22,6 +22,7 @@
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0.0 | 2025-12-21 | - | Initial creation |
+| 1.1.0 | 2025-12-23 | - | Updated directory structure to match implementation, added new modules (ui, vmaf_analyzer, concurrent, session, error_recovery, etc.) |
 
 ---
 
@@ -52,8 +53,10 @@ This document defines the detailed design of the Video Converter system. It prov
 | Item | Content |
 |------|---------|
 | System Name | Video Converter |
-| Target Version | v1.0.0 |
+| Target Version | v0.1.0.0+ |
 | Design Scope | Entire system (Core modules, Automation, CLI) |
+
+> **Note**: This project uses 0.x.x.x versioning to indicate active development status.
 
 ### 1.3 Design Principles
 
@@ -137,45 +140,67 @@ video_converter/
 ├── src/
 │   └── video_converter/
 │       ├── __init__.py
-│       ├── main.py                    # Entry point
+│       ├── __main__.py                # CLI Entry point
 │       ├── core/
 │       │   ├── __init__.py
-│       │   ├── orchestrator.py        # SDS-C01-001
-│       │   ├── config.py              # SDS-C01-002
-│       │   └── logger.py              # SDS-C01-003
+│       │   ├── orchestrator.py        # SDS-C01-001 (Main workflow coordinator)
+│       │   ├── config.py              # SDS-C01-002 (Configuration management)
+│       │   ├── logger.py              # SDS-C01-003 (Logging system)
+│       │   ├── types.py               # SDS-C01-004 (Core data classes)
+│       │   ├── session.py             # SDS-C01-005 (Session persistence)
+│       │   ├── history.py             # SDS-C01-006 (Conversion history)
+│       │   ├── error_recovery.py      # SDS-C01-007 (Error handling)
+│       │   └── concurrent.py          # SDS-C01-008 (Parallel processing)
 │       ├── extractors/
 │       │   ├── __init__.py
-│       │   ├── base.py                # SDS-E01-001
-│       │   ├── photos_extractor.py    # SDS-E01-002
-│       │   └── folder_extractor.py    # SDS-E01-003
+│       │   ├── photos_extractor.py    # SDS-E01-001 (Photos library access)
+│       │   ├── folder_extractor.py    # SDS-E01-002 (Filesystem scanning)
+│       │   └── icloud_handler.py      # SDS-E01-003 (iCloud file handling)
 │       ├── converters/
 │       │   ├── __init__.py
-│       │   ├── base.py                # SDS-V01-001
-│       │   ├── hardware_converter.py  # SDS-V01-002
-│       │   └── software_converter.py  # SDS-V01-003
+│       │   ├── base.py                # SDS-V01-001 (Abstract interface)
+│       │   ├── hardware.py            # SDS-V01-002 (VideoToolbox encoder)
+│       │   ├── software.py            # SDS-V01-003 (libx265 encoder)
+│       │   ├── factory.py             # SDS-V01-004 (Converter factory)
+│       │   └── progress.py            # SDS-V01-005 (FFmpeg progress parsing)
 │       ├── processors/
 │       │   ├── __init__.py
-│       │   ├── codec_detector.py      # SDS-P01-001
-│       │   ├── metadata_manager.py    # SDS-P01-002
-│       │   └── quality_validator.py   # SDS-P01-003
+│       │   ├── codec_detector.py      # SDS-P01-001 (Codec detection)
+│       │   ├── metadata.py            # SDS-P01-002 (ExifTool metadata)
+│       │   ├── quality_validator.py   # SDS-P01-003 (Quality validation)
+│       │   ├── gps.py                 # SDS-P01-004 (GPS coordinates)
+│       │   ├── vmaf_analyzer.py       # SDS-P01-005 (VMAF analysis)
+│       │   ├── verification.py        # SDS-P01-006 (Output verification)
+│       │   ├── timestamp.py           # SDS-P01-007 (File timestamps)
+│       │   └── retry_manager.py       # SDS-P01-008 (Retry logic)
 │       ├── automation/
 │       │   ├── __init__.py
-│       │   ├── launchd_manager.py     # SDS-A01-001
-│       │   └── folder_watcher.py      # SDS-A01-002
+│       │   ├── service_manager.py     # SDS-A01-001 (launchd service)
+│       │   ├── launchd.py             # SDS-A01-002 (plist generation)
+│       │   └── notification.py        # SDS-A01-003 (macOS notifications)
 │       ├── reporters/
 │       │   ├── __init__.py
-│       │   ├── statistics.py          # SDS-R01-001
-│       │   └── notifier.py            # SDS-R01-002
+│       │   ├── statistics_reporter.py # SDS-R01-001 (Stats formatting)
+│       │   └── batch_reporter.py      # SDS-R01-002 (Batch reporting)
+│       ├── ui/
+│       │   ├── __init__.py
+│       │   └── progress.py            # SDS-UI-001 (Rich progress display)
 │       └── utils/
 │           ├── __init__.py
-│           ├── command_runner.py      # SDS-U01-001
-│           ├── progress_parser.py     # SDS-U01-002
-│           └── file_utils.py          # SDS-U01-003
+│           ├── command_runner.py      # SDS-U01-001 (External tool execution)
+│           ├── progress_parser.py     # SDS-U01-002 (FFmpeg output parsing)
+│           ├── file_utils.py          # SDS-U01-003 (File operations)
+│           └── dependency_checker.py  # SDS-U01-004 (System dependency check)
 ├── tests/
+│   ├── unit/                          # Unit tests (31 files)
+│   ├── integration/                   # Integration tests
+│   └── conftest.py                    # Pytest fixtures
 ├── config/
-│   └── defaults.json
+│   ├── default.json                   # Default configuration
+│   └── launchd/                       # Service templates
 └── scripts/
-    └── install.sh
+    ├── install.sh
+    └── uninstall.sh
 ```
 
 ---
@@ -992,21 +1017,48 @@ class RetryPolicy:
 
 | SDS ID | File | Class/Function |
 |--------|------|----------------|
+| **Core Module** |
 | SDS-C01-001 | orchestrator.py | Orchestrator |
 | SDS-C01-002 | config.py | Config |
-| SDS-E01-002 | photos_extractor.py | PhotosExtractor |
+| SDS-C01-003 | logger.py | get_logger, configure_logging |
+| SDS-C01-004 | types.py | ConversionRequest, ConversionResult, ConversionProgress |
+| SDS-C01-005 | session.py | ConversionSession |
+| SDS-C01-006 | history.py | ConversionHistory, ConversionRecord |
+| SDS-C01-007 | error_recovery.py | ErrorRecoveryManager, ErrorCategory |
+| SDS-C01-008 | concurrent.py | ConcurrentProcessor, ResourceMonitor |
+| **Extractors Module** |
+| SDS-E01-001 | photos_extractor.py | PhotosExtractor |
+| SDS-E01-002 | folder_extractor.py | FolderExtractor, FolderVideoInfo |
+| SDS-E01-003 | icloud_handler.py | iCloudHandler, CloudStatus |
+| **Converters Module** |
 | SDS-V01-001 | base.py | BaseConverter |
 | SDS-V01-002 | hardware.py | HardwareConverter |
 | SDS-V01-003 | software.py | SoftwareConverter |
-| SDS-P01-001 | codec_detector.py | CodecDetector |
-| SDS-P01-002 | metadata_manager.py | MetadataManager |
+| SDS-V01-004 | factory.py | ConverterFactory |
+| SDS-V01-005 | progress.py | ProgressInfo, ProgressParser |
+| **Processors Module** |
+| SDS-P01-001 | codec_detector.py | CodecDetector, CodecInfo |
+| SDS-P01-002 | metadata.py | MetadataProcessor |
 | SDS-P01-003 | quality_validator.py | QualityValidator |
-| SDS-P01-004 | gps.py | GPSHandler |
-| SDS-P01-005 | photos_extractor.py | PhotosVideoFilter |
-| SDS-P01-006 | photos_extractor.py | VideoExporter |
-| SDS-A01-001 | launchd_manager.py | LaunchdManager |
+| SDS-P01-004 | gps.py | GPSHandler, GPSCoordinates |
+| SDS-P01-005 | vmaf_analyzer.py | VmafAnalyzer, VmafScores |
+| SDS-P01-006 | verification.py | OutputVerifier |
+| SDS-P01-007 | timestamp.py | TimestampSynchronizer |
+| SDS-P01-008 | retry_manager.py | RetryManager, RetryConfig |
+| **Automation Module** |
+| SDS-A01-001 | service_manager.py | ServiceManager |
+| SDS-A01-002 | launchd.py | LaunchdGenerator |
+| SDS-A01-003 | notification.py | NotificationManager |
+| **Reporters Module** |
+| SDS-R01-001 | statistics_reporter.py | StatisticsReporter |
+| SDS-R01-002 | batch_reporter.py | BatchReporter |
+| **UI Module** |
+| SDS-UI-001 | ui/progress.py | SingleFileProgressDisplay, BatchProgressDisplay |
+| **Utils Module** |
 | SDS-U01-001 | command_runner.py | CommandRunner, FFprobeRunner |
 | SDS-U01-002 | progress_parser.py | FFmpegProgressParser |
+| SDS-U01-003 | file_utils.py | FileUtils |
+| SDS-U01-004 | dependency_checker.py | DependencyChecker |
 
 ---
 

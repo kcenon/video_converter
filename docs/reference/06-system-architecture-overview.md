@@ -203,7 +203,7 @@ restore_metadata() {
 
 ```json
 {
-  "version": "1.0.0",
+  "version": "0.1.0.0",
   "encoding": {
     "mode": "hardware",
     "quality": 45,

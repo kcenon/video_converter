@@ -73,7 +73,7 @@ def mock_config_data() -> dict:
         dict: Configuration dictionary with test values.
     """
     return {
-        "version": "1.0.0",
+        "version": "0.1.0.0",
         "encoding": {
             "mode": "hardware",
             "quality": 45,

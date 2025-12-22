@@ -1,9 +1,9 @@
 # Video Converter - Software Requirements Specification (SRS)
 
-**Document Version**: 1.0.0
-**Date**: 2025-12-21
-**Status**: Draft
-**Reference Document**: PRD v1.0.0
+**Document Version**: 1.0.1
+**Date**: 2025-12-23
+**Status**: Active
+**Reference Document**: PRD v1.1.0
 
 ---
 
@@ -13,7 +13,7 @@
 
 | Item | Reference |
 |------|-----------|
-| Parent Document | PRD.md v1.0.0 |
+| Parent Document | PRD.md v1.1.0 |
 | Related Documents | SDS.md, development-plan.md, architecture/*.md |
 | Requirements ID Scheme | SRS-xxx (this document), FR-xxx/NFR-xxx (PRD) |
 
@@ -22,6 +22,7 @@
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0.0 | 2025-12-21 | - | Initial creation |
+| 1.0.1 | 2025-12-23 | - | Updated document status and references to align with PRD v1.1.0 |
 
 ---
 
@@ -51,9 +52,11 @@ This document specifies the software requirements for the Video Converter system
 | Item | Content |
 |------|---------|
 | System Name | Video Converter |
-| Version | 1.0.0 |
+| Version | 0.1.0.0+ |
 | Target Platform | macOS 12.0+ (Apple Silicon) |
 | Development Language | Python 3.10+ |
+
+> **Note**: This project uses 0.x.x.x versioning to indicate active development status.
 
 ### 1.3 Definitions and Abbreviations
 
@@ -945,7 +948,7 @@ Converting: vacation_2024.mp4
 **config.json Schema** (abbreviated):
 ```json
 {
-  "version": "1.0.0",
+  "version": "0.1.0.0",
   "encoding": {
     "mode": "hardware",
     "quality": 45,

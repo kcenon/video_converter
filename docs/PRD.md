@@ -1,8 +1,8 @@
 # Video Converter - Product Requirements Document (PRD)
 
-**Document Version**: 1.0.0
-**Date**: 2025-12-21
-**Status**: Draft
+**Document Version**: 1.1.0
+**Date**: 2025-12-23
+**Status**: Active
 **Author**: Product Team
 
 ---
@@ -685,7 +685,7 @@ Converting: vacation_2024.mp4
 
 ```json
 {
-  "version": "1.0.0",
+  "version": "0.1.0.0",
   "encoding": {
     "mode": "hardware",
     "quality": 45,
@@ -826,38 +826,40 @@ Converting: vacation_2024.mp4
 
 ### 13.1 Release Roadmap
 
+> **Note**: This project uses 0.x.x.x versioning to indicate active development status.
+> Version 1.0.0.0 will be assigned when the project reaches production-ready stability.
+
 ```
-2025 Q1
-├── v0.1.0 (Alpha) - Week 2
-│   └── Basic conversion, minimal CLI implementation
-│
-├── v0.5.0 (Beta) - Week 5
-│   └── Photos integration, metadata preservation
-│
-└── v1.0.0 (Release) - Week 8
-    └── Automation, complete CLI, documentation
+2025 Q4 (Completed)
+└── v0.1.0.0 (Initial Release) - 2025-12-22 ✅
+    └── Core conversion, Photos integration, automation, CLI
 
-2025 Q2
-├── v1.1.0
-│   └── GUI app (basic), album filter
-│
-└── v1.2.0
-    └── VMAF verification, checkpoint
+2026 Q1 (In Progress)
+└── v0.2.0.0 (Feature Release) - In Development
+    ├── VMAF quality verification
+    ├── macOS Notification Center integration
+    ├── Statistics and reporting
+    ├── Concurrent processing support
+    ├── Rich progress display
+    └── Error recovery and retry logic
 
-2025 Q3+
-└── v2.0.0
-    └── AV1 support, Photos replacement research
+2026 Q2
+└── v0.3.0.0
+    └── GUI application (basic)
+
+2026 Q3+
+└── v0.4.0.0
+    └── AV1 codec support, advanced features
 ```
 
 ### 13.2 Feature Mapping by Version
 
-| Version | Major Features | Target Users |
-|---------|---------------|--------------|
-| **v0.1.0** | Single file conversion, HW/SW encoder | Dev/test |
-| **v0.5.0** | Photos scan, batch conversion, metadata | Early adopters |
-| **v1.0.0** | launchd automation, notifications, complete CLI | General users |
-| **v1.1.0** | Basic GUI, album filter, VMAF | General users |
-| **v2.0.0** | Photos replacement, AV1 | All users |
+| Version | Major Features | Target Users | Status |
+|---------|---------------|--------------|--------|
+| **v0.1.0.0** | Core conversion, Photos integration, launchd automation, CLI | General users | ✅ Released |
+| **v0.2.0.0** | VMAF verification, notifications, statistics, concurrent processing, error recovery | General users | 🔄 In Development |
+| **v0.3.0.0** | Basic GUI application | General users | 📅 Planned |
+| **v0.4.0.0** | AV1 codec support, advanced features | All users | 📅 Planned |
 
 ### 13.3 Release Checklist
 
@@ -921,6 +923,7 @@ Converting: vacation_2024.mp4
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0.0 | 2025-12-21 | - | Initial creation |
+| 1.1.0 | 2025-12-23 | - | Updated release roadmap to reflect v1.0.0 release and v1.1.0 development status |
 
 ---
 
