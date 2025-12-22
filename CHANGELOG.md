@@ -12,6 +12,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Photos Library Re-Import Support (#101)
+- `PhotosImporter` class for importing converted videos back to Photos library
+- AppleScript integration via `osascript` command for Photos.app automation
+- `import_video()` method to import video files and return UUID
+- `verify_import()` method to confirm successful import by UUID
+- `get_video_info()` method to retrieve imported video metadata
+- Configurable timeout (default 5 minutes) for large video imports
+- Comprehensive exception hierarchy:
+  - `PhotosImportError`: Base exception for import operations
+  - `PhotosNotRunningError`: Photos.app activation failure
+  - `ImportTimeoutError`: Operation timeout
+  - `DuplicateVideoError`: Video already exists in library
+  - `ImportFailedError`: General import failure
+- New `AppleScriptRunner` utility class for safe AppleScript execution
+- `escape_applescript_string()` utility for safe string injection
+
 #### iCloud Drive Folder Support (#88)
 - Automatic detection of iCloud stub files (`.filename.icloud` format) in `FolderExtractor`
 - `_is_icloud_stub()` and `_is_video_stub()` methods for stub file detection
