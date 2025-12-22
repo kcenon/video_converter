@@ -1,7 +1,8 @@
 """Processor modules for video converter.
 
 This package provides video processing functionality including
-codec detection, metadata management, GPS handling, and quality validation.
+codec detection, metadata management, GPS handling, timestamp synchronization,
+and quality validation.
 
 SDS Reference: SDS-P01
 """
@@ -41,6 +42,15 @@ from video_converter.processors.quality_validator import (
     VideoInfo,
     VideoValidator,
 )
+from video_converter.processors.timestamp import (
+    FileTimestamps,
+    TimestampError,
+    TimestampReadError,
+    TimestampSyncError,
+    TimestampSyncResult,
+    TimestampSynchronizer,
+    TimestampVerificationResult,
+)
 
 __all__ = [
     # Codec detection
@@ -59,6 +69,14 @@ __all__ = [
     "MetadataExtractionError",
     "MetadataProcessor",
     "MetadataVerificationResult",
+    # Timestamp synchronization
+    "FileTimestamps",
+    "TimestampError",
+    "TimestampReadError",
+    "TimestampSyncError",
+    "TimestampSyncResult",
+    "TimestampSynchronizer",
+    "TimestampVerificationResult",
     # Quality validation
     "ComparisonSeverity",
     "CompressionRange",
