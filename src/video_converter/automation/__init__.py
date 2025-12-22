@@ -1,7 +1,7 @@
 """Automation module for scheduled video conversion.
 
 This module provides tools for setting up automated video conversion
-on macOS using launchd services.
+on macOS using launchd services and notification integration.
 """
 
 from video_converter.automation.launchd import (
@@ -15,6 +15,13 @@ from video_converter.automation.launchd import (
     generate_daily_plist,
     generate_watch_plist,
     validate_plist_syntax,
+)
+from video_converter.automation.notification import (
+    NotificationConfig,
+    NotificationManager,
+    NotificationResult,
+    NotificationType,
+    send_notification,
 )
 from video_converter.automation.service_manager import (
     ServiceManager,
@@ -35,6 +42,12 @@ __all__ = [
     "DEFAULT_PLIST_NAME",
     "DEFAULT_LOG_DIR",
     "SERVICE_LABEL",
+    # notification module
+    "NotificationType",
+    "NotificationConfig",
+    "NotificationResult",
+    "NotificationManager",
+    "send_notification",
     # service_manager module
     "ServiceManager",
     "ServiceResult",

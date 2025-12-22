@@ -15,6 +15,7 @@ Automated video codec conversion solution for macOS that converts H.264 videos t
 - **Metadata Safe**: 100% preservation of GPS, dates, album info
 - **Hardware Accelerated**: Fast conversion with Apple Silicon VideoToolbox
 - **Photos Integration**: Direct access to macOS Photos library
+- **Notifications**: macOS Notification Center alerts for batch completion and errors
 
 ## Requirements
 

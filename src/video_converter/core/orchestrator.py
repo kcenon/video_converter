@@ -40,6 +40,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from video_converter.automation.notification import (
+    NotificationConfig,
+    NotificationManager,
+)
 from video_converter.converters.base import (
     BaseConverter,
     EncoderNotAvailableError,
@@ -117,6 +121,8 @@ class OrchestratorConfig:
         check_disk_space: Whether to check disk space before processing.
         min_free_space: Minimum free disk space in bytes (default 1GB).
         pause_on_disk_full: Whether to pause on low disk space.
+        enable_notifications: Whether to send macOS notifications.
+        notification_config: Configuration for notification behavior.
     """
 
     mode: ConversionMode = ConversionMode.HARDWARE
@@ -138,6 +144,8 @@ class OrchestratorConfig:
     check_disk_space: bool = True
     min_free_space: int = 1024 * 1024 * 1024  # 1GB
     pause_on_disk_full: bool = True
+    enable_notifications: bool = True
+    notification_config: NotificationConfig | None = None
 
 
 @dataclass
@@ -241,6 +249,15 @@ class Orchestrator:
             enable_resource_monitoring=True,
             adaptive_concurrency=False,
         )
+
+        # Notification manager
+        if self.config.enable_notifications:
+            notification_config = self.config.notification_config or NotificationConfig()
+            self._notification_manager: NotificationManager | None = NotificationManager(
+                config=notification_config
+            )
+        else:
+            self._notification_manager = None
 
     def _get_converter(self) -> BaseConverter:
         """Get or create the video converter.
@@ -754,6 +771,9 @@ class Orchestrator:
                 f"{report.failed} failed, {report.skipped} skipped"
             ),
         )
+
+        # Send notification
+        self._send_batch_notification(report)
 
         if on_complete:
             on_complete(report)
@@ -1455,3 +1475,47 @@ class Orchestrator:
             Pause reason string, or None if not paused.
         """
         return self._paused_reason if self._paused else None
+
+    def _send_batch_notification(self, report: ConversionReport) -> None:
+        """Send notification for batch completion.
+
+        Args:
+            report: The conversion report to notify about.
+        """
+        if self._notification_manager is None:
+            return
+
+        try:
+            result = self._notification_manager.send_batch_notification(report)
+            if not result.success:
+                logger.warning(f"Failed to send notification: {result.error_message}")
+            else:
+                logger.debug("Batch completion notification sent")
+        except Exception as e:
+            logger.warning(f"Error sending notification: {e}")
+
+    def send_notification(
+        self,
+        title: str,
+        body: str,
+        sound: bool | None = None,
+    ) -> bool:
+        """Send a custom notification.
+
+        Args:
+            title: The notification title.
+            body: The notification body text.
+            sound: Whether to play sound. Uses config default if None.
+
+        Returns:
+            True if notification was sent successfully.
+        """
+        if self._notification_manager is None:
+            return False
+
+        result = self._notification_manager.send_notification(
+            title=title,
+            body=body,
+            sound=sound,
+        )
+        return result.success
