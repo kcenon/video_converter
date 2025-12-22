@@ -483,12 +483,13 @@ class FolderExtractor:
 
         # Analyze codec
         codec_info: CodecInfo | None = None
-        try:
-            from video_converter.processors.codec_detector import (
-                CorruptedVideoError,
-                InvalidVideoError,
-            )
+        # Import exceptions first to ensure they're available in except clause
+        from video_converter.processors.codec_detector import (
+            CorruptedVideoError,
+            InvalidVideoError,
+        )
 
+        try:
             codec_info = self.codec_detector.analyze(path)
         except (InvalidVideoError, CorruptedVideoError) as e:
             logger.warning(f"Failed to analyze video codec for {path}: {e}")

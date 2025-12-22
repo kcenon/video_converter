@@ -74,6 +74,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Folder Extractor
+- FolderExtractor class for direct video conversion from filesystem folders
+- Recursive directory scanning with include/exclude pattern filtering
+- Video codec detection and conversion candidate identification
+- FolderVideoInfo and FolderStats dataclasses for structured video information
+- Comprehensive error handling (FolderNotFoundError, FolderAccessDeniedError, InvalidVideoFileError)
+- Unit tests with 62 test cases covering all functionality
+
 ### Planned
 - Rich progress bar display
 - Statistics and reporting
