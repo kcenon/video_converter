@@ -106,7 +106,7 @@ class SessionStateManager:
         self.state_dir.mkdir(parents=True, exist_ok=True)
 
         self._current_session: SessionState | None = None
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._auto_save_interval = auto_save_interval
         self._last_save_time: datetime | None = None
         self._dirty = False

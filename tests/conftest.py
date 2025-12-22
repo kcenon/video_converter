@@ -17,9 +17,11 @@ Example:
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -265,3 +267,33 @@ def sample_h265_metadata() -> dict:
         "duration": "120.5",
         "bit_rate": "2500000",
     }
+
+
+@pytest.fixture
+def mock_osxphotos() -> Generator[MagicMock, None, None]:
+    """Mock osxphotos module for Photos library tests.
+
+    This fixture handles the lazy import of osxphotos by injecting
+    a mock module into sys.modules before tests run.
+
+    Yields:
+        MagicMock: The mocked osxphotos module.
+    """
+    mock_module = MagicMock()
+    mock_db = MagicMock()
+    mock_db.library_path = "/Users/test/Pictures/Photos Library.photoslibrary"
+    mock_module.PhotosDB.return_value = mock_db
+
+    # Store original module if it exists
+    original = sys.modules.get("osxphotos")
+
+    # Inject mock into sys.modules
+    sys.modules["osxphotos"] = mock_module
+
+    yield mock_module
+
+    # Restore original module
+    if original is not None:
+        sys.modules["osxphotos"] = original
+    else:
+        del sys.modules["osxphotos"]
