@@ -29,6 +29,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests for `OriginalHandling` enum and `PhotosImporter` methods
 - Integration tests for CLI option validation
 
+#### Photos Re-Import Unit Tests (#104)
+- `test_photos_metadata_preservation.py` - Comprehensive tests for `MetadataPreserver` class:
+  - `VideoMetadataSnapshot` dataclass property and factory tests
+  - `MetadataTolerance` factory methods (default, strict, relaxed)
+  - `VerificationResult` dataclass tests for success/failure scenarios
+  - `capture_metadata()` method tests with PhotosVideoInfo mocks
+  - `embed_metadata_in_file()` tests for date, GPS, description, keywords
+  - `apply_photos_metadata()` tests for albums, favorites, hidden status
+  - `verify_metadata()` tests with tolerance handling and missing albums
+  - Internal helper method tests (`_set_favorite`, `_add_to_album`)
+- `test_photos_original_handling.py` - Tests for original video handling:
+  - DELETE option with AppleScript execution and error scenarios
+  - ARCHIVE option with album creation and video addition
+  - KEEP option verification (no-op behavior)
+  - Album creation functionality and failure handling
+  - Handling failure rollback scenarios
+  - AppleScript generation and special character escaping
+- `test_photos_reimport.py` - Integration tests for re-import workflow:
+  - CLI options availability (--reimport, --delete-originals, etc.)
+  - Option validation (mutual exclusivity, required flags)
+  - Full re-import workflow with mocked components
+  - Error handling and rollback scenarios
+  - Different handling options (DELETE, ARCHIVE, KEEP) tests
+
 #### Photos CLI Unit Tests (#98)
 - `test_photos_handler.py` - Comprehensive tests for `PhotosSourceHandler` class:
   - `PhotosConversionOptions` and `PhotosConversionResult` dataclass validation
