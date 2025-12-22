@@ -78,6 +78,7 @@ class FailureType(Enum):
         VALIDATION_ERROR: Output file failed validation.
         COMPRESSION_ERROR: Compression ratio out of expected range.
         ENCODER_ERROR: Hardware/software encoder not available.
+        VMAF_QUALITY_ERROR: VMAF score below acceptable threshold.
         UNKNOWN: Unknown error type.
     """
 
@@ -85,6 +86,7 @@ class FailureType(Enum):
     VALIDATION_ERROR = "validation_error"
     COMPRESSION_ERROR = "compression_error"
     ENCODER_ERROR = "encoder_error"
+    VMAF_QUALITY_ERROR = "vmaf_quality_error"
     UNKNOWN = "unknown"
 
 

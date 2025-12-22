@@ -201,6 +201,8 @@ def _display_conversion_summary(
     duration_seconds: float,
     speed_ratio: float,
     encoder_mode: str,
+    vmaf_score: float | None = None,
+    vmaf_quality_level: str | None = None,
 ) -> None:
     """Display formatted conversion summary.
 
@@ -212,6 +214,8 @@ def _display_conversion_summary(
         duration_seconds: Conversion duration in seconds.
         speed_ratio: Speed ratio (e.g., 6.0 means 6x realtime).
         encoder_mode: Encoder mode used ("hardware" or "software").
+        vmaf_score: VMAF quality score if measured.
+        vmaf_quality_level: VMAF quality classification if measured.
     """
     saved_bytes = original_size - converted_size
     saved_pct = (saved_bytes / original_size) * 100 if original_size > 0 else 0
@@ -231,6 +235,20 @@ def _display_conversion_summary(
     console.print("├──────────────────────────────────────────────┤")
     console.print(f"│  Duration:   {_format_duration(duration_seconds):<31} │")
     console.print(f"│  Speed:      {speed_ratio:.1f}x realtime{' ' * 20}│")
+
+    # Display VMAF score if available
+    if vmaf_score is not None:
+        console.print("├──────────────────────────────────────────────┤")
+        quality_label = vmaf_quality_level.replace("_", " ").title() if vmaf_quality_level else "Unknown"
+        if vmaf_score >= 93:
+            vmaf_color = "green"
+        elif vmaf_score >= 80:
+            vmaf_color = "yellow"
+        else:
+            vmaf_color = "red"
+        vmaf_text = f"VMAF: {vmaf_score:.1f} ({quality_label})"
+        console.print(f"│  [{vmaf_color}]{vmaf_text:<42}[/{vmaf_color}] │")
+
     console.print("╰──────────────────────────────────────────────╯")
 
 
@@ -293,6 +311,23 @@ def _display_conversion_error(
     default=True,
     help="Validate output file after conversion (default: True).",
 )
+@click.option(
+    "--vmaf/--no-vmaf",
+    default=False,
+    help="Measure VMAF quality score after conversion (default: False).",
+)
+@click.option(
+    "--vmaf-threshold",
+    type=float,
+    default=93.0,
+    help="Minimum acceptable VMAF score (default: 93.0 for visually lossless).",
+)
+@click.option(
+    "--vmaf-sample-interval",
+    type=int,
+    default=30,
+    help="Frame sampling interval for VMAF analysis (default: 30, 1=all frames).",
+)
 @click.pass_context
 def convert(
     ctx: click.Context,
@@ -304,6 +339,9 @@ def convert(
     force: bool,
     preserve_metadata: bool,
     validate: bool,
+    vmaf: bool,
+    vmaf_threshold: float,
+    vmaf_sample_interval: int,
 ) -> None:
     """Convert a single video file from H.264 to H.265.
 
@@ -391,6 +429,9 @@ def convert(
         preset=conv_preset,
         preserve_metadata=preserve_metadata,
         validate_output=validate,
+        enable_vmaf=vmaf,
+        vmaf_threshold=vmaf_threshold,
+        vmaf_sample_interval=vmaf_sample_interval,
     )
     orchestrator = Orchestrator(config=orch_config, enable_session_persistence=False)
 
@@ -450,6 +491,8 @@ def convert(
                     duration_seconds=result.duration_seconds,
                     speed_ratio=result.speed_ratio,
                     encoder_mode=conv_mode.value,
+                    vmaf_score=result.vmaf_score,
+                    vmaf_quality_level=result.vmaf_quality_level,
                 )
 
             if result.warnings and not cli_ctx.quiet:
