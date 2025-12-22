@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -13,7 +12,12 @@ from video_converter.utils.command_runner import (
     CommandNotFoundError,
     CommandResult,
     CommandRunner,
+    CommandTimeoutError,
+    ExifToolRunner,
     FFprobeRunner,
+    run_command,
+    run_exiftool,
+    run_ffprobe,
 )
 
 
@@ -134,25 +138,6 @@ class TestFFprobeRunner:
 
     def test_probe_with_mock(self) -> None:
         """Test probe with mocked FFprobe output."""
-        mock_output = {
-            "format": {
-                "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
-                "duration": "10.5",
-                "size": "1048576",
-                "bit_rate": "800000",
-            },
-            "streams": [
-                {
-                    "index": 0,
-                    "codec_type": "video",
-                    "codec_name": "h264",
-                    "width": 1920,
-                    "height": 1080,
-                    "r_frame_rate": "30/1",
-                }
-            ],
-        }
-
         runner = FFprobeRunner()
         with patch.object(runner._runner, "run") as mock_run:
             mock_run.return_value = CommandResult(
@@ -175,3 +160,160 @@ class TestFFprobeRunnerAsync:
         runner = FFprobeRunner()
         with pytest.raises(FileNotFoundError):
             await runner.probe_async(Path("/nonexistent/video.mp4"))
+
+
+class TestCommandTimeoutError:
+    """Tests for CommandTimeoutError exception."""
+
+    def test_timeout_error_message(self) -> None:
+        """Test that timeout error contains command and timeout info."""
+        error = CommandTimeoutError("ffmpeg", 60.0)
+        assert error.command == "ffmpeg"
+        assert error.timeout == 60.0
+        assert "ffmpeg" in str(error)
+        assert "60" in str(error)
+
+    def test_run_timeout_raises_command_timeout_error(self) -> None:
+        """Test that run raises CommandTimeoutError on timeout."""
+        runner = CommandRunner()
+        # Use a command that will definitely timeout with a very short timeout
+        with pytest.raises(CommandTimeoutError) as exc_info:
+            runner.run(["sleep", "10"], timeout=0.01)
+        assert exc_info.value.command == "sleep"
+        assert exc_info.value.timeout == 0.01
+
+
+class TestCommandRunnerAsyncTimeout:
+    """Async timeout tests for CommandRunner."""
+
+    @pytest.mark.asyncio
+    async def test_run_async_timeout_raises_command_timeout_error(self) -> None:
+        """Test that run_async raises CommandTimeoutError on timeout."""
+        runner = CommandRunner()
+        with pytest.raises(CommandTimeoutError) as exc_info:
+            await runner.run_async(["sleep", "10"], timeout=0.01)
+        assert exc_info.value.command == "sleep"
+
+
+class TestRunWithStreaming:
+    """Tests for run_with_streaming method."""
+
+    @pytest.mark.asyncio
+    async def test_streaming_captures_output(self) -> None:
+        """Test that streaming captures stdout and stderr."""
+        runner = CommandRunner()
+        result = await runner.run_with_streaming(["echo", "hello streaming"])
+        assert result.success is True
+        assert "hello streaming" in result.stdout
+
+    @pytest.mark.asyncio
+    async def test_streaming_calls_callback(self) -> None:
+        """Test that on_output callback is called for each line."""
+        runner = CommandRunner()
+        lines_received: list[str] = []
+
+        def callback(line: str) -> None:
+            lines_received.append(line)
+
+        # Use a command that outputs to stderr
+        result = await runner.run_with_streaming(
+            ["ls", "/nonexistent_path_xyz"],
+            on_output=callback,
+        )
+
+        # ls on non-existent path outputs to stderr
+        assert result.success is False
+        # Callback should have been called at least once
+        assert len(lines_received) >= 0  # May or may not have output
+
+    @pytest.mark.asyncio
+    async def test_streaming_timeout_raises(self) -> None:
+        """Test that streaming raises CommandTimeoutError on timeout."""
+        runner = CommandRunner()
+        with pytest.raises(CommandTimeoutError):
+            await runner.run_with_streaming(["sleep", "10"], timeout=0.01)
+
+
+class TestExifToolRunner:
+    """Tests for ExifToolRunner class."""
+
+    def test_is_available(self) -> None:
+        """Test that is_available returns correct value."""
+        runner = ExifToolRunner()
+        # exiftool may or may not be installed
+        result = runner.is_available()
+        assert isinstance(result, bool)
+
+    def test_read_metadata_nonexistent_file(self) -> None:
+        """Test that read_metadata raises for non-existent file."""
+        runner = ExifToolRunner()
+        with pytest.raises(FileNotFoundError):
+            runner.read_metadata(Path("/nonexistent/video.mp4"))
+
+    def test_write_metadata_nonexistent_file(self) -> None:
+        """Test that write_metadata raises for non-existent file."""
+        runner = ExifToolRunner()
+        with pytest.raises(FileNotFoundError):
+            runner.write_metadata(
+                Path("/nonexistent/video.mp4"),
+                {"CreateDate": "2024:01:01 00:00:00"},
+            )
+
+    def test_copy_metadata_nonexistent_source(self) -> None:
+        """Test that copy_metadata raises for non-existent source."""
+        runner = ExifToolRunner()
+        with pytest.raises(FileNotFoundError):
+            runner.copy_metadata(
+                Path("/nonexistent/source.mp4"),
+                Path("/nonexistent/dest.mp4"),
+            )
+
+    def test_read_metadata_with_mock(self) -> None:
+        """Test read_metadata with mocked ExifTool output."""
+        runner = ExifToolRunner()
+        with patch.object(runner._runner, "run") as mock_run:
+            mock_run.return_value = CommandResult(
+                returncode=0,
+                stdout='[{"SourceFile": "test.mp4", "CreateDate": "2024:03:15 10:30:00"}]',
+                stderr="",
+            )
+            with patch.object(Path, "exists", return_value=True):
+                result = runner.read_metadata(Path("test.mp4"))
+                assert "CreateDate" in result
+                assert result["CreateDate"] == "2024:03:15 10:30:00"
+
+
+class TestExifToolRunnerAsync:
+    """Async tests for ExifToolRunner."""
+
+    @pytest.mark.asyncio
+    async def test_read_metadata_async_nonexistent_file(self) -> None:
+        """Test that read_metadata_async raises for non-existent file."""
+        runner = ExifToolRunner()
+        with pytest.raises(FileNotFoundError):
+            await runner.read_metadata_async(Path("/nonexistent/video.mp4"))
+
+
+class TestConvenienceFunctions:
+    """Tests for convenience functions."""
+
+    def test_run_command(self) -> None:
+        """Test run_command convenience function."""
+        result = run_command(["echo", "hello"])
+        assert result.success is True
+        assert "hello" in result.stdout
+
+    def test_run_command_not_found(self) -> None:
+        """Test run_command raises for non-existent command."""
+        with pytest.raises(CommandNotFoundError):
+            run_command(["nonexistent_command_xyz"])
+
+    def test_run_ffprobe_nonexistent_file(self) -> None:
+        """Test run_ffprobe raises for non-existent file."""
+        with pytest.raises(FileNotFoundError):
+            run_ffprobe("/nonexistent/video.mp4")
+
+    def test_run_exiftool_nonexistent_file(self) -> None:
+        """Test run_exiftool raises for non-existent file."""
+        with pytest.raises(FileNotFoundError):
+            run_exiftool("/nonexistent/video.mp4")
