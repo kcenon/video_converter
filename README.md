@@ -198,6 +198,39 @@ video-converter uninstall-service --yes
 video-converter uninstall-service --remove-logs
 ```
 
+### Service Management Commands
+
+Control the launchd service with these commands:
+
+```bash
+# Manually start the service (triggers immediate run)
+video-converter service-start
+
+# Stop the running service
+video-converter service-stop
+
+# Load the service into launchd (plist must be installed)
+video-converter service-load
+
+# Unload the service from launchd (keeps plist file)
+video-converter service-unload
+
+# Restart the service (unload + load)
+video-converter service-restart
+
+# View service logs (stdout)
+video-converter service-logs
+
+# View last 100 lines of logs
+video-converter service-logs -n 100
+
+# View error logs (stderr)
+video-converter service-logs --stderr
+
+# Follow logs in real-time (like tail -f)
+video-converter service-logs -f
+```
+
 ## Usage
 
 ```bash
@@ -213,6 +246,12 @@ Commands:
   setup             Initial setup wizard
   install-service   Install launchd automation service
   uninstall-service Remove launchd automation service
+  service-start     Manually start the service
+  service-stop      Stop the running service
+  service-load      Load service into launchd
+  service-unload    Unload service from launchd
+  service-restart   Restart the service
+  service-logs      View service log files
 
 Global Options:
   --config PATH  Custom config file path

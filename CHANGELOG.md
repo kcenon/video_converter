@@ -76,6 +76,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### launchctl Wrapper for Service Management (#35)
+- Public `load()`, `unload()`, `restart()` methods in ServiceManager
+- Permission checking for plist files before loading
+- CLI commands: `service-start`, `service-stop`, `service-load`, `service-unload`, `service-restart`, `service-logs`
+- `--follow` and `--stderr` options for service-logs command
+- Tests for load/unload/restart operations and permission checks
+
 #### Failure Isolation and Error Recovery (#32)
 - ErrorCategory enum for classifying conversion failures (input, encoding, validation, metadata, disk space, permission)
 - RecoveryAction enum for recommended recovery actions per error category
