@@ -45,6 +45,10 @@ from video_converter.converters.base import (
     EncoderNotAvailableError,
 )
 from video_converter.converters.factory import ConverterFactory
+from video_converter.core.concurrent import (
+    AggregatedProgress,
+    ConcurrentProcessor,
+)
 from video_converter.core.session import SessionStateManager
 from video_converter.core.types import (
     BatchStatus,
@@ -209,6 +213,13 @@ class Orchestrator:
         self._current_session_id: str | None = None
         self._tasks: list[ConversionTask] = []
         self._current_session: SessionState | None = None
+
+        # Concurrent processing support
+        self._concurrent_processor = ConcurrentProcessor(
+            max_concurrent=self.config.max_concurrent,
+            enable_resource_monitoring=True,
+            adaptive_concurrency=False,
+        )
 
     def _get_converter(self) -> BaseConverter:
         """Get or create the video converter.
@@ -693,6 +704,54 @@ class Orchestrator:
 
         # Stage 2: Process queue
         total_tasks = len(self._tasks)
+
+        # Use concurrent processing if max_concurrent > 1
+        if self.config.max_concurrent > 1:
+            await self._process_tasks_concurrent(
+                report, on_progress, total_tasks
+            )
+        else:
+            await self._process_tasks_sequential(
+                report, on_progress, total_tasks
+            )
+
+        # Complete
+        report.completed_at = datetime.now()
+        if not self._cancelled:
+            self._batch_status = BatchStatus.COMPLETED
+            if self.session_manager:
+                self.session_manager.complete_session()
+
+        self._emit_progress(
+            on_progress,
+            ConversionStage.COMPLETE,
+            ConversionStatus.COMPLETED,
+            total_files=total_tasks,
+            stage_progress=1.0,
+            message=(
+                f"Completed: {report.successful} succeeded, "
+                f"{report.failed} failed, {report.skipped} skipped"
+            ),
+        )
+
+        if on_complete:
+            on_complete(report)
+
+        return report
+
+    async def _process_tasks_sequential(
+        self,
+        report: ConversionReport,
+        on_progress: ProgressCallback | None,
+        total_tasks: int,
+    ) -> None:
+        """Process tasks sequentially (max_concurrent = 1).
+
+        Args:
+            report: The conversion report to update.
+            on_progress: Optional progress callback.
+            total_tasks: Total number of tasks.
+        """
         for i, task in enumerate(self._tasks):
             # Wait if paused
             await self._pause_event.wait()
@@ -727,65 +786,148 @@ class Orchestrator:
                 output_path=task.output_path,
             )
 
-            task.result = result
-            if result.success:
-                task.status = ConversionStatus.COMPLETED
-                # Update session state
-                if self.session_manager and self._current_session:
-                    video_entry = self._find_video_entry(task.input_path)
-                    if video_entry:
-                        self.session_manager.mark_video_completed(
-                            video_entry,
-                            result.original_size,
-                            result.converted_size,
-                        )
-            else:
-                task.status = ConversionStatus.FAILED
-                task.error = result.error_message
+            self._handle_task_result(task, result, report)
 
-                # Update session state
-                if self.session_manager and self._current_session:
-                    video_entry = self._find_video_entry(task.input_path)
-                    if video_entry:
-                        self.session_manager.mark_video_failed(
-                            video_entry,
-                            result.error_message or "Unknown error",
-                        )
+    async def _process_tasks_concurrent(
+        self,
+        report: ConversionReport,
+        on_progress: ProgressCallback | None,
+        total_tasks: int,
+    ) -> None:
+        """Process tasks concurrently using ConcurrentProcessor.
 
-                # Move to failed directory if configured
-                if self.config.move_to_failed and task.input_path.exists():
-                    try:
-                        dest = self.config.move_to_failed / task.input_path.name
-                        self.config.move_to_failed.mkdir(parents=True, exist_ok=True)
-                        task.input_path.rename(dest)
-                    except OSError as e:
-                        logger.warning(f"Could not move failed file: {e}")
-
-            report.add_result(result)
-
-        # Complete
-        report.completed_at = datetime.now()
-        if not self._cancelled:
-            self._batch_status = BatchStatus.COMPLETED
-            if self.session_manager:
-                self.session_manager.complete_session()
-
-        self._emit_progress(
-            on_progress,
-            ConversionStage.COMPLETE,
-            ConversionStatus.COMPLETED,
-            total_files=total_tasks,
-            stage_progress=1.0,
-            message=(
-                f"Completed: {report.successful} succeeded, "
-                f"{report.failed} failed, {report.skipped} skipped"
-            ),
+        Args:
+            report: The conversion report to update.
+            on_progress: Optional progress callback.
+            total_tasks: Total number of tasks.
+        """
+        logger.info(
+            f"Starting concurrent processing with max_concurrent={self.config.max_concurrent}"
         )
 
-        if on_complete:
-            on_complete(report)
+        # Create a mapping of task index to task for result handling
+        task_map = {i: task for i, task in enumerate(self._tasks)}
 
-        return report
+        def on_aggregated_progress(agg_progress: AggregatedProgress) -> None:
+            """Handle aggregated progress from concurrent processor."""
+            if on_progress:
+                # Calculate stage progress based on completed + in-progress
+                stage_progress = agg_progress.overall_progress
+
+                # Build message with current files
+                if agg_progress.current_files:
+                    files_str = ", ".join(agg_progress.current_files[:3])
+                    if len(agg_progress.current_files) > 3:
+                        files_str += f" (+{len(agg_progress.current_files) - 3} more)"
+                    message = f"Converting: {files_str}"
+                else:
+                    message = (
+                        f"Processing: {agg_progress.completed_jobs}/{agg_progress.total_jobs} completed"
+                    )
+
+                self._emit_progress(
+                    on_progress,
+                    ConversionStage.CONVERT,
+                    ConversionStatus.IN_PROGRESS,
+                    current_file=", ".join(agg_progress.current_files[:2]) or "",
+                    current_index=agg_progress.completed_jobs,
+                    total_files=total_tasks,
+                    stage_progress=stage_progress,
+                    message=message,
+                )
+
+        async def process_task(
+            task: ConversionTask, progress_callback: callable
+        ) -> ConversionResult:
+            """Process a single task within concurrent context."""
+            # Check for pause/cancel
+            await self._pause_event.wait()
+            if self._cancelled:
+                raise asyncio.CancelledError("Batch cancelled")
+
+            task.status = ConversionStatus.IN_PROGRESS
+
+            # Convert the file
+            result = await self.convert_single(
+                input_path=task.input_path,
+                output_path=task.output_path,
+            )
+
+            return result
+
+        # Process all tasks concurrently
+        results = await self._concurrent_processor.process_batch(
+            items=self._tasks,
+            processor=process_task,
+            on_progress=on_aggregated_progress,
+        )
+
+        # Handle results and update report
+        for i, result in enumerate(results):
+            if i in task_map:
+                task = task_map[i]
+                if result is not None:
+                    self._handle_task_result(task, result, report)
+                else:
+                    # Task failed with exception
+                    task.status = ConversionStatus.FAILED
+                    task.error = "Task failed with exception"
+
+        # Check if cancelled
+        if self._cancelled:
+            report.cancelled = True
+            self._batch_status = BatchStatus.CANCELLED
+            if self.session_manager:
+                self.session_manager.cancel_session()
+
+    def _handle_task_result(
+        self,
+        task: ConversionTask,
+        result: ConversionResult,
+        report: ConversionReport,
+    ) -> None:
+        """Handle the result of a conversion task.
+
+        Args:
+            task: The conversion task.
+            result: The conversion result.
+            report: The conversion report to update.
+        """
+        task.result = result
+        if result.success:
+            task.status = ConversionStatus.COMPLETED
+            # Update session state
+            if self.session_manager and self._current_session:
+                video_entry = self._find_video_entry(task.input_path)
+                if video_entry:
+                    self.session_manager.mark_video_completed(
+                        video_entry,
+                        result.original_size,
+                        result.converted_size,
+                    )
+        else:
+            task.status = ConversionStatus.FAILED
+            task.error = result.error_message
+
+            # Update session state
+            if self.session_manager and self._current_session:
+                video_entry = self._find_video_entry(task.input_path)
+                if video_entry:
+                    self.session_manager.mark_video_failed(
+                        video_entry,
+                        result.error_message or "Unknown error",
+                    )
+
+            # Move to failed directory if configured
+            if self.config.move_to_failed and task.input_path.exists():
+                try:
+                    dest = self.config.move_to_failed / task.input_path.name
+                    self.config.move_to_failed.mkdir(parents=True, exist_ok=True)
+                    task.input_path.rename(dest)
+                except OSError as e:
+                    logger.warning(f"Could not move failed file: {e}")
+
+        report.add_result(result)
 
     def _find_video_entry(self, input_path: Path) -> VideoEntry | None:
         """Find a VideoEntry in the current session by input path.

@@ -34,6 +34,14 @@ from video_converter.core.logger import (
     get_logger,
     set_log_level,
 )
+from video_converter.core.concurrent import (
+    AggregatedProgress,
+    ConcurrentProcessor,
+    JobProgress,
+    ResourceLevel,
+    ResourceMonitor,
+    ResourceStatus,
+)
 from video_converter.core.session import (
     SessionCorruptedError,
     SessionNotFoundError,
@@ -67,6 +75,13 @@ __all__ = [
     "PathsConfig",
     "PhotosConfig",
     "ProcessingConfig",
+    # Concurrent
+    "AggregatedProgress",
+    "ConcurrentProcessor",
+    "JobProgress",
+    "ResourceLevel",
+    "ResourceMonitor",
+    "ResourceStatus",
     # History
     "ConversionHistory",
     "ConversionRecord",
