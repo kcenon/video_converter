@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+#### Statistics and Reporting
+- Time-based filtering for conversion statistics (today, week, month, all)
+- `StatsPeriod` enum for period selection
+- `StatisticsReporter` class for formatted output with box drawing
+- Enhanced `stats` CLI command with real history integration
+- `stats-export` CLI command for JSON/CSV export
+- `--detailed` flag for showing recent conversions
+- `--period` option for time-based statistics filtering
+- `--include-records` option for exporting individual conversion records
+- Comprehensive unit tests for statistics features
+
 ## [1.0.0] - 2024-12-22
 
 ### Added

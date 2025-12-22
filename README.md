@@ -241,6 +241,7 @@ Commands:
   run               Batch conversion execution
   status            Service and conversion status
   stats             Conversion statistics
+  stats-export      Export statistics to file
   config            View current configuration
   config-set        Modify configuration values
   setup             Initial setup wizard
@@ -280,6 +281,58 @@ Options:
   --validate/--no-validate
                     Validate output file after conversion (default: True)
   --help            Show help
+```
+
+### View Conversion Statistics
+
+```bash
+# Show all-time statistics
+video-converter stats
+
+# Show statistics for this week
+video-converter stats --period week
+
+# Show statistics for today
+video-converter stats --period today
+
+# Show detailed statistics with recent conversions
+video-converter stats --detailed
+
+# Output statistics as JSON
+video-converter stats --json
+```
+
+Output example:
+```
+╭────────────────────────────────────────────────╮
+│           Conversion Statistics                │
+├────────────────────────────────────────────────┤
+│  Period: All Time (since 2024-01-01)           │
+├────────────────────────────────────────────────┤
+│  Videos Converted:     245                     │
+│  Success Rate:         98.4%                   │
+│  Total Original:       125.6 GB                │
+│  Total Converted:      58.2 GB                 │
+│  Storage Saved:        67.4 GB (53.7%)         │
+├────────────────────────────────────────────────┤
+│  Average Compression:  53.2%                   │
+╰────────────────────────────────────────────────╯
+```
+
+### Export Statistics
+
+```bash
+# Export to JSON (default)
+video-converter stats-export
+
+# Export to CSV
+video-converter stats-export --format csv
+
+# Export this week's stats with records
+video-converter stats-export --period week --include-records
+
+# Export to specific file
+video-converter stats-export -o ~/reports/stats.json
 ```
 
 ### View and Modify Configuration
