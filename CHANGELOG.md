@@ -12,6 +12,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Original Video Handling Options for Photos Re-import (#102)
+- `OriginalHandling` enum with three options:
+  - `DELETE`: Permanently remove original video after successful re-import
+  - `ARCHIVE`: Move original to an archive album for later review
+  - `KEEP`: Keep both original and converted versions
+- `PhotosImporter.handle_original()` method for processing originals after re-import
+- CLI options for controlling original video handling:
+  - `--reimport/--no-reimport`: Enable/disable re-import to Photos library
+  - `--delete-originals`: Delete originals (requires `--confirm-delete` for safety)
+  - `--keep-originals`: Keep both original and converted versions
+  - `--archive-album`: Custom album name for archiving (default: "Converted Originals")
+  - `--confirm-delete`: Safety confirmation required for deletion
+- Validation for mutually exclusive options (--delete-originals vs --keep-originals)
+- AppleScript integration for delete, archive, and album creation operations
+- Unit tests for `OriginalHandling` enum and `PhotosImporter` methods
+- Integration tests for CLI option validation
+
 #### Photos CLI Unit Tests (#98)
 - `test_photos_handler.py` - Comprehensive tests for `PhotosSourceHandler` class:
   - `PhotosConversionOptions` and `PhotosConversionResult` dataclass validation
