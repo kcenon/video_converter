@@ -118,6 +118,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Thread-safe operations with RLock
 - Comprehensive unit tests (41 test cases)
 
+#### File Timestamp Synchronization (#21)
+- TimestampSynchronizer class for copying timestamps from original to converted files
+- FileTimestamps dataclass for timestamp extraction and management
+- Support for birth time (creation date) on macOS via SetFile command
+- Modification time and access time synchronization using os.utime
+- TimestampVerificationResult for comparing timestamps with configurable tolerance
+- Integration with Orchestrator pipeline (METADATA stage)
+- preserve_timestamps config option (default: True)
+- Comprehensive unit tests (23 test cases)
+
 ### Planned
 - Rich progress bar display
 - Statistics and reporting
