@@ -38,9 +38,19 @@ import json
 import logging
 import threading
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
+from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+
+class StatsPeriod(Enum):
+    """Time period for statistics filtering."""
+
+    TODAY = "today"
+    WEEK = "week"
+    MONTH = "month"
+    ALL = "all"
 
 if TYPE_CHECKING:
     pass
@@ -165,6 +175,9 @@ class HistoryStatistics:
         total_saved_bytes: Total bytes saved by compression.
         first_conversion: Timestamp of earliest conversion.
         last_conversion: Timestamp of most recent conversion.
+        period: The time period these statistics cover.
+        period_start: Start timestamp of the period.
+        total_duration_seconds: Total conversion time in seconds.
     """
 
     total_converted: int = 0
@@ -174,6 +187,9 @@ class HistoryStatistics:
     total_saved_bytes: int = 0
     first_conversion: str | None = None
     last_conversion: str | None = None
+    period: str = "all"
+    period_start: str | None = None
+    total_duration_seconds: float = 0.0
 
     @property
     def success_rate(self) -> float:
@@ -198,6 +214,17 @@ class HistoryStatistics:
             return 0.0
         return 1.0 - (self.total_output_bytes / self.total_source_bytes)
 
+    @property
+    def storage_saved_percent(self) -> float:
+        """Calculate storage saved percentage.
+
+        Returns:
+            Percentage of storage saved (0.0-100.0).
+        """
+        if self.total_source_bytes <= 0:
+            return 0.0
+        return (self.total_saved_bytes / self.total_source_bytes) * 100
+
     def to_dict(self) -> dict:
         """Convert statistics to dictionary.
 
@@ -205,15 +232,19 @@ class HistoryStatistics:
             Dictionary representation of statistics.
         """
         return {
+            "period": self.period,
+            "period_start": self.period_start,
             "total_converted": self.total_converted,
             "total_failed": self.total_failed,
             "total_source_bytes": self.total_source_bytes,
             "total_output_bytes": self.total_output_bytes,
             "total_saved_bytes": self.total_saved_bytes,
+            "storage_saved_percent": self.storage_saved_percent,
             "first_conversion": self.first_conversion,
             "last_conversion": self.last_conversion,
             "success_rate": self.success_rate,
             "average_compression_ratio": self.average_compression_ratio,
+            "total_duration_seconds": self.total_duration_seconds,
         }
 
 
@@ -390,17 +421,100 @@ class ConversionHistory:
 
         logger.info(f"Cleared {count} records from history")
 
-    def get_statistics(self) -> HistoryStatistics:
-        """Get aggregated statistics for all conversions.
+    def _get_period_start(self, period: StatsPeriod) -> datetime | None:
+        """Get the start datetime for a given period.
+
+        Args:
+            period: The time period to calculate start for.
+
+        Returns:
+            The start datetime or None for ALL period.
+        """
+        now = datetime.now()
+        if period == StatsPeriod.TODAY:
+            return now.replace(hour=0, minute=0, second=0, microsecond=0)
+        elif period == StatsPeriod.WEEK:
+            start_of_week = now - timedelta(days=now.weekday())
+            return start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+        elif period == StatsPeriod.MONTH:
+            return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        return None
+
+    def _filter_records_by_period(
+        self,
+        records: list[ConversionRecord],
+        period: StatsPeriod,
+    ) -> list[ConversionRecord]:
+        """Filter records by time period.
+
+        Args:
+            records: List of records to filter.
+            period: Time period to filter by.
+
+        Returns:
+            Filtered list of records.
+        """
+        if period == StatsPeriod.ALL:
+            return records
+
+        period_start = self._get_period_start(period)
+        if period_start is None:
+            return records
+
+        filtered = []
+        for record in records:
+            if record.converted_at:
+                try:
+                    record_time = datetime.fromisoformat(record.converted_at)
+                    if record_time >= period_start:
+                        filtered.append(record)
+                except ValueError:
+                    continue
+        return filtered
+
+    def get_records_by_period(
+        self,
+        period: StatsPeriod = StatsPeriod.ALL,
+    ) -> list[ConversionRecord]:
+        """Get all conversion records filtered by time period.
+
+        Args:
+            period: Time period to filter by.
+
+        Returns:
+            List of ConversionRecord instances within the period.
+        """
+        with self._lock:
+            all_records = list(self._records.values())
+            return self._filter_records_by_period(all_records, period)
+
+    def get_statistics(
+        self,
+        period: StatsPeriod = StatsPeriod.ALL,
+    ) -> HistoryStatistics:
+        """Get aggregated statistics for conversions.
+
+        Args:
+            period: Time period to filter statistics by.
 
         Returns:
             HistoryStatistics with totals and averages.
         """
         with self._lock:
             stats = HistoryStatistics()
+            stats.period = period.value
 
-            successful = [r for r in self._records.values() if r.success]
-            failed = [r for r in self._records.values() if not r.success]
+            # Calculate period start
+            period_start = self._get_period_start(period)
+            if period_start:
+                stats.period_start = period_start.isoformat()
+
+            # Filter records by period
+            all_records = list(self._records.values())
+            filtered_records = self._filter_records_by_period(all_records, period)
+
+            successful = [r for r in filtered_records if r.success]
+            failed = [r for r in filtered_records if not r.success]
 
             stats.total_converted = len(successful)
             stats.total_failed = len(failed)
@@ -414,7 +528,7 @@ class ConversionHistory:
                 stats.total_source_bytes - stats.total_output_bytes
             )
 
-            # Find first and last conversion times
+            # Find first and last conversion times within period
             timestamps = [r.converted_at for r in successful if r.converted_at]
             if timestamps:
                 stats.first_conversion = min(timestamps)
@@ -584,6 +698,7 @@ __all__ = [
     "HistoryStatistics",
     "HistoryError",
     "HistoryCorruptedError",
+    "StatsPeriod",
     "get_history",
     "reset_history",
     "DEFAULT_HISTORY_DIR",

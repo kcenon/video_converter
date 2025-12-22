@@ -883,8 +883,13 @@ def status() -> None:
     is_flag=True,
     help="Output statistics in JSON format.",
 )
+@click.option(
+    "--detailed",
+    is_flag=True,
+    help="Show detailed statistics with recent conversions.",
+)
 @click.pass_context
-def stats(ctx: click.Context, period: str, output_json: bool) -> None:
+def stats(ctx: click.Context, period: str, output_json: bool, detailed: bool) -> None:
     """Show conversion statistics.
 
     Display cumulative statistics about video conversions including
@@ -900,66 +905,130 @@ def stats(ctx: click.Context, period: str, output_json: bool) -> None:
 
         # Export statistics as JSON
         video-converter stats --json
+
+        # Show detailed statistics with recent conversions
+        video-converter stats --detailed
     """
-    from video_converter.core.session import SessionStateManager
-    from datetime import datetime, timedelta
+    from video_converter.core.history import get_history, StatsPeriod
+    from video_converter.reporters.statistics_reporter import StatisticsReporter
 
-    # Get statistics from session manager
-    session_manager = SessionStateManager()
-    session_status = session_manager.get_session_status()
-
-    # Calculate statistics (placeholder values for now)
-    # In a full implementation, this would query historical data
-    stats_data = {
-        "period": period,
-        "total_converted": 0,
-        "total_failed": 0,
-        "success_rate": 0.0,
-        "total_original_bytes": 0,
-        "total_converted_bytes": 0,
-        "storage_saved_bytes": 0,
-        "storage_saved_percent": 0.0,
+    # Map period string to StatsPeriod enum
+    period_map = {
+        "today": StatsPeriod.TODAY,
+        "week": StatsPeriod.WEEK,
+        "month": StatsPeriod.MONTH,
+        "all": StatsPeriod.ALL,
     }
+    stats_period = period_map.get(period, StatsPeriod.ALL)
 
-    if session_status:
-        stats_data["total_converted"] = session_status.get("completed_count", 0)
-        stats_data["total_failed"] = session_status.get("failed_count", 0)
-        total = stats_data["total_converted"] + stats_data["total_failed"]
-        if total > 0:
-            stats_data["success_rate"] = (stats_data["total_converted"] / total) * 100
+    # Get statistics from conversion history
+    history = get_history()
+    history_stats = history.get_statistics(stats_period)
+    reporter = StatisticsReporter()
 
     if output_json:
-        console.print(json.dumps(stats_data, indent=2))
+        console.print(json.dumps(reporter.to_dict(history_stats), indent=2))
         return
 
     # Display formatted statistics
-    console.print()
-    console.print("╭" + "─" * 48 + "╮")
-    console.print("│" + "Conversion Statistics".center(48) + "│")
-    console.print("├" + "─" * 48 + "┤")
-    console.print(f"│  Period: {period.capitalize():<38}│")
-    console.print("├" + "─" * 48 + "┤")
+    if detailed:
+        records = history.get_records_by_period(stats_period)
+        console.print(reporter.format_detailed(history_stats, records))
+    else:
+        console.print(reporter.format_summary(history_stats))
 
-    console.print(f"│  Videos Converted:     {stats_data['total_converted']:<23}│")
-    console.print(f"│  Videos Failed:        {stats_data['total_failed']:<23}│")
-    console.print(f"│  Success Rate:         {stats_data['success_rate']:.1f}%{' ' * 20}│")
-
-    if stats_data["total_original_bytes"] > 0:
-        original_gb = stats_data["total_original_bytes"] / (1024 ** 3)
-        converted_gb = stats_data["total_converted_bytes"] / (1024 ** 3)
-        saved_gb = stats_data["storage_saved_bytes"] / (1024 ** 3)
-        saved_pct = stats_data["storage_saved_percent"]
-
-        console.print("├" + "─" * 48 + "┤")
-        console.print(f"│  Total Original:       {original_gb:.1f} GB{' ' * 17}│")
-        console.print(f"│  Total Converted:      {converted_gb:.1f} GB{' ' * 17}│")
-        console.print(f"│  Storage Saved:        {saved_gb:.1f} GB ({saved_pct:.1f}%){' ' * 8}│")
-
-    console.print("╰" + "─" * 48 + "╯")
     console.print()
 
-    if stats_data["total_converted"] == 0:
+    if history_stats.total_converted == 0:
         console.print("[dim]No conversions recorded yet. Run 'video-converter run' to start converting.[/dim]")
+
+
+@main.command("stats-export")
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["json", "csv"]),
+    default="json",
+    help="Export format (default: json).",
+)
+@click.option(
+    "--period",
+    type=click.Choice(["today", "week", "month", "all"]),
+    default="all",
+    help="Time period for statistics (default: all).",
+)
+@click.option(
+    "--output", "-o",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Output file path. Defaults to statistics.<format> in current directory.",
+)
+@click.option(
+    "--include-records",
+    is_flag=True,
+    help="Include individual conversion records in export.",
+)
+@click.pass_context
+def stats_export(
+    ctx: click.Context,
+    output_format: str,
+    period: str,
+    output: Path | None,
+    include_records: bool,
+) -> None:
+    """Export conversion statistics to file.
+
+    Export statistics to JSON or CSV format for external analysis
+    or record keeping.
+
+    Examples:
+
+        # Export to JSON (default)
+        video-converter stats-export
+
+        # Export to CSV
+        video-converter stats-export --format csv
+
+        # Export this week's stats with records
+        video-converter stats-export --period week --include-records
+
+        # Export to specific file
+        video-converter stats-export -o ~/reports/stats.json
+    """
+    from video_converter.core.history import get_history, StatsPeriod
+    from video_converter.reporters.statistics_reporter import StatisticsReporter
+
+    # Map period string to StatsPeriod enum
+    period_map = {
+        "today": StatsPeriod.TODAY,
+        "week": StatsPeriod.WEEK,
+        "month": StatsPeriod.MONTH,
+        "all": StatsPeriod.ALL,
+    }
+    stats_period = period_map.get(period, StatsPeriod.ALL)
+
+    # Get statistics and records
+    history = get_history()
+    history_stats = history.get_statistics(stats_period)
+    records = history.get_records_by_period(stats_period) if include_records else None
+
+    reporter = StatisticsReporter()
+
+    # Determine output path
+    if output is None:
+        output = Path.cwd() / f"statistics.{output_format}"
+
+    # Export
+    if output_format == "json":
+        reporter.export_json(history_stats, output, records)
+    else:
+        reporter.export_csv(history_stats, output, records)
+
+    console.print(f"[green]✓ Statistics exported to {output}[/green]")
+    console.print(f"  Period: {period}")
+    console.print(f"  Videos: {history_stats.total_converted}")
+    if include_records and records:
+        console.print(f"  Records: {len(records)}")
 
 
 @main.command()
