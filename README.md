@@ -181,7 +181,9 @@ Configuration file location: `~/.config/video_converter/config.json`
     "mode": "hardware",
     "quality": 45,
     "crf": 22,
-    "preset": "medium"
+    "preset": "medium",
+    "bit_depth": 8,
+    "hdr": false
   },
   "paths": {
     "output": "~/Videos/Converted",
