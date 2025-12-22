@@ -26,6 +26,11 @@ Thank you for your interest in contributing to Video Converter! This document pr
    brew install ffmpeg exiftool
    ```
 
+5. **Set up pre-commit hooks**
+   ```bash
+   pre-commit install
+   ```
+
 ## Running Tests
 
 ```bash
@@ -35,17 +40,43 @@ pytest
 # Run with coverage
 pytest --cov=src/video_converter
 
+# Run only unit tests
+pytest tests/unit
+
 # Run specific test file
 pytest tests/unit/test_codec_detector.py
+
+# Skip slow tests
+pytest -m "not slow"
+
+# Skip integration tests
+pytest -m "not integration"
 ```
+
+### Test Structure
+
+- `tests/unit/` - Unit tests for individual modules
+- `tests/integration/` - Integration tests for component interactions
+- `tests/fixtures/` - Test data and fixture files
+- `tests/conftest.py` - Shared fixtures for all tests
 
 ## Code Style
 
 This project uses:
 - **Ruff** for linting and formatting
 - **MyPy** for type checking
+- **pre-commit** for automated checks
 
-Before submitting a PR, ensure your code passes:
+Pre-commit hooks will automatically run on each commit. To run manually:
+```bash
+# Run all hooks on all files
+pre-commit run --all-files
+
+# Run specific hook
+pre-commit run ruff --all-files
+```
+
+You can also run checks manually:
 ```bash
 ruff check src/
 ruff format src/
