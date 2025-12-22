@@ -931,7 +931,10 @@ class ServiceManager:
 
             if weekday is not None:
                 # Weekly schedule
-                days_ahead = weekday - now.weekday()
+                # Convert launchd weekday (0=Sun, 1=Mon, ..., 6=Sat)
+                # to Python weekday (0=Mon, 1=Tue, ..., 6=Sun)
+                python_weekday = (weekday - 1) % 7
+                days_ahead = python_weekday - now.weekday()
                 if days_ahead < 0:
                     days_ahead += 7
                 elif days_ahead == 0 and next_run <= now:
