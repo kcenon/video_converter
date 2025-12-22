@@ -697,15 +697,13 @@ def run(
         # Validate reimport options
         if delete_originals and keep_originals:
             console.print(
-                "[red]✗ Cannot use both --delete-originals and --keep-originals[/red]",
-                err=True,
+                "[red]✗ Cannot use both --delete-originals and --keep-originals[/red]"
             )
             sys.exit(1)
 
         if delete_originals and not confirm_delete:
             console.print(
-                "[red]✗ --delete-originals requires --confirm-delete flag[/red]",
-                err=True,
+                "[red]✗ --delete-originals requires --confirm-delete flag[/red]"
             )
             console.print(
                 "[dim]This is a safety measure to prevent accidental deletion.[/dim]"
@@ -715,8 +713,7 @@ def run(
         if (delete_originals or keep_originals) and not reimport:
             console.print(
                 "[yellow]⚠ --delete-originals and --keep-originals "
-                "require --reimport flag[/yellow]",
-                err=True,
+                "require --reimport flag[/yellow]"
             )
             sys.exit(1)
 

@@ -268,3 +268,138 @@ class TestPhotosErrorHandling:
         )
 
         assert result.exit_code != 0 or "Invalid" in result.output
+
+
+class TestPhotosReimportOptions:
+    """Tests for Photos reimport CLI options."""
+
+    def test_reimport_option_available(self, cli_runner: CliRunner) -> None:
+        """Test that --reimport option is available."""
+        result = cli_runner.invoke(main, ["run", "--help"])
+
+        assert "--reimport" in result.output
+
+    def test_delete_originals_option_available(self, cli_runner: CliRunner) -> None:
+        """Test that --delete-originals option is available."""
+        result = cli_runner.invoke(main, ["run", "--help"])
+
+        assert "--delete-originals" in result.output
+
+    def test_keep_originals_option_available(self, cli_runner: CliRunner) -> None:
+        """Test that --keep-originals option is available."""
+        result = cli_runner.invoke(main, ["run", "--help"])
+
+        assert "--keep-originals" in result.output
+
+    def test_archive_album_option_available(self, cli_runner: CliRunner) -> None:
+        """Test that --archive-album option is available."""
+        result = cli_runner.invoke(main, ["run", "--help"])
+
+        assert "--archive-album" in result.output
+
+    def test_confirm_delete_option_available(self, cli_runner: CliRunner) -> None:
+        """Test that --confirm-delete option is available."""
+        result = cli_runner.invoke(main, ["run", "--help"])
+
+        assert "--confirm-delete" in result.output
+
+
+class TestPhotosReimportValidation:
+    """Tests for Photos reimport option validation."""
+
+    def test_delete_originals_requires_confirm(self, cli_runner: CliRunner) -> None:
+        """Test that --delete-originals requires --confirm-delete."""
+        result = cli_runner.invoke(
+            main,
+            ["run", "--source", "photos", "--reimport", "--delete-originals"],
+        )
+
+        assert result.exit_code != 0
+        assert "--confirm-delete" in result.output or "confirm" in result.output.lower()
+
+    def test_delete_and_keep_mutually_exclusive(self, cli_runner: CliRunner) -> None:
+        """Test that --delete-originals and --keep-originals are mutually exclusive."""
+        result = cli_runner.invoke(
+            main,
+            [
+                "run",
+                "--source",
+                "photos",
+                "--reimport",
+                "--delete-originals",
+                "--keep-originals",
+                "--confirm-delete",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "Cannot use both" in result.output
+
+    def test_delete_originals_requires_reimport(self, cli_runner: CliRunner) -> None:
+        """Test that --delete-originals requires --reimport."""
+        result = cli_runner.invoke(
+            main,
+            ["run", "--source", "photos", "--delete-originals", "--confirm-delete"],
+        )
+
+        assert result.exit_code != 0
+        assert "--reimport" in result.output or "reimport" in result.output.lower()
+
+    def test_keep_originals_requires_reimport(self, cli_runner: CliRunner) -> None:
+        """Test that --keep-originals requires --reimport."""
+        result = cli_runner.invoke(
+            main,
+            ["run", "--source", "photos", "--keep-originals"],
+        )
+
+        assert result.exit_code != 0
+        assert "--reimport" in result.output or "reimport" in result.output.lower()
+
+    def test_reimport_with_delete_and_confirm_accepted(
+        self, cli_runner: CliRunner
+    ) -> None:
+        """Test valid combination of --reimport --delete-originals --confirm-delete."""
+        result = cli_runner.invoke(
+            main,
+            [
+                "run",
+                "--source",
+                "photos",
+                "--reimport",
+                "--delete-originals",
+                "--confirm-delete",
+            ],
+        )
+
+        # Should not fail due to invalid options
+        # May fail due to permission or other runtime issues
+        assert "Cannot use both" not in result.output
+        assert "requires --confirm-delete" not in result.output
+
+    def test_reimport_with_keep_accepted(self, cli_runner: CliRunner) -> None:
+        """Test valid combination of --reimport --keep-originals."""
+        result = cli_runner.invoke(
+            main,
+            ["run", "--source", "photos", "--reimport", "--keep-originals"],
+        )
+
+        # Should not fail due to invalid options
+        assert "Cannot use both" not in result.output
+        assert "require --reimport" not in result.output
+
+    def test_reimport_with_custom_album_accepted(self, cli_runner: CliRunner) -> None:
+        """Test --reimport with custom --archive-album."""
+        result = cli_runner.invoke(
+            main,
+            [
+                "run",
+                "--source",
+                "photos",
+                "--reimport",
+                "--archive-album",
+                "My Custom Album",
+            ],
+        )
+
+        # Should not fail due to invalid options
+        assert "Invalid value for '--archive-album'" not in result.output
