@@ -1124,7 +1124,7 @@ class RetryPolicy:
 | SDS-R01-001 | statistics_reporter.py | StatisticsReporter |
 | SDS-R01-002 | batch_reporter.py | BatchReporter |
 | **UI Module** |
-| SDS-UI-001 | ui/progress.py | SingleFileProgressDisplay, BatchProgressDisplay |
+| SDS-UI-001 | ui/progress.py | SingleFileProgressDisplay, BatchProgressDisplay, PhotosProgressDisplay |
 | **Utils Module** |
 | SDS-U01-001 | command_runner.py | CommandRunner, FFprobeRunner |
 | SDS-U01-002 | progress_parser.py | FFmpegProgressParser |

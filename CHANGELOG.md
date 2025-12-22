@@ -12,6 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Photos-Specific Progress Display (#97)
+- `PhotosProgressDisplay` class for Photos library conversion with rich UI
+- Library info panel showing path, video count, total size, and estimated savings
+- Two-phase progress tracking: Export (file transfer) and Convert (encoding)
+- Photos-specific metadata display: album name, date taken, file size
+- Styled summary panel with conversion statistics (successful, failed, saved, elapsed time)
+- `_NullPhotosProgress` for quiet mode support (Null Object pattern)
+- `PhotosLibraryInfo` dataclass for library information display
+- `create_photos_progress()` method added to `ProgressDisplayManager`
+- Export progress callback integration in `_run_photos_batch_conversion`
+
 #### Photos Library Permission Check and User Guidance (#96)
 - `--check-permissions` flag for verifying Photos library access before conversion
 - Rich panel display for permission errors with step-by-step instructions
