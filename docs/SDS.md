@@ -156,6 +156,9 @@ video_converter/
 │       │   ├── photos_extractor.py    # SDS-E01-001 (Photos library access)
 │       │   ├── folder_extractor.py    # SDS-E01-002 (Filesystem scanning)
 │       │   └── icloud_handler.py      # SDS-E01-003 (iCloud file handling)
+│       ├── importers/
+│       │   ├── __init__.py
+│       │   └── photos_importer.py     # SDS-P01-009 (Photos re-import)
 │       ├── converters/
 │       │   ├── __init__.py
 │       │   ├── base.py                # SDS-V01-001 (Abstract interface)
@@ -190,7 +193,8 @@ video_converter/
 │           ├── command_runner.py      # SDS-U01-001 (External tool execution)
 │           ├── progress_parser.py     # SDS-U01-002 (FFmpeg output parsing)
 │           ├── file_utils.py          # SDS-U01-003 (File operations)
-│           └── dependency_checker.py  # SDS-U01-004 (System dependency check)
+│           ├── dependency_checker.py  # SDS-U01-004 (System dependency check)
+│           └── applescript.py         # SDS-U01-005 (AppleScript execution)
 ├── tests/
 │   ├── unit/                          # Unit tests (31 files)
 │   ├── integration/                   # Integration tests
@@ -745,6 +749,71 @@ class VideoExporter:
 | `VideoNotAvailableError` | Raised when video is iCloud-only and not downloaded |
 | `ExportError` | Raised when export fails (permission denied, disk full, etc.) |
 
+#### SDS-P01-009: Photos Importer Design
+
+| Item | Content |
+|------|---------|
+| **SDS ID** | SDS-P01-009 |
+| **Module** | PhotosImporter |
+| **File** | `src/video_converter/importers/photos_importer.py` |
+| **SRS Trace** | SRS-305 (Photos Re-Import) |
+| **Responsibility** | Import converted videos back to Photos library with AppleScript |
+
+**Features**:
+
+| Feature | Description |
+|---------|-------------|
+| Video Import | Import video files to Photos library via AppleScript |
+| UUID Return | Returns Photos library UUID for imported video |
+| Import Verification | Verify successful import by checking UUID existence |
+| Timeout Handling | Configurable timeout (default 5 minutes) for large videos |
+| Error Classification | Specific exceptions for different failure modes |
+
+**Design**:
+
+```python
+class PhotosImporter:
+    """Import videos to macOS Photos library via AppleScript."""
+
+    DEFAULT_TIMEOUT = 300.0  # 5 minutes
+
+    def __init__(self, timeout: float = DEFAULT_TIMEOUT) -> None:
+        """Initialize with configurable timeout."""
+        pass
+
+    def import_video(self, video_path: Path) -> str:
+        """Import video to Photos library and return UUID."""
+        pass
+
+    def verify_import(self, uuid: str) -> bool:
+        """Verify that import was successful by UUID."""
+        pass
+
+    def get_video_info(self, uuid: str) -> dict[str, str] | None:
+        """Get information about an imported video."""
+        pass
+```
+
+**Error Classes**:
+
+| Exception | Description |
+|-----------|-------------|
+| `PhotosImportError` | Base exception for all import operations |
+| `PhotosNotRunningError` | Raised when Photos.app cannot be activated |
+| `ImportTimeoutError` | Raised when import operation exceeds timeout |
+| `DuplicateVideoError` | Raised when video already exists in library |
+| `ImportFailedError` | Raised when import fails for other reasons |
+
+**AppleScript Utility** (`src/video_converter/utils/applescript.py`):
+
+| Class | Description |
+|-------|-------------|
+| `AppleScriptRunner` | Execute AppleScript commands via osascript |
+| `AppleScriptResult` | Result dataclass with returncode, stdout, stderr |
+| `AppleScriptError` | Base exception for AppleScript errors |
+| `AppleScriptTimeoutError` | Execution timeout exception |
+| `AppleScriptExecutionError` | Script execution failure exception |
+
 ---
 
 ## 4. Class Detailed Design
@@ -1007,6 +1076,7 @@ class RetryPolicy:
 | SRS-301 | Photos Scan | SDS-E01-002 | PhotosExtractor | Mapped |
 | SRS-302 | Video Filtering | SDS-P01-005 | PhotosVideoFilter | Mapped |
 | SRS-303 | Video Export | SDS-P01-006 | VideoExporter | Mapped |
+| SRS-305 | Photos Re-Import | SDS-P01-009 | PhotosImporter | Mapped |
 | SRS-401 | Metadata Extraction | SDS-P01-002 | MetadataManager | Mapped |
 | SRS-402 | GPS Preservation | SDS-P01-004 | GPSHandler | Mapped |
 | SRS-501 | Quality Validation | SDS-P01-003 | QualityValidator | Mapped |
@@ -1059,6 +1129,9 @@ class RetryPolicy:
 | SDS-U01-002 | progress_parser.py | FFmpegProgressParser |
 | SDS-U01-003 | file_utils.py | FileUtils |
 | SDS-U01-004 | dependency_checker.py | DependencyChecker |
+| SDS-U01-005 | applescript.py | AppleScriptRunner |
+| **Importers Module** |
+| SDS-P01-009 | photos_importer.py | PhotosImporter |
 
 ---
 
