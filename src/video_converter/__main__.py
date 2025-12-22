@@ -547,6 +547,32 @@ def convert(
     is_flag=True,
     help="Photos mode: Check Photos library access permission and exit.",
 )
+@click.option(
+    "--reimport/--no-reimport",
+    default=False,
+    help="Photos mode: Re-import converted videos back to Photos library.",
+)
+@click.option(
+    "--delete-originals",
+    is_flag=True,
+    help="Photos mode: Delete original videos after successful re-import.",
+)
+@click.option(
+    "--keep-originals",
+    is_flag=True,
+    help="Photos mode: Keep original videos alongside converted versions.",
+)
+@click.option(
+    "--archive-album",
+    type=str,
+    default="Converted Originals",
+    help="Photos mode: Album name for archiving originals (default: 'Converted Originals').",
+)
+@click.option(
+    "--confirm-delete",
+    is_flag=True,
+    help="Photos mode: Confirm deletion of original videos (required with --delete-originals).",
+)
 @click.pass_context
 def run(
     ctx: click.Context,
@@ -563,6 +589,11 @@ def run(
     favorites_only: bool,
     limit: int | None,
     check_permissions: bool,
+    reimport: bool,
+    delete_originals: bool,
+    keep_originals: bool,
+    archive_album: str,
+    confirm_delete: bool,
 ) -> None:
     """Run batch conversion on multiple videos.
 
@@ -596,6 +627,18 @@ def run(
 
         # Check Photos library permissions before running
         video-converter run --source photos --check-permissions
+
+        # Re-import converted videos to Photos (archive originals by default)
+        video-converter run --source photos --reimport
+
+        # Re-import and delete originals (requires confirmation)
+        video-converter run --source photos --reimport --delete-originals --confirm-delete
+
+        # Re-import and keep both versions
+        video-converter run --source photos --reimport --keep-originals
+
+        # Re-import with custom archive album
+        video-converter run --source photos --reimport --archive-album "Old H.264 Videos"
     """
     cli_ctx: CLIContext = ctx.obj
     config = cli_ctx.config
@@ -651,6 +694,32 @@ def run(
         _run_batch_conversion(cli_ctx, h264_videos, output_dir)
 
     elif source == "photos":
+        # Validate reimport options
+        if delete_originals and keep_originals:
+            console.print(
+                "[red]✗ Cannot use both --delete-originals and --keep-originals[/red]",
+                err=True,
+            )
+            sys.exit(1)
+
+        if delete_originals and not confirm_delete:
+            console.print(
+                "[red]✗ --delete-originals requires --confirm-delete flag[/red]",
+                err=True,
+            )
+            console.print(
+                "[dim]This is a safety measure to prevent accidental deletion.[/dim]"
+            )
+            sys.exit(1)
+
+        if (delete_originals or keep_originals) and not reimport:
+            console.print(
+                "[yellow]⚠ --delete-originals and --keep-originals "
+                "require --reimport flag[/yellow]",
+                err=True,
+            )
+            sys.exit(1)
+
         _run_photos_conversion(
             cli_ctx=cli_ctx,
             output_dir=output_dir,
@@ -661,6 +730,10 @@ def run(
             to_date=to_date,
             favorites_only=favorites_only,
             limit=limit,
+            reimport=reimport,
+            delete_originals=delete_originals,
+            keep_originals=keep_originals,
+            archive_album=archive_album,
         )
 
 
@@ -923,6 +996,10 @@ def _run_photos_conversion(
     to_date: datetime | None,
     favorites_only: bool,
     limit: int | None,
+    reimport: bool = False,
+    delete_originals: bool = False,
+    keep_originals: bool = False,
+    archive_album: str = "Converted Originals",
 ) -> None:
     """Run conversion on Photos library videos.
 
@@ -936,6 +1013,10 @@ def _run_photos_conversion(
         to_date: Only include videos until this date.
         favorites_only: Only include favorite videos.
         limit: Maximum number of videos to convert.
+        reimport: Whether to re-import converted videos to Photos.
+        delete_originals: Whether to delete original videos after reimport.
+        keep_originals: Whether to keep original videos alongside converted.
+        archive_album: Album name for archiving originals.
     """
     from video_converter.extractors.photos_extractor import (
         PhotosAccessDeniedError,
@@ -1000,11 +1081,20 @@ def _run_photos_conversion(
             console.print()
 
             if dry_run:
-                _display_photos_dry_run(candidates, output_dir)
+                _display_photos_dry_run(candidates, output_dir, reimport)
                 return
 
             # Run conversion
-            _run_photos_batch_conversion(cli_ctx, handler, candidates, output_dir)
+            _run_photos_batch_conversion(
+                cli_ctx=cli_ctx,
+                handler=handler,
+                candidates=candidates,
+                output_dir=output_dir,
+                reimport=reimport,
+                delete_originals=delete_originals,
+                keep_originals=keep_originals,
+                archive_album=archive_album,
+            )
     except PhotosLibraryNotFoundError:
         display_photos_permission_error(
             console=console,
@@ -1022,14 +1112,20 @@ def _run_photos_conversion(
 def _display_photos_dry_run(
     candidates: list,
     output_dir: Path | None,
+    reimport: bool = False,
 ) -> None:
     """Display what would be converted from Photos in dry run mode.
 
     Args:
         candidates: List of PhotosVideoInfo candidates.
         output_dir: Output directory.
+        reimport: Whether reimport is enabled.
     """
-    table = Table(title="Photos Videos to Convert (Dry Run)")
+    title = "Photos Videos to Convert (Dry Run)"
+    if reimport:
+        title += " [Re-import Enabled]"
+
+    table = Table(title=title)
     table.add_column("Filename", style="cyan")
     table.add_column("Size", style="green")
     table.add_column("Date", style="blue")
@@ -1055,6 +1151,8 @@ def _display_photos_dry_run(
     console.print(table)
     console.print()
     console.print(f"[bold]Total:[/bold] {len(candidates)} files, {total_size:.1f} MB")
+    if reimport:
+        console.print("[bold]Re-import:[/bold] Converted videos will be imported back to Photos")
     console.print()
     console.print("[dim]Run without --dry-run to start conversion.[/dim]")
 
@@ -1064,6 +1162,10 @@ def _run_photos_batch_conversion(
     handler,
     candidates: list,
     output_dir: Path | None,
+    reimport: bool = False,
+    delete_originals: bool = False,
+    keep_originals: bool = False,
+    archive_album: str = "Converted Originals",
 ) -> None:
     """Run batch conversion for Photos library videos.
 
@@ -1072,10 +1174,23 @@ def _run_photos_batch_conversion(
         handler: PhotosSourceHandler instance.
         candidates: List of PhotosVideoInfo to convert.
         output_dir: Output directory for converted files.
+        reimport: Whether to re-import converted videos to Photos.
+        delete_originals: Whether to delete original videos after reimport.
+        keep_originals: Whether to keep original videos alongside converted.
+        archive_album: Album name for archiving originals.
     """
     import time
 
     from video_converter.ui.progress import PhotosLibraryInfo
+
+    # Import reimport-related modules if needed
+    if reimport:
+        from video_converter.importers.photos_importer import (
+            OriginalHandling,
+            OriginalHandlingError,
+            PhotosImporter,
+            PhotosImportError,
+        )
 
     config = cli_ctx.config
 
@@ -1200,9 +1315,56 @@ def _run_photos_batch_conversion(
                 )
 
                 if result.success:
-                    successful += 1
                     total_converted += result.converted_size
-                    photos_progress.complete_video(success=True, saved_bytes=result.size_saved)
+
+                    # Handle reimport if enabled
+                    reimport_success = True
+                    if reimport:
+                        try:
+                            importer = PhotosImporter()
+
+                            # Import converted video to Photos
+                            new_uuid = importer.import_video(output_path)
+
+                            # Verify import
+                            if importer.verify_import(new_uuid):
+                                # Determine handling mode
+                                if delete_originals:
+                                    handling_mode = OriginalHandling.DELETE
+                                elif keep_originals:
+                                    handling_mode = OriginalHandling.KEEP
+                                else:
+                                    handling_mode = OriginalHandling.ARCHIVE
+
+                                # Handle original video
+                                importer.handle_original(
+                                    original_uuid=video.uuid,
+                                    handling=handling_mode,
+                                    archive_album=archive_album,
+                                )
+                            else:
+                                reimport_success = False
+                                errors.append(
+                                    f"{video.filename}: Re-import verification failed"
+                                )
+
+                        except PhotosImportError as e:
+                            reimport_success = False
+                            errors.append(f"{video.filename}: Re-import failed - {e}")
+                        except OriginalHandlingError as e:
+                            # Import succeeded but original handling failed
+                            errors.append(
+                                f"{video.filename}: Original handling failed - {e}"
+                            )
+
+                    if reimport_success:
+                        successful += 1
+                        photos_progress.complete_video(
+                            success=True, saved_bytes=result.size_saved
+                        )
+                    else:
+                        failed += 1
+                        photos_progress.complete_video(success=False)
                 else:
                     failed += 1
                     errors.append(f"{video.filename}: {result.error_message}")
