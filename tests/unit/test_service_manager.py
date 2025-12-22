@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import plistlib
 import tempfile
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -11,10 +12,13 @@ import pytest
 
 from video_converter.automation.launchd import SERVICE_LABEL
 from video_converter.automation.service_manager import (
+    DetailedServiceStatus,
+    LastRunInfo,
     ServiceManager,
     ServiceResult,
     ServiceState,
     ServiceStatus,
+    format_bytes,
 )
 
 
@@ -697,3 +701,320 @@ class TestScheduleDescription:
         )
         assert "Daily" in desc
         assert "Watching" in desc
+
+
+class TestLastRunInfo:
+    """Tests for LastRunInfo dataclass."""
+
+    def test_relative_time_never(self) -> None:
+        """Test relative time when never run."""
+        info = LastRunInfo()
+        assert info.relative_time == "Never"
+
+    def test_relative_time_today(self) -> None:
+        """Test relative time for today."""
+        info = LastRunInfo(timestamp=datetime.now() - timedelta(hours=1))
+        assert "Today" in info.relative_time
+
+    def test_relative_time_yesterday(self) -> None:
+        """Test relative time for yesterday."""
+        info = LastRunInfo(timestamp=datetime.now() - timedelta(days=1, hours=1))
+        assert "Yesterday" in info.relative_time
+
+    def test_relative_time_days_ago(self) -> None:
+        """Test relative time for days ago."""
+        info = LastRunInfo(timestamp=datetime.now() - timedelta(days=3))
+        assert "3 days ago" in info.relative_time
+
+    def test_relative_time_older(self) -> None:
+        """Test relative time for older dates."""
+        info = LastRunInfo(timestamp=datetime.now() - timedelta(days=10))
+        # Should show date format
+        assert "-" in info.relative_time  # Date format YYYY-MM-DD
+
+    def test_result_text_unknown(self) -> None:
+        """Test result text when unknown."""
+        info = LastRunInfo()
+        assert info.result_text == "Unknown"
+
+    def test_result_text_success(self) -> None:
+        """Test result text for success."""
+        info = LastRunInfo(success=True)
+        assert info.result_text == "Success"
+
+    def test_result_text_failed(self) -> None:
+        """Test result text for failure."""
+        info = LastRunInfo(success=False)
+        assert info.result_text == "Failed"
+
+
+class TestDetailedServiceStatus:
+    """Tests for DetailedServiceStatus dataclass."""
+
+    def test_default_values(self) -> None:
+        """Test default values."""
+        basic = ServiceStatus(
+            state=ServiceState.NOT_INSTALLED,
+            is_installed=False,
+            is_loaded=False,
+            is_running=False,
+        )
+        detailed = DetailedServiceStatus(basic_status=basic)
+
+        assert detailed.next_run is None
+        assert detailed.next_run_relative == "Unknown"
+        assert detailed.total_videos_converted == 0
+        assert detailed.total_storage_saved_bytes == 0
+        assert detailed.success_rate == 0.0
+
+    def test_with_statistics(self) -> None:
+        """Test with statistics values."""
+        basic = ServiceStatus(
+            state=ServiceState.INSTALLED_IDLE,
+            is_installed=True,
+            is_loaded=True,
+            is_running=False,
+        )
+        detailed = DetailedServiceStatus(
+            basic_status=basic,
+            next_run=datetime.now() + timedelta(hours=2),
+            next_run_relative="Today, 15:00",
+            total_videos_converted=42,
+            total_storage_saved_bytes=1024 * 1024 * 500,  # 500 MB
+            success_rate=0.95,
+        )
+
+        assert detailed.total_videos_converted == 42
+        assert detailed.success_rate == 0.95
+
+
+class TestFormatBytes:
+    """Tests for format_bytes function."""
+
+    def test_bytes(self) -> None:
+        """Test formatting bytes."""
+        assert format_bytes(500) == "500 B"
+
+    def test_kilobytes(self) -> None:
+        """Test formatting kilobytes."""
+        assert format_bytes(1536) == "1.5 KB"
+
+    def test_megabytes(self) -> None:
+        """Test formatting megabytes."""
+        assert format_bytes(1024 * 1024 * 2) == "2.0 MB"
+
+    def test_gigabytes(self) -> None:
+        """Test formatting gigabytes."""
+        assert format_bytes(1024 * 1024 * 1024 * 3) == "3.0 GB"
+
+    def test_gigabytes_decimal(self) -> None:
+        """Test formatting gigabytes with decimal."""
+        assert format_bytes(int(1024 * 1024 * 1024 * 1.5)) == "1.5 GB"
+
+
+class TestCalculateNextRun:
+    """Tests for calculate_next_run method."""
+
+    @pytest.fixture
+    def temp_dir(self) -> Path:
+        """Create a temporary directory for tests."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    @pytest.fixture
+    def manager(self, temp_dir: Path) -> ServiceManager:
+        """Create a ServiceManager with temporary paths."""
+        plist_path = temp_dir / "test.plist"
+        log_dir = temp_dir / "logs"
+        return ServiceManager(plist_path=plist_path, log_dir=log_dir)
+
+    def test_not_installed(self, manager: ServiceManager) -> None:
+        """Test when service is not installed."""
+        next_run, desc = manager.calculate_next_run()
+        assert next_run is None
+        assert "Not installed" in desc
+
+    def test_daily_schedule(self, manager: ServiceManager) -> None:
+        """Test calculation for daily schedule."""
+        # Create plist with daily schedule
+        plist = {
+            "Label": SERVICE_LABEL,
+            "StartCalendarInterval": {"Hour": 3, "Minute": 0},
+        }
+        manager.plist_path.parent.mkdir(parents=True, exist_ok=True)
+        with manager.plist_path.open("wb") as f:
+            plistlib.dump(plist, f)
+
+        next_run, desc = manager.calculate_next_run()
+
+        assert next_run is not None
+        assert next_run.hour == 3
+        assert next_run.minute == 0
+        # Description should mention time
+        assert "03:00" in desc or "3:00" in desc
+
+    def test_weekly_schedule(self, manager: ServiceManager) -> None:
+        """Test calculation for weekly schedule."""
+        # Create plist with weekly schedule (launchd: 1=Monday)
+        # Note: launchd uses 0=Sunday, 1=Monday, ..., 6=Saturday
+        # Python uses 0=Monday, 1=Tuesday, ..., 6=Sunday
+        plist = {
+            "Label": SERVICE_LABEL,
+            "StartCalendarInterval": {"Hour": 9, "Minute": 30, "Weekday": 1},
+        }
+        manager.plist_path.parent.mkdir(parents=True, exist_ok=True)
+        with manager.plist_path.open("wb") as f:
+            plistlib.dump(plist, f)
+
+        next_run, desc = manager.calculate_next_run()
+
+        assert next_run is not None
+        assert next_run.hour == 9
+        assert next_run.minute == 30
+        # launchd weekday 1 = Monday = Python weekday 0
+        # The implementation uses launchd weekday directly for calculation
+        # so next_run should be on Monday (Python weekday 0)
+        assert next_run.weekday() == 0  # Monday in Python
+
+    def test_watch_paths_only(self, manager: ServiceManager) -> None:
+        """Test when only watch paths are configured."""
+        plist = {
+            "Label": SERVICE_LABEL,
+            "WatchPaths": ["/path/to/folder"],
+        }
+        manager.plist_path.parent.mkdir(parents=True, exist_ok=True)
+        with manager.plist_path.open("wb") as f:
+            plistlib.dump(plist, f)
+
+        next_run, desc = manager.calculate_next_run()
+
+        assert next_run is None
+        assert "folder" in desc.lower()
+
+
+class TestGetLastRunInfo:
+    """Tests for get_last_run_info method."""
+
+    @pytest.fixture
+    def temp_dir(self) -> Path:
+        """Create a temporary directory for tests."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    @pytest.fixture
+    def manager(self, temp_dir: Path) -> ServiceManager:
+        """Create a ServiceManager with temporary paths."""
+        plist_path = temp_dir / "test.plist"
+        log_dir = temp_dir / "logs"
+        return ServiceManager(plist_path=plist_path, log_dir=log_dir)
+
+    def test_no_logs(self, manager: ServiceManager) -> None:
+        """Test when no log files exist."""
+        info = manager.get_last_run_info()
+
+        assert info.timestamp is None
+        assert info.success is None
+
+    def test_with_success_log(self, manager: ServiceManager) -> None:
+        """Test parsing success from log."""
+        manager.log_dir.mkdir(parents=True, exist_ok=True)
+        (manager.log_dir / "stdout.log").write_text(
+            "Starting conversion...\n"
+            "Processing video.mp4\n"
+            "Conversion completed successfully\n"
+        )
+
+        info = manager.get_last_run_info()
+
+        assert info.timestamp is not None
+        assert info.success is True
+
+    def test_with_failure_log(self, manager: ServiceManager) -> None:
+        """Test parsing failure from log."""
+        manager.log_dir.mkdir(parents=True, exist_ok=True)
+        (manager.log_dir / "stdout.log").write_text(
+            "Starting conversion...\n"
+            "Error: FFmpeg failed\n"
+        )
+
+        info = manager.get_last_run_info()
+
+        assert info.success is False
+
+    def test_with_statistics_in_log(self, manager: ServiceManager) -> None:
+        """Test parsing statistics from log."""
+        manager.log_dir.mkdir(parents=True, exist_ok=True)
+        (manager.log_dir / "stdout.log").write_text(
+            "Starting conversion...\n"
+            "12 videos converted\n"
+            "500 MB saved\n"
+            "Completed successfully\n"
+        )
+
+        info = manager.get_last_run_info()
+
+        assert info.videos_converted == 12
+        assert info.storage_saved_bytes == 500 * 1024 * 1024
+
+    def test_with_stderr_error(self, manager: ServiceManager) -> None:
+        """Test detecting error from stderr."""
+        manager.log_dir.mkdir(parents=True, exist_ok=True)
+        (manager.log_dir / "stdout.log").write_text("Starting...\n")
+        (manager.log_dir / "stderr.log").write_text(
+            "Error: Permission denied\n"
+        )
+
+        info = manager.get_last_run_info()
+
+        assert info.success is False
+        assert "Permission denied" in (info.error_message or "")
+
+
+class TestGetDetailedStatus:
+    """Tests for get_detailed_status method."""
+
+    @pytest.fixture
+    def temp_dir(self) -> Path:
+        """Create a temporary directory for tests."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    @pytest.fixture
+    def manager(self, temp_dir: Path) -> ServiceManager:
+        """Create a ServiceManager with temporary paths."""
+        plist_path = temp_dir / "test.plist"
+        log_dir = temp_dir / "logs"
+        return ServiceManager(plist_path=plist_path, log_dir=log_dir)
+
+    def test_not_installed(self, manager: ServiceManager) -> None:
+        """Test detailed status when not installed."""
+        detailed = manager.get_detailed_status()
+
+        assert detailed.basic_status.state == ServiceState.NOT_INSTALLED
+        assert detailed.next_run_relative == "Not installed"
+
+    @patch("subprocess.run")
+    def test_installed_with_schedule(
+        self, mock_run: MagicMock, manager: ServiceManager
+    ) -> None:
+        """Test detailed status when installed with schedule."""
+        # Create plist with schedule
+        plist = {
+            "Label": SERVICE_LABEL,
+            "StartCalendarInterval": {"Hour": 3, "Minute": 0},
+        }
+        manager.plist_path.parent.mkdir(parents=True, exist_ok=True)
+        with manager.plist_path.open("wb") as f:
+            plistlib.dump(plist, f)
+
+        # Mock launchctl
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout=f"-\t0\t{SERVICE_LABEL}\n",
+        )
+
+        detailed = manager.get_detailed_status()
+
+        assert detailed.basic_status.is_installed
+        assert detailed.next_run is not None
+        assert "03:00" in detailed.next_run_relative or "Today" in detailed.next_run_relative

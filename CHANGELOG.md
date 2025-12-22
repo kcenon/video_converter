@@ -76,6 +76,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Service Status Query (#36)
+- `calculate_next_run()` method for computing next scheduled execution time
+- `get_last_run_info()` method for parsing service logs to get last run details
+- `get_detailed_status()` method combining status, schedule, history, and statistics
+- `LastRunInfo` dataclass for last run timestamp, success status, and statistics
+- `DetailedServiceStatus` dataclass for comprehensive service information
+- `format_bytes()` helper function for human-readable byte display
+- Enhanced CLI `status` command with next run time, last run result, and conversion statistics
+- Launchd weekday to Python weekday conversion for accurate schedule calculation
+- 26 new tests for service status functionality
+
 #### launchctl Wrapper for Service Management (#35)
 - Public `load()`, `unload()`, `restart()` methods in ServiceManager
 - Permission checking for plist files before loading
