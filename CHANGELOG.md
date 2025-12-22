@@ -128,6 +128,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - preserve_timestamps config option (default: True)
 - Comprehensive unit tests (23 test cases)
 
+#### Metadata Verification System (#22)
+- MetadataVerifier class for comprehensive metadata comparison between original and converted files
+- ToleranceSettings dataclass for configurable comparison thresholds (date: 1s, GPS: 0.000001°, duration: 0.1s)
+- CheckResult and VerificationResult dataclasses for structured verification results
+- Support for date/time, GPS, camera, video, and audio metadata verification
+- Category-based verification with selectable categories
+- Pre-configured tolerance profiles (strict, default, relaxed)
+- Comprehensive unit tests (43 test cases)
+
 ### Planned
 - Rich progress bar display
 - Statistics and reporting
