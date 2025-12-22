@@ -168,7 +168,6 @@ class TestPhotosLibrary:
         with pytest.raises(PhotosLibraryNotFoundError):
             PhotosLibrary(library_path=Path("/nonexistent/path.photoslibrary"))
 
-    @patch("video_converter.extractors.photos_extractor.osxphotos")
     def test_db_property_lazy_loading(self, mock_osxphotos: MagicMock) -> None:
         """Test that db property lazy-loads the database."""
         mock_db = MagicMock()
@@ -183,7 +182,6 @@ class TestPhotosLibrary:
         _ = library.db
         mock_osxphotos.PhotosDB.assert_called_once()
 
-    @patch("video_converter.extractors.photos_extractor.osxphotos")
     def test_db_property_with_custom_path(self, mock_osxphotos: MagicMock, tmp_path: Path) -> None:
         """Test db property with custom library path."""
         mock_db = MagicMock()
@@ -197,7 +195,6 @@ class TestPhotosLibrary:
 
         mock_osxphotos.PhotosDB.assert_called_once_with(dbfile=str(custom_lib))
 
-    @patch("video_converter.extractors.photos_extractor.osxphotos")
     def test_check_permissions_success(self, mock_osxphotos: MagicMock) -> None:
         """Test check_permissions returns True on success."""
         mock_db = MagicMock()
@@ -207,7 +204,6 @@ class TestPhotosLibrary:
         library = PhotosLibrary()
         assert library.check_permissions() is True
 
-    @patch("video_converter.extractors.photos_extractor.osxphotos")
     def test_check_permissions_denied(self, mock_osxphotos: MagicMock) -> None:
         """Test check_permissions returns False when access denied."""
         mock_osxphotos.PhotosDB.side_effect = PermissionError("Access denied")
@@ -215,7 +211,6 @@ class TestPhotosLibrary:
         library = PhotosLibrary()
         assert library.check_permissions() is False
 
-    @patch("video_converter.extractors.photos_extractor.osxphotos")
     def test_check_permissions_caches_result(self, mock_osxphotos: MagicMock) -> None:
         """Test that check_permissions caches the result."""
         mock_db = MagicMock()
@@ -233,7 +228,6 @@ class TestPhotosLibrary:
         # Should only call PhotosDB once due to caching
         mock_osxphotos.PhotosDB.assert_called_once()
 
-    @patch("video_converter.extractors.photos_extractor.osxphotos")
     def test_get_video_count(self, mock_osxphotos: MagicMock) -> None:
         """Test get_video_count returns correct count."""
         mock_db = MagicMock()
@@ -246,7 +240,6 @@ class TestPhotosLibrary:
         assert count == 3
         mock_db.photos.assert_called_once_with(media_type=["video"])
 
-    @patch("video_converter.extractors.photos_extractor.osxphotos")
     def test_get_library_info(self, mock_osxphotos: MagicMock) -> None:
         """Test get_library_info returns expected structure."""
         mock_db = MagicMock()
@@ -264,7 +257,6 @@ class TestPhotosLibrary:
         assert info["photo_count"] == 10
         assert info["video_count"] == 5
 
-    @patch("video_converter.extractors.photos_extractor.osxphotos")
     def test_get_videos_empty_library(self, mock_osxphotos: MagicMock) -> None:
         """Test get_videos with empty library."""
         mock_db = MagicMock()
@@ -276,7 +268,6 @@ class TestPhotosLibrary:
 
         assert videos == []
 
-    @patch("video_converter.extractors.photos_extractor.osxphotos")
     def test_get_videos_with_filters(self, mock_osxphotos: MagicMock) -> None:
         """Test get_videos with favorites_only filter."""
         mock_photo1 = MagicMock()
@@ -309,7 +300,6 @@ class TestPhotosLibrary:
         assert videos[0].uuid == "uuid1"
         assert videos[0].favorite is True
 
-    @patch("video_converter.extractors.photos_extractor.osxphotos")
     def test_get_videos_excludes_hidden_by_default(self, mock_osxphotos: MagicMock) -> None:
         """Test that hidden videos are excluded by default."""
         mock_visible = MagicMock()
@@ -338,7 +328,6 @@ class TestPhotosLibrary:
         assert len(videos) == 1
         assert videos[0].uuid == "visible"
 
-    @patch("video_converter.extractors.photos_extractor.osxphotos")
     def test_get_videos_includes_hidden_when_requested(self, mock_osxphotos: MagicMock) -> None:
         """Test that hidden videos are included when requested."""
         mock_hidden = MagicMock()
@@ -364,7 +353,6 @@ class TestPhotosLibrary:
         assert len(videos) == 1
         assert videos[0].uuid == "hidden"
 
-    @patch("video_converter.extractors.photos_extractor.osxphotos")
     def test_get_video_by_uuid_found(self, mock_osxphotos: MagicMock) -> None:
         """Test get_video_by_uuid when video exists."""
         mock_photo = MagicMock()
@@ -391,7 +379,6 @@ class TestPhotosLibrary:
         assert video.uuid == "target-uuid"
         mock_db.photos.assert_called_with(uuid=["target-uuid"])
 
-    @patch("video_converter.extractors.photos_extractor.osxphotos")
     def test_get_video_by_uuid_not_found(self, mock_osxphotos: MagicMock) -> None:
         """Test get_video_by_uuid when video doesn't exist."""
         mock_db = MagicMock()
@@ -403,7 +390,6 @@ class TestPhotosLibrary:
 
         assert video is None
 
-    @patch("video_converter.extractors.photos_extractor.osxphotos")
     def test_close_resets_state(self, mock_osxphotos: MagicMock) -> None:
         """Test that close resets internal state."""
         mock_db = MagicMock()
@@ -421,7 +407,6 @@ class TestPhotosLibrary:
         assert library._initialized is False
         assert library._permission_checked is False
 
-    @patch("video_converter.extractors.photos_extractor.osxphotos")
     def test_context_manager(self, mock_osxphotos: MagicMock) -> None:
         """Test context manager usage."""
         mock_db = MagicMock()

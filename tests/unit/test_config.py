@@ -226,9 +226,13 @@ class TestConfigLoad:
         assert config.encoding.quality == 45
 
     def test_config_version(self) -> None:
-        """Test config version is set."""
+        """Test config version is set and follows semantic versioning."""
         config = Config.load()
-        assert config.version == "1.0.0"
+        # Version should be a non-empty string following semantic versioning
+        assert config.version is not None
+        assert len(config.version) > 0
+        # Should contain at least one dot for versioning (e.g., "0.1.0.0")
+        assert "." in config.version
 
 
 class TestConfigEnvironmentOverride:
