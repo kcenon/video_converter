@@ -462,8 +462,8 @@ Photos Library ──▶ H.264 Detection ──▶ VideoToolbox ──▶ H.265 
 ## Roadmap
 
 - [x] v1.0.0 - CLI with automation (Current)
-- [ ] v1.1.0 - GUI application
-- [ ] v1.2.0 - VMAF quality verification
+- [x] v1.1.0 - VMAF quality verification
+- [ ] v1.2.0 - GUI application
 - [ ] v2.0.0 - AV1 codec support
 
 ## Contributing
