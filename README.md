@@ -45,7 +45,56 @@ video-converter setup
 ### Single File Conversion
 
 ```bash
-video-converter convert input.mp4 output.mp4 --mode hardware
+# Basic conversion (auto-generates output name with _h265 suffix)
+video-converter convert input.mp4
+
+# Specify output file
+video-converter convert input.mp4 output.mp4
+
+# High quality software encoding
+video-converter convert input.mov output.mov --mode software --quality 85
+
+# Fast encoding with preset
+video-converter convert input.mp4 --preset fast
+
+# Overwrite existing output file
+video-converter convert input.mp4 output.mp4 --force
+
+# Quiet mode for scripts
+video-converter -q convert input.mp4 output.mp4
+```
+
+#### Progress Display
+
+During conversion, a real-time progress bar is shown:
+
+```
+Converting: vacation.mp4
+Mode: hardware (hevc_videotoolbox)
+Input: 1.50 GB (H264, 4K@30fps, 3 min 45 sec)
+
+⠋ Converting vacation.mp4 ━━━━━━━━━━━━━━━━━━━━ 30% │ 450 MB │ ETA: 2m 15s
+```
+
+#### Completion Summary
+
+After conversion, a formatted summary is displayed:
+
+```
+╭──────────────────────────────────────────────╮
+│            Conversion Complete               │
+├──────────────────────────────────────────────┤
+│  Input:      vacation.mp4                    │
+│  Output:     vacation_h265.mp4               │
+│  Codec:      H.264 → H.265 (hardware)        │
+├──────────────────────────────────────────────┤
+│  Original:   1.50 GB                         │
+│  Converted:  680 MB                          │
+│  Saved:      820 MB (54.7%)                  │
+├──────────────────────────────────────────────┤
+│  Duration:   3 min 45 sec                    │
+│  Speed:      6.2x realtime                   │
+╰──────────────────────────────────────────────╯
 ```
 
 ### Batch Conversion (Folder)
@@ -152,6 +201,27 @@ Global Options:
   -q, --quiet    Minimal output (errors only)
   --version      Show version
   --help         Show help
+```
+
+### Convert Command Options
+
+```bash
+video-converter convert INPUT_FILE [OUTPUT_FILE] [options]
+
+Arguments:
+  INPUT_FILE   Path to the video file to convert (required)
+  OUTPUT_FILE  Output path (optional, auto-generated if not specified)
+
+Options:
+  --mode TEXT       Encoding mode: hardware or software
+  --quality INT     Quality setting 1-100 (higher = better quality, larger file)
+  --preset TEXT     Encoder preset: fast, medium, slow
+  -f, --force       Overwrite output file if exists
+  --preserve-metadata/--no-preserve-metadata
+                    Preserve original metadata (default: True)
+  --validate/--no-validate
+                    Validate output file after conversion (default: True)
+  --help            Show help
 ```
 
 ### View and Modify Configuration
