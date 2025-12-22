@@ -123,6 +123,7 @@ addopts = [
     "-v",
     "--tb=short",
     "--strict-markers",
+    "-x",  # Stop on first failure
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
@@ -134,6 +135,7 @@ source = ["src/video_converter"]
 branch = true
 
 [tool.coverage.report]
+fail_under = 80
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",
