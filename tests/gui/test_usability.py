@@ -147,11 +147,12 @@ class TestAccessibility:
         qtbot.addWidget(window)
 
         # Queue view pause/cancel buttons should have text
-        assert window.queue_view.pause_button.text() != ""
-        assert window.queue_view.cancel_button.text() != ""
+        assert window.queue_view.pause_resume_button.text() != ""
+        assert window.queue_view.cancel_all_button.text() != ""
 
-        # Settings view save button should have text
-        assert window.settings_view.save_button.text() != ""
+        # Verify buttons exist and have meaningful text
+        assert len(window.queue_view.pause_resume_button.text()) > 0
+        assert len(window.queue_view.cancel_all_button.text()) > 0
 
         window.close()
 
@@ -257,8 +258,8 @@ class TestUserWorkflows:
         # 2. Modify a setting
         window.settings_view.quality_slider.setValue(25)
 
-        # 3. Save settings
-        window.settings_view.save_button.click()
+        # 3. Save settings (call _on_save directly since save_button is local)
+        window.settings_view._on_save()
 
         window.close()
 

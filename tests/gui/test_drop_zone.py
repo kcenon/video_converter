@@ -284,7 +284,7 @@ class TestDropZoneClickBrowse:
         qtbot.addWidget(widget)
 
         with patch(
-            "video_converter.gui.widgets.drop_zone.QFileDialog.getOpenFileNames"
+            "PySide6.QtWidgets.QFileDialog.getOpenFileNames"
         ) as mock_dialog:
             mock_dialog.return_value = ([], "")
 
@@ -311,7 +311,7 @@ class TestDropZoneClickBrowse:
         qtbot.addWidget(widget)
 
         with patch(
-            "video_converter.gui.widgets.drop_zone.QFileDialog.getOpenFileNames"
+            "PySide6.QtWidgets.QFileDialog.getOpenFileNames"
         ) as mock_dialog:
             mock_dialog.return_value = ([str(sample_video_files[0])], "")
 
@@ -340,7 +340,7 @@ class TestDropZoneClickBrowse:
         file_paths = [str(f) for f in sample_video_files]
 
         with patch(
-            "video_converter.gui.widgets.drop_zone.QFileDialog.getOpenFileNames"
+            "PySide6.QtWidgets.QFileDialog.getOpenFileNames"
         ) as mock_dialog:
             mock_dialog.return_value = (file_paths, "")
 
