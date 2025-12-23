@@ -61,7 +61,7 @@ class VideoConverterApp(QApplication):
             Exit code from the application.
         """
         self.main_window.show()
-        return self.exec()
+        return int(self.exec())
 
 
 def main() -> int:

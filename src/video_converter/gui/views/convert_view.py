@@ -158,10 +158,12 @@ class ConvertView(QWidget):
 
         # Encoder selection
         self.encoder_combo = QComboBox()
-        self.encoder_combo.addItems([
-            "VideoToolbox (Hardware)",
-            "libx265 (Software)",
-        ])
+        self.encoder_combo.addItems(
+            [
+                "VideoToolbox (Hardware)",
+                "libx265 (Software)",
+            ]
+        )
         group_layout.addRow("Encoder:", self.encoder_combo)
 
         # Quality preset
@@ -278,9 +280,7 @@ class ConvertView(QWidget):
         path = Path(file_path)
         if path.exists():
             size_mb = path.stat().st_size / (1024 * 1024)
-            self.file_info_label.setText(
-                f"File: {path.name} | Size: {size_mb:.1f} MB"
-            )
+            self.file_info_label.setText(f"File: {path.name} | Size: {size_mb:.1f} MB")
         else:
             self.file_info_label.setText("File not found")
             self.convert_button.setEnabled(False)

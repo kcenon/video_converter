@@ -21,7 +21,8 @@ def is_dark_mode() -> bool:
         True if dark mode is enabled.
     """
     palette = QApplication.palette()
-    return palette.color(QPalette.ColorRole.Window).lightness() < 128
+    lightness = palette.color(QPalette.ColorRole.Window).lightness()
+    return bool(lightness < 128)
 
 
 def apply_macos_theme(app: QApplication) -> None:
