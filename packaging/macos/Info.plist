@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Bundle Identification -->
+    <key>CFBundleName</key>
+    <string>Video Converter</string>
+    <key>CFBundleDisplayName</key>
+    <string>Video Converter</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.github.kcenon.videoconverter</string>
+    <key>CFBundleExecutable</key>
+    <string>Video Converter</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
+
+    <!-- Version Information -->
+    <key>CFBundleVersion</key>
+    <string>0.3.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.3.0</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+
+    <!-- System Requirements -->
+    <key>LSMinimumSystemVersion</key>
+    <string>12.0</string>
+    <key>LSArchitecturePriority</key>
+    <array>
+        <string>arm64</string>
+        <string>x86_64</string>
+    </array>
+
+    <!-- Display and Appearance -->
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSSupportsAutomaticGraphicsSwitching</key>
+    <true/>
+    <key>NSRequiresAquaSystemAppearance</key>
+    <false/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+
+    <!-- Copyright -->
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright 2024 Video Converter Team. All rights reserved.</string>
+
+    <!-- Privacy Permissions -->
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Video Converter needs access to your Photos library to find and convert H.264 videos to H.265 format.</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>Video Converter needs permission to save converted videos back to your Photos library.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Video Converter uses AppleScript to interact with Photos app for importing converted videos.</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>Video Converter may access your Desktop to save converted videos.</string>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>Video Converter may access your Documents folder to save converted videos.</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>Video Converter may access your Downloads folder to convert or save videos.</string>
+
+    <!-- Application Category -->
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.video</string>
+
+    <!-- File Associations -->
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>QuickTime Movie</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>com.apple.quicktime-movie</string>
+            </array>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>MPEG-4 Video</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.mpeg-4</string>
+            </array>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Video File</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.movie</string>
+                <string>public.video</string>
+                <string>public.avi</string>
+            </array>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+        </dict>
+    </array>
+
+    <!-- Exported Type Declarations (UTI) -->
+    <key>UTExportedTypeDeclarations</key>
+    <array/>
+
+    <!-- Imported Type Declarations (UTI) -->
+    <key>UTImportedTypeDeclarations</key>
+    <array/>
+
+    <!-- URL Schemes -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.github.kcenon.videoconverter</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>videoconverter</string>
+            </array>
+        </dict>
+    </array>
+
+    <!-- Sparkle Auto-Update -->
+    <key>SUFeedURL</key>
+    <string>https://github.com/kcenon/video_converter/releases.atom</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUAllowsAutomaticUpdates</key>
+    <true/>
+
+    <!-- App Transport Security (allow GitHub API) -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <false/>
+        <key>NSExceptionDomains</key>
+        <dict>
+            <key>github.com</key>
+            <dict>
+                <key>NSIncludesSubdomains</key>
+                <true/>
+                <key>NSTemporaryExceptionAllowsInsecureHTTPLoads</key>
+                <false/>
+                <key>NSExceptionMinimumTLSVersion</key>
+                <string>TLSv1.2</string>
+            </dict>
+        </dict>
+    </dict>
+</dict>
+</plist>
