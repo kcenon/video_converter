@@ -107,6 +107,7 @@ class MainWindow(QMainWindow):
 
         # Connect view signals
         self.home_view.file_dropped.connect(self._on_file_dropped)
+        self.home_view.files_dropped.connect(self._on_files_dropped)
         self.home_view.browse_photos_requested.connect(self._show_photos_view)
 
     def _setup_navigation(self) -> None:
@@ -222,13 +223,39 @@ class MainWindow(QMainWindow):
 
     @Slot(str)
     def _on_file_dropped(self, file_path: str) -> None:
-        """Handle file drop on home view.
+        """Handle single file drop on home view.
 
         Args:
             file_path: Path to the dropped file.
         """
         self.convert_view.set_input_file(file_path)
         self._set_current_tab(self.TAB_CONVERT)
+
+    @Slot(list)
+    def _on_files_dropped(self, file_paths: list[str]) -> None:
+        """Handle multiple file drop on home view.
+
+        Adds all files to the conversion queue and switches to queue view.
+
+        Args:
+            file_paths: List of paths to dropped video files.
+        """
+        if not file_paths:
+            return
+
+        # Apply saved settings for batch conversion
+        settings = self._settings_manager.apply_to_conversion_settings({})
+
+        # Add all files to conversion queue
+        for file_path in file_paths:
+            self._conversion_service.add_task(file_path, settings=settings)
+
+        # Switch to Queue view to show progress
+        self._set_current_tab(self.TAB_QUEUE)
+
+        # Update status bar
+        count = len(file_paths)
+        self.statusBar().showMessage(f"Added {count} video(s) to conversion queue")
 
     @Slot()
     def _show_photos_view(self) -> None:
