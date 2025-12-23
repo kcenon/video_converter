@@ -38,7 +38,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from video_converter.automation.notification import (
     NotificationConfig,
@@ -48,6 +48,7 @@ from video_converter.converters.base import (
     BaseConverter,
     EncoderNotAvailableError,
 )
+from video_converter.converters.progress import ProgressInfo
 from video_converter.converters.factory import ConverterFactory
 from video_converter.core.concurrent import (
     AggregatedProgress,
@@ -613,6 +614,7 @@ class Orchestrator:
         output_path: Path | None = None,
         on_progress: ProgressCallback | None = None,
         video_info: FolderVideoInfo | None = None,
+        on_progress_info: Callable[[ProgressInfo], None] | None = None,
     ) -> ConversionResult:
         """Convert a single video file through the full pipeline.
 
@@ -622,8 +624,10 @@ class Orchestrator:
         Args:
             input_path: Path to the input video.
             output_path: Path for the output video. Auto-generated if None.
-            on_progress: Optional progress callback.
+            on_progress: Optional progress callback for pipeline stage updates.
             video_info: Optional FolderVideoInfo with iCloud status.
+            on_progress_info: Optional progress callback for detailed FFmpeg progress
+                (percentage, speed, current size, ETA).
 
         Returns:
             ConversionResult with success status and statistics.
@@ -687,7 +691,7 @@ class Orchestrator:
                 error_message=str(e),
             )
 
-        result = await converter.convert(request)
+        result = await converter.convert(request, on_progress_info=on_progress_info)
 
         if not result.success:
             if self.retry_manager:

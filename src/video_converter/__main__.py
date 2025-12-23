@@ -440,34 +440,20 @@ def convert(
     )
     orchestrator = Orchestrator(config=orch_config, enable_session_persistence=False)
 
-    # Get converter for direct progress tracking
-    try:
-        converter = orchestrator.converter_factory.get_converter(conv_mode)
-    except Exception as e:
-        _display_conversion_error(input_file, f"Encoder not available: {e}")
-        sys.exit(1)
-
-    # Create conversion request
-    from video_converter.core.types import ConversionRequest
-
-    request = ConversionRequest(
-        input_path=input_file,
-        output_path=output_file,
-        mode=conv_mode,
-        quality=conv_quality,
-        crf=config.encoding.crf,
-        preset=conv_preset,
-        preserve_metadata=preserve_metadata,
-    )
-
-    # Run conversion with progress bar
+    # Run conversion with progress bar using Orchestrator pipeline
+    # This ensures VMAF analysis, validation, retry, and timestamp sync are performed
     try:
         # Create progress display manager
         progress_manager = ProgressDisplayManager(quiet=cli_ctx.quiet, console=console)
 
         if cli_ctx.quiet:
             # Quiet mode - no progress display
-            result = asyncio.run(converter.convert(request))
+            result = asyncio.run(
+                orchestrator.convert_single(
+                    input_path=input_file,
+                    output_path=output_file,
+                )
+            )
         else:
             # Beautiful progress bar display
             progress_display = progress_manager.create_single_file_progress(
@@ -480,7 +466,13 @@ def convert(
                 progress_display.update_from_info(info)
 
             try:
-                result = asyncio.run(converter.convert(request, on_progress_info=on_progress_info))
+                result = asyncio.run(
+                    orchestrator.convert_single(
+                        input_path=input_file,
+                        output_path=output_file,
+                        on_progress_info=on_progress_info,
+                    )
+                )
             finally:
                 progress_display.finish()
 
