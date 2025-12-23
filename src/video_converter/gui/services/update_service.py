@@ -281,10 +281,12 @@ class UpdateService(QObject):
                 headers={"User-Agent": f"VideoConverter/{CURRENT_VERSION}"},
             )
 
-            with urllib.request.urlopen(request, timeout=300) as response:
-                with open(destination, "wb") as f:
-                    while chunk := response.read(8192):
-                        f.write(chunk)
+            with (
+                urllib.request.urlopen(request, timeout=300) as response,
+                open(destination, "wb") as f,
+            ):
+                while chunk := response.read(8192):
+                    f.write(chunk)
 
             return destination
         except Exception:
