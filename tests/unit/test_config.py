@@ -250,9 +250,7 @@ class TestConfigEnvironmentOverride:
         config = Config.load(force_reload=True)
         assert config.encoding.quality == 80
 
-    def test_processing_max_concurrent_override(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_processing_max_concurrent_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test processing max_concurrent environment override."""
         monkeypatch.setenv("VIDEO_CONVERTER_PROCESSING__MAX_CONCURRENT", "4")
         config = Config.load(force_reload=True)
@@ -334,9 +332,7 @@ class TestConfigReset:
         # Should be different instance after reset
         assert id(config2) != config1_id
 
-    def test_reset_allows_new_env_override(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_reset_allows_new_env_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test that reset allows new environment override."""
         config1 = Config.load()
         assert config1.encoding.mode == "hardware"
@@ -480,3 +476,35 @@ class TestConfigWithFolder:
         result = config.to_dict()
         assert "folder" in result
 
+
+class TestVersionConsistency:
+    """Tests for version consistency across the codebase."""
+
+    def test_version_from_package_metadata(self) -> None:
+        """Test that __version__ is loaded from package metadata."""
+        from video_converter import __version__
+
+        assert __version__ is not None
+        assert len(__version__) > 0
+        # Version should follow semantic versioning pattern (x.y.z or x.y.z.w)
+        parts = __version__.split(".")
+        assert len(parts) >= 3, f"Version '{__version__}' should have at least 3 parts"
+
+    def test_config_version_matches_package_version(self) -> None:
+        """Test that Config.version matches package __version__."""
+        from video_converter import __version__
+
+        config = Config.load()
+        assert config.version == __version__
+
+    def test_cli_version_output(self) -> None:
+        """Test that CLI --version outputs correct version."""
+        from click.testing import CliRunner
+
+        from video_converter import __version__
+        from video_converter.__main__ import main
+
+        runner = CliRunner()
+        result = runner.invoke(main, ["--version"])
+        assert result.exit_code == 0
+        assert __version__ in result.output

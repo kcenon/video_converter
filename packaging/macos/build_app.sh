@@ -28,7 +28,6 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 # Build configuration
 APP_NAME="Video Converter"
-APP_VERSION="0.3.0"
 BUNDLE_ID="com.github.kcenon.videoconverter"
 SPEC_FILE="${SCRIPT_DIR}/video_converter.spec"
 DIST_DIR="${PROJECT_ROOT}/dist"
@@ -108,6 +107,10 @@ check_dependencies() {
         pip3 install -e "${PROJECT_ROOT}[gui]"
     fi
     print_success "video_converter package found"
+
+    # Get version from package
+    APP_VERSION=$(python3 -c "from video_converter import __version__; print(__version__)")
+    print_success "App version: ${APP_VERSION}"
 
     # Check for code signing tools (if signing is enabled)
     if $DO_SIGN; then
