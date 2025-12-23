@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+#### CLI Convert Command Orchestrator Integration (#170)
+- **Refactored `convert` command** to use `orchestrator.convert_single()` instead of direct `converter.convert()` call
+  - Enables full Orchestrator pipeline features for single file conversions
+  - VMAF analysis is now properly triggered when `--vmaf` flag is used
+  - Output validation is performed when `--validate` flag is used
+  - Automatic retry logic on encoder failures through RetryManager
+  - Timestamp synchronization preserves original file dates
+  - iCloud file handling with automatic download before conversion
+- **Added `on_progress_info` parameter to `Orchestrator.convert_single()`**
+  - Allows detailed FFmpeg progress tracking (percentage, speed, ETA, current size)
+  - Maintains existing progress bar display functionality in CLI
+
 ### Added
 
 #### macOS App Packaging (#145)
