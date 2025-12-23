@@ -29,6 +29,8 @@ MANIFEST
 # PyInstaller
 *.manifest
 *.spec
+# Exception: keep packaging spec files
+!packaging/**/*.spec
 
 # Installer logs
 pip-log.txt
