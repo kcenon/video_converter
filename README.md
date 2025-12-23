@@ -485,7 +485,7 @@ Configuration file location: `~/.config/video_converter/config.json`
 
 ```json
 {
-  "version": "0.1.0.0",
+  "version": "0.2.0.0",
   "encoding": {
     "mode": "hardware",
     "quality": 45,
@@ -507,12 +507,22 @@ Configuration file location: `~/.config/video_converter/config.json`
   "photos": {
     "include_albums": [],
     "exclude_albums": ["Screenshots"],
-    "download_from_icloud": true
+    "download_from_icloud": true,
+    "reimport": false,
+    "original_handling": "archive",
+    "archive_album": "Converted Originals"
   },
   "processing": {
     "max_concurrent": 2,
     "validate_quality": true,
-    "preserve_original": true
+    "preserve_original": true,
+    "enable_vmaf": false,
+    "vmaf_threshold": 93
+  },
+  "folder": {
+    "auto_download_icloud": true,
+    "icloud_timeout": 3600,
+    "skip_icloud_on_timeout": true
   },
   "notification": {
     "on_complete": true,
@@ -591,13 +601,16 @@ Photos Library ──▶ H.264 Detection ──▶ VideoToolbox ──▶ H.265 
 > **Note**: This project uses 0.x.x.x versioning to indicate active development status.
 
 - [x] v0.1.0.0 - CLI with automation (Released 2025-12-22)
-- [ ] v0.2.0.0 - VMAF quality verification, enhanced features (In Development)
+- [x] v0.2.0.0 - VMAF quality verification, enhanced features (Released 2025-12-23)
   - [x] VMAF quality analysis (integrated into conversion pipeline)
-  - macOS Notification Center integration
-  - Statistics and reporting
-  - Concurrent processing
-  - Error recovery and retry logic
-  - Rich progress display
+  - [x] macOS Notification Center integration
+  - [x] Statistics and reporting
+  - [x] Concurrent processing
+  - [x] Error recovery and retry logic
+  - [x] Rich progress display
+  - [x] Photos library re-import
+  - [x] iCloud file support
+  - [x] Enhanced service management
 - [ ] v0.3.0.0 - GUI application
 - [ ] v0.4.0.0 - AV1 codec support
 
