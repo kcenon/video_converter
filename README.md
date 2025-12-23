@@ -594,12 +594,19 @@ pip install -e ".[gui]"
 video-converter-gui
 ```
 
-Features (coming soon):
+Current features:
 - Drag & drop video files
 - Photos library browser
 - Real-time conversion progress
-- Menubar app for background monitoring
+- Settings persistence
 - Dark mode support
+
+Menubar app features:
+- Background monitoring while main window is closed
+- Real-time progress display in menu
+- Pause/resume/cancel controls
+- System notifications for completion and errors
+- Click to show/hide main window
 
 ## Technology Stack
 
@@ -636,11 +643,11 @@ Features (coming soon):
 - [ ] v0.3.0.0 - GUI application (in development)
   - [x] Phase 1: PySide6 setup and project structure
   - [x] Phase 2: Main window and navigation
-  - [ ] Phase 3: Conversion view and progress
-  - [ ] Phase 4: Photos library browser
-  - [ ] Phase 5: Queue management
-  - [ ] Phase 6: Settings view
-  - [ ] Phase 7: Menubar app
+  - [x] Phase 3: Conversion view and progress
+  - [x] Phase 4: Photos library browser
+  - [x] Phase 5: Queue management
+  - [x] Phase 6: Settings view
+  - [x] Phase 7: Menubar app
   - [ ] Phase 8: macOS packaging
 - [ ] v0.4.0.0 - AV1 codec support
 

@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### GUI Application
+- **Menubar App Integration** (#142): macOS system tray application for background monitoring:
+  - Real-time conversion progress display in menubar menu
+  - Text-based progress bar visualization (▓░)
+  - Pause/resume/cancel controls accessible from menubar
+  - System notifications for task completion and errors
+  - Main window toggle with single/double click on tray icon
+  - Background execution support (app keeps running when window closed)
+  - Integration with `ConversionService` for live status updates
 - **Drag and Drop Support** (#141): Comprehensive drag and drop functionality:
   - Folder drag support to extract video files automatically
   - Visual feedback showing file count during drag operations
