@@ -52,7 +52,7 @@ This document specifies the software requirements for the Video Converter system
 | Item | Content |
 |------|---------|
 | System Name | Video Converter |
-| Version | 0.1.0.0+ |
+| Version | 0.2.0.0+ |
 | Target Platform | macOS 12.0+ (Apple Silicon) |
 | Development Language | Python 3.10+ |
 
