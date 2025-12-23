@@ -74,6 +74,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Menu bar with File, Edit, View, Help menus
 
 #### Testing
+- **GUI Integration Tests** (#160): Comprehensive integration tests for complete user workflows in `tests/gui/test_gui_integration.py`:
+  - File drop to conversion flow (single/multiple files)
+  - Photos library to conversion flow
+  - Settings persistence across sessions
+  - Menubar and main window synchronization
+  - Queue management operations (pause/resume/cancel)
+  - Tab navigation state preservation
+  - Error handling propagation between components
+  - 23 test cases covering all main user workflows
+  - Tests run in < 1 second with no flaky tests
 - **CLI Test Coverage** (#128): Comprehensive test suite for CLI commands in `tests/unit/cli/`:
   - `test_convert_cmd.py` - Convert command tests (VMAF, metadata, encoding modes)
   - `test_run_cmd.py` - Batch conversion tests (folder/Photos modes, filters)
