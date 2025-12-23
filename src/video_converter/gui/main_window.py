@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 
 from video_converter.gui.dialogs.result_dialog import ConversionResultDialog
 from video_converter.gui.services.conversion_service import ConversionService
+from video_converter.gui.services.photos_service import PhotosService
 from video_converter.gui.services.settings_manager import SettingsManager
 from video_converter.gui.views.convert_view import ConvertView
 from video_converter.gui.views.home_view import HomeView
@@ -64,6 +65,9 @@ class MainWindow(QMainWindow):
         # Create conversion service
         self._conversion_service = ConversionService(self)
 
+        # Create photos service
+        self._photos_service = PhotosService(self)
+
         self._setup_window()
         self._setup_views()
         self._setup_navigation()
@@ -71,6 +75,7 @@ class MainWindow(QMainWindow):
         self._setup_status_bar()
         self._connect_conversion_service()
         self._connect_settings_manager()
+        self._connect_photos_service()
 
     def _setup_window(self) -> None:
         """Configure window properties."""
@@ -261,6 +266,8 @@ class MainWindow(QMainWindow):
     def _show_photos_view(self) -> None:
         """Switch to Photos view."""
         self._set_current_tab(self.TAB_PHOTOS)
+        # Initialize photos view if not already done
+        self.photos_view.initialize()
 
     @Slot()
     def _on_open_file(self) -> None:
@@ -456,6 +463,40 @@ class MainWindow(QMainWindow):
             f"Completed: {successful}/{total} succeeded, {failed} failed"
         )
 
+    def _connect_photos_service(self) -> None:
+        """Connect photos service to photos view."""
+        # Set up photos service for the photos view
+        self.photos_view.set_photos_service(self._photos_service)
+
+        # Connect photos view signals
+        self.photos_view.videos_selected.connect(self._on_photos_videos_selected)
+
+    @Slot(list)
+    def _on_photos_videos_selected(self, video_paths: list[str]) -> None:
+        """Handle video selection from Photos view.
+
+        Args:
+            video_paths: List of video file paths selected for conversion.
+        """
+        if not video_paths:
+            return
+
+        # Apply saved settings for batch conversion
+        settings = self._settings_manager.apply_to_conversion_settings({})
+
+        # Add all files to conversion queue
+        for file_path in video_paths:
+            self._conversion_service.add_task(file_path, settings=settings)
+
+        # Switch to Queue view to show progress
+        self._set_current_tab(self.TAB_QUEUE)
+
+        # Update status bar
+        count = len(video_paths)
+        self.statusBar().showMessage(
+            f"Added {count} video(s) from Photos library to conversion queue"
+        )
+
     @property
     def conversion_service(self) -> ConversionService:
         """Get the conversion service.
@@ -464,6 +505,15 @@ class MainWindow(QMainWindow):
             The conversion service instance.
         """
         return self._conversion_service
+
+    @property
+    def photos_service(self) -> PhotosService:
+        """Get the photos service.
+
+        Returns:
+            The photos service instance.
+        """
+        return self._photos_service
 
     def closeEvent(self, event) -> None:
         """Handle window close event.
@@ -475,6 +525,7 @@ class MainWindow(QMainWindow):
         if self._settings_manager.is_dirty():
             self._settings_manager.save()
 
-        # Shutdown conversion service
+        # Shutdown services
         self._conversion_service.shutdown()
+        self._photos_service.shutdown()
         super().closeEvent(event)
