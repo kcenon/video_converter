@@ -13,6 +13,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
 from video_converter.gui.main_window import MainWindow
+from video_converter.gui.menubar.menubar_app import MenubarApp
 from video_converter.gui.styles.theme import apply_macos_theme
 
 if TYPE_CHECKING:
@@ -27,6 +28,7 @@ class VideoConverterApp(QApplication):
 
     Attributes:
         main_window: The main application window.
+        menubar_app: The menubar/system tray application.
     """
 
     def __init__(self, argv: Sequence[str] | None = None) -> None:
@@ -48,11 +50,26 @@ class VideoConverterApp(QApplication):
         # Enable high DPI scaling
         self.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps)
 
+        # Don't quit when last window is closed (menubar app keeps running)
+        self.setQuitOnLastWindowClosed(False)
+
         # Apply macOS theme
         apply_macos_theme(self)
 
         # Create main window
         self.main_window = MainWindow()
+
+        # Create menubar app with conversion service from main window
+        self.menubar_app = MenubarApp(
+            self.main_window.conversion_service,
+            parent=self.main_window,
+        )
+
+        # Connect menubar signals
+        self.menubar_app.show_main_window_requested.connect(
+            self._on_show_main_window_requested
+        )
+        self.menubar_app.quit_requested.connect(self._on_quit_requested)
 
     def run(self) -> int:
         """Run the application event loop.
@@ -60,8 +77,27 @@ class VideoConverterApp(QApplication):
         Returns:
             Exit code from the application.
         """
+        # Show both main window and menubar app
         self.main_window.show()
+        self.menubar_app.show()
         return int(self.exec())
+
+    def _on_show_main_window_requested(self) -> None:
+        """Handle show main window request from menubar."""
+        self.main_window.show()
+        self.main_window.raise_()
+        self.main_window.activateWindow()
+
+    def _on_quit_requested(self) -> None:
+        """Handle quit request from menubar."""
+        # Hide menubar app
+        self.menubar_app.hide()
+
+        # Close main window (this will trigger cleanup)
+        self.main_window.close()
+
+        # Quit the application
+        self.quit()
 
 
 def main() -> int:

@@ -456,6 +456,15 @@ class MainWindow(QMainWindow):
             f"Completed: {successful}/{total} succeeded, {failed} failed"
         )
 
+    @property
+    def conversion_service(self) -> ConversionService:
+        """Get the conversion service.
+
+        Returns:
+            The conversion service instance.
+        """
+        return self._conversion_service
+
     def closeEvent(self, event) -> None:
         """Handle window close event.
 
