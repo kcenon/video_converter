@@ -49,6 +49,8 @@ dev = [
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.0.0",
+    "pytest-qt>=4.4.0",
+    "pytest-xvfb>=3.0.0",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
     "pre-commit>=3.0.0",
@@ -139,6 +141,7 @@ addopts = [
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
+    "gui: marks tests as GUI tests requiring Qt (deselect with '-m \"not gui\"')",
 ]
 
 [tool.coverage.run]
