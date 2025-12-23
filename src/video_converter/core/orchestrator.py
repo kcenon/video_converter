@@ -48,8 +48,8 @@ from video_converter.converters.base import (
     BaseConverter,
     EncoderNotAvailableError,
 )
-from video_converter.converters.progress import ProgressInfo
 from video_converter.converters.factory import ConverterFactory
+from video_converter.converters.progress import ProgressInfo
 from video_converter.core.concurrent import (
     AggregatedProgress,
     ConcurrentProcessor,
