@@ -56,9 +56,21 @@ pytest -m "not integration"
 ### Test Structure
 
 - `tests/unit/` - Unit tests for individual modules
+  - `tests/unit/cli/` - CLI command tests (convert, run, stats, config, service)
 - `tests/integration/` - Integration tests for component interactions
 - `tests/fixtures/` - Test data and fixture files
 - `tests/conftest.py` - Shared fixtures for all tests
+
+### Running CLI Tests
+
+```bash
+# Run all CLI tests
+pytest tests/unit/cli/
+
+# Run specific command tests
+pytest tests/unit/cli/test_convert_cmd.py
+pytest tests/unit/cli/test_service_cmd.py
+```
 
 ## Code Style
 
