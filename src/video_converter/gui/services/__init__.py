@@ -20,15 +20,25 @@ from video_converter.gui.services.settings_manager import (
     SettingsManager,
     get_default_settings,
 )
+from video_converter.gui.services.update_service import (
+    CURRENT_VERSION,
+    ReleaseInfo,
+    UpdateService,
+    check_for_updates_sync,
+)
 
 __all__: list[str] = [
     "AlbumInfo",
+    "CURRENT_VERSION",
     "ConversionService",
     "ConversionTask",
     "ConversionWorker",
     "PhotosService",
     "PhotosWorker",
+    "ReleaseInfo",
     "SettingsManager",
+    "UpdateService",
     "VideoDisplayInfo",
+    "check_for_updates_sync",
     "get_default_settings",
 ]

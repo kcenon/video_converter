@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### macOS App Packaging (#145)
+- **PyInstaller Configuration**: `video_converter.spec` for building standalone macOS .app bundle
+  - All dependencies bundled including PySide6, osxphotos, and core modules
+  - High DPI support with Retina display optimization
+  - File associations for common video formats
+  - URL scheme handler for `videoconverter://` links
+- **Code Signing Support**: Entitlements and build scripts for proper macOS distribution
+  - `entitlements.plist` for hardened runtime and Photos library access
+  - `Info.plist` with privacy descriptions and app metadata
+  - Support for Developer ID signing and notarization
+- **DMG Installer**: `create_dmg.sh` script for creating drag-to-install disk images
+  - Styled DMG with Applications folder shortcut
+  - Optional integration with `create-dmg` tool for enhanced appearance
+  - SHA256 checksum generation for verification
+- **Homebrew Cask Formula**: `video-converter.rb` for installation via Homebrew
+  - Automatic dependency management (ffmpeg)
+  - Zap support for complete uninstallation
+  - Caveats with setup instructions
+- **Auto-Update Service**: `UpdateService` for checking GitHub releases
+  - Async update checking with Qt threading
+  - Version comparison and release notes parsing
+  - Download URL extraction from release assets
+  - `check_for_updates_sync()` for CLI usage
+
 #### GUI Application
 - **Photos Library Browser** (#143): Full Photos library integration for the GUI:
   - `PhotosService` for async Photos library access in separate thread

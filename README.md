@@ -30,6 +30,8 @@ Automated video codec conversion solution for macOS that converts H.264 videos t
 
 ## Installation
 
+### CLI Installation
+
 ```bash
 # Clone the repository
 git clone https://github.com/kcenon/video_converter.git
@@ -42,6 +44,33 @@ pip install -e .
 # Grant Photos access (will prompt on first run)
 video-converter setup
 ```
+
+### GUI Application (macOS)
+
+For a graphical interface with drag-and-drop support:
+
+```bash
+# Install via Homebrew (recommended)
+brew install --cask video-converter
+
+# Or download the DMG from releases
+# https://github.com/kcenon/video_converter/releases
+```
+
+**Building from Source:**
+
+```bash
+# Install with GUI and packaging dependencies
+pip install -e ".[gui,packaging]"
+
+# Build the .app bundle
+./packaging/macos/build_app.sh
+
+# Create DMG installer (optional)
+./packaging/macos/create_dmg.sh
+```
+
+The built application will be in `dist/Video Converter.app`.
 
 ## Quick Start
 
