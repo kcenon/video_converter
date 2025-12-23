@@ -263,8 +263,7 @@ class iCloudHandler:
 
             # Log error details
             logger.warning(
-                f"brctl download failed for {video.filename}: "
-                f"exit code {result.returncode}"
+                f"brctl download failed for {video.filename}: exit code {result.returncode}"
             )
             if result.stderr:
                 logger.debug(f"brctl stderr: {result.stderr}")
@@ -275,10 +274,7 @@ class iCloudHandler:
             logger.warning(f"brctl command timed out for: {video.filename}")
             return False
         except FileNotFoundError:
-            logger.error(
-                "brctl command not found. "
-                "iCloud download requires macOS 12 or later."
-            )
+            logger.error("brctl command not found. iCloud download requires macOS 12 or later.")
             return False
         except subprocess.SubprocessError as e:
             logger.error(f"Failed to run brctl: {e}")
@@ -447,8 +443,7 @@ class iCloudHandler:
                 return True
 
             logger.warning(
-                f"brctl evict failed for {video.filename}: "
-                f"exit code {result.returncode}"
+                f"brctl evict failed for {video.filename}: exit code {result.returncode}"
             )
             return False
 
@@ -485,10 +480,7 @@ class iCloudHandler:
             True if the path is an iCloud stub file.
         """
         name = path.name
-        return (
-            name.startswith(self.ICLOUD_STUB_PREFIX)
-            and name.endswith(self.ICLOUD_STUB_SUFFIX)
-        )
+        return name.startswith(self.ICLOUD_STUB_PREFIX) and name.endswith(self.ICLOUD_STUB_SUFFIX)
 
     def _is_downloading(self, path: Path) -> bool:
         """Check if a file is currently downloading.
@@ -509,11 +501,8 @@ class iCloudHandler:
 
         # Check if stub exists but original file is partially created
         stub_path = self._get_stub_path(path)
-        if stub_path.exists() and path.exists():
-            # Both exist, likely downloading
-            return True
-
-        return False
+        # Both exist means likely downloading
+        return stub_path.exists() and path.exists()
 
     def _get_download_progress(self, path: Path) -> float:
         """Get current download progress percentage.

@@ -32,7 +32,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import threading
 import uuid
 from datetime import datetime
@@ -156,9 +155,7 @@ class SessionStateManager:
                 with open(state_file, "w", encoding="utf-8") as f:
                     json.dump(data, f, indent=2)
 
-                logger.warning(
-                    f"Found interrupted session: {data.get('session_id')}"
-                )
+                logger.warning(f"Found interrupted session: {data.get('session_id')}")
         except (json.JSONDecodeError, KeyError) as e:
             logger.warning(f"Could not check interrupted sessions: {e}")
 
@@ -229,9 +226,7 @@ class SessionStateManager:
             self._dirty = True
             self.save()
 
-            logger.info(
-                f"Created session {session_id} with {len(pending_videos)} videos"
-            )
+            logger.info(f"Created session {session_id} with {len(pending_videos)} videos")
             return self._current_session
 
     def _create_output_path(
@@ -278,11 +273,7 @@ class SessionStateManager:
                 return
 
             now = datetime.now()
-            if (
-                not force
-                and self._last_save_time is not None
-                and self._auto_save_interval > 0
-            ):
+            if not force and self._last_save_time is not None and self._auto_save_interval > 0:
                 elapsed = (now - self._last_save_time).total_seconds()
                 if elapsed < self._auto_save_interval:
                     return
@@ -377,14 +368,16 @@ class SessionStateManager:
                         + len(data.get("failed_videos", []))
                     )
                     completed = len(data.get("completed_videos", []))
-                    sessions.append({
-                        "session_id": data.get("session_id"),
-                        "status": status.value,
-                        "started_at": data.get("started_at"),
-                        "total_videos": total,
-                        "completed_videos": completed,
-                        "progress": completed / total if total > 0 else 0.0,
-                    })
+                    sessions.append(
+                        {
+                            "session_id": data.get("session_id"),
+                            "status": status.value,
+                            "started_at": data.get("started_at"),
+                            "total_videos": total,
+                            "completed_videos": completed,
+                            "progress": completed / total if total > 0 else 0.0,
+                        }
+                    )
             except (json.JSONDecodeError, ValueError):
                 pass
 
@@ -403,14 +396,16 @@ class SessionStateManager:
                             + len(data.get("failed_videos", []))
                         )
                         completed = len(data.get("completed_videos", []))
-                        sessions.append({
-                            "session_id": data.get("session_id"),
-                            "status": status.value,
-                            "started_at": data.get("started_at"),
-                            "total_videos": total,
-                            "completed_videos": completed,
-                            "progress": completed / total if total > 0 else 0.0,
-                        })
+                        sessions.append(
+                            {
+                                "session_id": data.get("session_id"),
+                                "status": status.value,
+                                "started_at": data.get("started_at"),
+                                "total_videos": total,
+                                "completed_videos": completed,
+                                "progress": completed / total if total > 0 else 0.0,
+                            }
+                        )
                 except (json.JSONDecodeError, ValueError):
                     continue
 
@@ -433,9 +428,7 @@ class SessionStateManager:
             if self._current_session is None:
                 return
 
-            self._current_session.mark_video_completed(
-                video, original_size, converted_size
-            )
+            self._current_session.mark_video_completed(video, original_size, converted_size)
             self._current_session.current_index += 1
             self._dirty = True
             self.save()

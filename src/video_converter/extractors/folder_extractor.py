@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import fnmatch
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -206,10 +206,7 @@ class FolderVideoInfo:
     def __str__(self) -> str:
         """Return human-readable summary."""
         codec_str = self.codec.upper() if self.codec else "unknown"
-        return (
-            f"{self.filename}: {codec_str} {self.resolution_label} "
-            f"({self.size_mb:.1f} MB)"
-        )
+        return f"{self.filename}: {codec_str} {self.resolution_label} ({self.size_mb:.1f} MB)"
 
 
 @dataclass
@@ -401,10 +398,7 @@ class FolderExtractor:
             True if the path is an iCloud stub file.
         """
         name = path.name
-        return (
-            name.startswith(self.ICLOUD_STUB_PREFIX)
-            and name.endswith(self.ICLOUD_STUB_SUFFIX)
-        )
+        return name.startswith(self.ICLOUD_STUB_PREFIX) and name.endswith(self.ICLOUD_STUB_SUFFIX)
 
     def _is_video_stub(self, path: Path) -> bool:
         """Check if a path is an iCloud stub file for a video.
@@ -435,7 +429,7 @@ class FolderExtractor:
         """
         name = stub_path.name
         # Remove leading '.' and trailing '.icloud'
-        original_name = name[len(self.ICLOUD_STUB_PREFIX):-len(self.ICLOUD_STUB_SUFFIX)]
+        original_name = name[len(self.ICLOUD_STUB_PREFIX) : -len(self.ICLOUD_STUB_SUFFIX)]
         return stub_path.parent / original_name
 
     def _get_stub_path(self, original_path: Path) -> Path:
@@ -447,7 +441,10 @@ class FolderExtractor:
         Returns:
             Path to the corresponding iCloud stub file.
         """
-        return original_path.parent / f"{self.ICLOUD_STUB_PREFIX}{original_path.name}{self.ICLOUD_STUB_SUFFIX}"
+        return (
+            original_path.parent
+            / f"{self.ICLOUD_STUB_PREFIX}{original_path.name}{self.ICLOUD_STUB_SUFFIX}"
+        )
 
     def _is_video_file(self, path: Path) -> bool:
         """Check if a path is a video file.
@@ -556,10 +553,7 @@ class FolderExtractor:
             count += 1
             yield path
 
-        logger.info(
-            f"Scan complete: found {count} video files "
-            f"({icloud_count} in iCloud)"
-        )
+        logger.info(f"Scan complete: found {count} video files ({icloud_count} in iCloud)")
 
     def get_video_info(self, path: Path) -> FolderVideoInfo:
         """Get video information for a single file.
@@ -830,7 +824,4 @@ class FolderExtractor:
 
     def __repr__(self) -> str:
         """Return string representation."""
-        return (
-            f"FolderExtractor(root_path={self._root_path!r}, "
-            f"recursive={self._recursive})"
-        )
+        return f"FolderExtractor(root_path={self._root_path!r}, recursive={self._recursive})"

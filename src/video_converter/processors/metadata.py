@@ -32,9 +32,8 @@ from pathlib import Path
 from typing import Any
 
 from video_converter.utils.command_runner import (
-    CommandRunner,
     CommandExecutionError,
-    CommandNotFoundError,
+    CommandRunner,
 )
 
 
@@ -303,12 +302,14 @@ class MetadataProcessor:
         if overwrite_original:
             args.append("-overwrite_original")
 
-        args.extend([
-            "-tagsFromFile",
-            str(source),
-            "-all:all",
-            str(dest),
-        ])
+        args.extend(
+            [
+                "-tagsFromFile",
+                str(source),
+                "-all:all",
+                str(dest),
+            ]
+        )
 
         try:
             result = self._runner.run(args, timeout=60.0)
@@ -523,9 +524,7 @@ class MetadataProcessor:
 
         for source, dest in source_dest_pairs:
             try:
-                success = self.copy_all(
-                    source, dest, overwrite_original=overwrite_original
-                )
+                success = self.copy_all(source, dest, overwrite_original=overwrite_original)
                 results[dest] = success
             except (FileNotFoundError, MetadataApplicationError):
                 results[dest] = False

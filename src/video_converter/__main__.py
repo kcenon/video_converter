@@ -19,11 +19,11 @@ from rich.table import Table
 
 from video_converter import __version__
 from video_converter.automation import ServiceManager, ServiceState
-from video_converter.core.config import Config, DEFAULT_CONFIG_FILE
-from video_converter.core.logger import configure_logging, set_log_level
+from video_converter.converters.factory import ConverterFactory
+from video_converter.core.config import DEFAULT_CONFIG_FILE, Config
+from video_converter.core.logger import configure_logging
 from video_converter.core.orchestrator import Orchestrator, OrchestratorConfig
 from video_converter.core.types import ConversionMode, ConversionProgress
-from video_converter.converters.factory import ConverterFactory
 from video_converter.processors.codec_detector import CodecDetector
 from video_converter.ui.progress import ProgressDisplayManager
 
@@ -57,9 +57,7 @@ def parse_time(time_str: str) -> tuple[int, int]:
     """
     match = re.match(r"^(\d{1,2}):(\d{2})$", time_str)
     if not match:
-        raise click.BadParameter(
-            f"Invalid time format: {time_str}. Use HH:MM format (e.g., 03:00)"
-        )
+        raise click.BadParameter(f"Invalid time format: {time_str}. Use HH:MM format (e.g., 03:00)")
 
     hour = int(match.group(1))
     minute = int(match.group(2))
@@ -82,13 +80,15 @@ def parse_time(time_str: str) -> tuple[int, int]:
     help="Path to custom configuration file.",
 )
 @click.option(
-    "--verbose", "-v",
+    "--verbose",
+    "-v",
     is_flag=True,
     default=False,
     help="Enable verbose output (DEBUG level logging).",
 )
 @click.option(
-    "--quiet", "-q",
+    "--quiet",
+    "-q",
     is_flag=True,
     default=False,
     help="Minimal output (only errors and results).",
@@ -128,7 +128,7 @@ def _create_progress_callback(quiet: bool) -> Any:
     if quiet:
         return None
 
-    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+    from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 
     progress = Progress(
         SpinnerColumn(),
@@ -231,7 +231,9 @@ def _display_conversion_summary(
     console.print("├──────────────────────────────────────────────┤")
     console.print(f"│  Original:   {_format_size(original_size):<31} │")
     console.print(f"│  Converted:  {_format_size(converted_size):<31} │")
-    console.print(f"│  [green]Saved:      {_format_size(saved_bytes)} ({saved_pct:.1f}%)[/green]{' ' * (20 - len(f'{saved_pct:.1f}'))}│")
+    console.print(
+        f"│  [green]Saved:      {_format_size(saved_bytes)} ({saved_pct:.1f}%)[/green]{' ' * (20 - len(f'{saved_pct:.1f}'))}│"
+    )
     console.print("├──────────────────────────────────────────────┤")
     console.print(f"│  Duration:   {_format_duration(duration_seconds):<31} │")
     console.print(f"│  Speed:      {speed_ratio:.1f}x realtime{' ' * 20}│")
@@ -239,7 +241,9 @@ def _display_conversion_summary(
     # Display VMAF score if available
     if vmaf_score is not None:
         console.print("├──────────────────────────────────────────────┤")
-        quality_label = vmaf_quality_level.replace("_", " ").title() if vmaf_quality_level else "Unknown"
+        quality_label = (
+            vmaf_quality_level.replace("_", " ").title() if vmaf_quality_level else "Unknown"
+        )
         if vmaf_score >= 93:
             vmaf_color = "green"
         elif vmaf_score >= 80:
@@ -297,7 +301,8 @@ def _display_conversion_error(
     help="Encoder preset: fast, medium, slow. Uses config default if not specified.",
 )
 @click.option(
-    "--force", "-f",
+    "--force",
+    "-f",
     is_flag=True,
     help="Overwrite output file if exists.",
 )
@@ -444,6 +449,7 @@ def convert(
 
     # Create conversion request
     from video_converter.core.types import ConversionRequest
+
     request = ConversionRequest(
         input_path=input_file,
         output_path=output_file,
@@ -474,9 +480,7 @@ def convert(
                 progress_display.update_from_info(info)
 
             try:
-                result = asyncio.run(
-                    converter.convert(request, on_progress_info=on_progress_info)
-                )
+                result = asyncio.run(converter.convert(request, on_progress_info=on_progress_info))
             finally:
                 progress_display.finish()
 
@@ -536,7 +540,8 @@ def convert(
     help="Output directory for converted files.",
 )
 @click.option(
-    "--recursive", "-r",
+    "--recursive",
+    "-r",
     is_flag=True,
     help="Recursively scan subdirectories.",
 )
@@ -684,7 +689,6 @@ def run(
         video-converter run --source photos --reimport --archive-album "Old H.264 Videos"
     """
     cli_ctx: CLIContext = ctx.obj
-    config = cli_ctx.config
 
     # Handle check-permissions mode for Photos
     if check_permissions:
@@ -739,24 +743,17 @@ def run(
     elif source == "photos":
         # Validate reimport options
         if delete_originals and keep_originals:
-            console.print(
-                "[red]✗ Cannot use both --delete-originals and --keep-originals[/red]"
-            )
+            console.print("[red]✗ Cannot use both --delete-originals and --keep-originals[/red]")
             sys.exit(1)
 
         if delete_originals and not confirm_delete:
-            console.print(
-                "[red]✗ --delete-originals requires --confirm-delete flag[/red]"
-            )
-            console.print(
-                "[dim]This is a safety measure to prevent accidental deletion.[/dim]"
-            )
+            console.print("[red]✗ --delete-originals requires --confirm-delete flag[/red]")
+            console.print("[dim]This is a safety measure to prevent accidental deletion.[/dim]")
             sys.exit(1)
 
         if (delete_originals or keep_originals) and not reimport:
             console.print(
-                "[yellow]⚠ --delete-originals and --keep-originals "
-                "require --reimport flag[/yellow]"
+                "[yellow]⚠ --delete-originals and --keep-originals require --reimport flag[/yellow]"
             )
             sys.exit(1)
 
@@ -1068,8 +1065,6 @@ def _run_photos_conversion(
     )
     from video_converter.ui.panels import display_photos_permission_error
 
-    config = cli_ctx.config
-
     # Initialize handler
     try:
         with PhotosSourceHandler() as handler:
@@ -1091,9 +1086,7 @@ def _run_photos_conversion(
             # Parse album options
             albums_list = [a.strip() for a in albums.split(",")] if albums else None
             exclude_list = (
-                [a.strip() for a in exclude_albums.split(",")]
-                if exclude_albums
-                else None
+                [a.strip() for a in exclude_albums.split(",")] if exclude_albums else None
             )
 
             # Create conversion options
@@ -1115,9 +1108,7 @@ def _run_photos_conversion(
                 console.print("[yellow]No H.264 videos found to convert.[/yellow]")
                 return
 
-            console.print(
-                f"[bold]Found {len(candidates)} H.264 video(s) to convert[/bold]"
-            )
+            console.print(f"[bold]Found {len(candidates)} H.264 video(s) to convert[/bold]")
             console.print()
 
             if dry_run:
@@ -1323,6 +1314,7 @@ def _run_photos_batch_conversion(
 
                 # Create conversion request
                 from video_converter.core.types import ConversionRequest
+
                 request = ConversionRequest(
                     input_path=exported_path,
                     output_path=output_path,
@@ -1350,9 +1342,7 @@ def _run_photos_batch_conversion(
                             eta=eta_str,
                         )
 
-                result = asyncio.run(
-                    converter.convert(request, on_progress_info=on_progress_info)
-                )
+                result = asyncio.run(converter.convert(request, on_progress_info=on_progress_info))
 
                 if result.success:
                     total_converted += result.converted_size
@@ -1384,24 +1374,18 @@ def _run_photos_batch_conversion(
                                 )
                             else:
                                 reimport_success = False
-                                errors.append(
-                                    f"{video.filename}: Re-import verification failed"
-                                )
+                                errors.append(f"{video.filename}: Re-import verification failed")
 
                         except PhotosImportError as e:
                             reimport_success = False
                             errors.append(f"{video.filename}: Re-import failed - {e}")
                         except OriginalHandlingError as e:
                             # Import succeeded but original handling failed
-                            errors.append(
-                                f"{video.filename}: Original handling failed - {e}"
-                            )
+                            errors.append(f"{video.filename}: Original handling failed - {e}")
 
                     if reimport_success:
                         successful += 1
-                        photos_progress.complete_video(
-                            success=True, saved_bytes=result.size_saved
-                        )
+                        photos_progress.complete_video(success=True, saved_bytes=result.size_saved)
                     else:
                         failed += 1
                         photos_progress.complete_video(success=False)
@@ -1482,7 +1466,9 @@ def _run_resume_session(cli_ctx: CLIContext) -> None:
     report = asyncio.run(orchestrator.resume_session())
 
     if report:
-        console.print(f"[green]✓ Session resumed: {report.successful} successful, {report.failed} failed[/green]")
+        console.print(
+            f"[green]✓ Session resumed: {report.successful} successful, {report.failed} failed[/green]"
+        )
     else:
         console.print("[yellow]Could not resume session.[/yellow]")
 
@@ -1505,7 +1491,6 @@ def status() -> None:
         video-converter status
     """
     from video_converter.automation.service_manager import (
-        DetailedServiceStatus,
         format_bytes,
     )
 
@@ -1606,7 +1591,7 @@ def stats(ctx: click.Context, period: str, output_json: bool, detailed: bool) ->
         # Show detailed statistics with recent conversions
         video-converter stats --detailed
     """
-    from video_converter.core.history import get_history, StatsPeriod
+    from video_converter.core.history import StatsPeriod, get_history
     from video_converter.reporters.statistics_reporter import StatisticsReporter
 
     # Map period string to StatsPeriod enum
@@ -1637,7 +1622,9 @@ def stats(ctx: click.Context, period: str, output_json: bool, detailed: bool) ->
     console.print()
 
     if history_stats.total_converted == 0:
-        console.print("[dim]No conversions recorded yet. Run 'video-converter run' to start converting.[/dim]")
+        console.print(
+            "[dim]No conversions recorded yet. Run 'video-converter run' to start converting.[/dim]"
+        )
 
 
 @main.command("stats-export")
@@ -1655,7 +1642,8 @@ def stats(ctx: click.Context, period: str, output_json: bool, detailed: bool) ->
     help="Time period for statistics (default: all).",
 )
 @click.option(
-    "--output", "-o",
+    "--output",
+    "-o",
     type=click.Path(path_type=Path),
     default=None,
     help="Output file path. Defaults to statistics.<format> in current directory.",
@@ -1692,7 +1680,7 @@ def stats_export(
         # Export to specific file
         video-converter stats-export -o ~/reports/stats.json
     """
-    from video_converter.core.history import get_history, StatsPeriod
+    from video_converter.core.history import StatsPeriod, get_history
     from video_converter.reporters.statistics_reporter import StatisticsReporter
 
     # Map period string to StatsPeriod enum
@@ -1786,7 +1774,9 @@ def config(ctx: click.Context) -> None:
     console.print(f"  Location:  {DEFAULT_CONFIG_FILE}")
     console.print()
 
-    console.print("[dim]Edit the config file directly or use 'video-converter setup' to reconfigure.[/dim]")
+    console.print(
+        "[dim]Edit the config file directly or use 'video-converter setup' to reconfigure.[/dim]"
+    )
 
 
 @main.command("config-set")
@@ -1907,7 +1897,9 @@ def setup(ctx: click.Context) -> None:
 
     if not hw_available and not sw_available:
         console.print()
-        console.print("[red]✗ No encoders available. Please install FFmpeg with HEVC support.[/red]")
+        console.print(
+            "[red]✗ No encoders available. Please install FFmpeg with HEVC support.[/red]"
+        )
         sys.exit(1)
 
     console.print()
@@ -1974,7 +1966,9 @@ def setup(ctx: click.Context) -> None:
     console.print(f"  Mode:        {mode}")
     console.print(f"  Quality:     {quality}")
     console.print(f"  Output:      {output_dir}")
-    console.print(f"  Automation:  {'Enabled at ' + schedule_time if enable_automation else 'Disabled'}")
+    console.print(
+        f"  Automation:  {'Enabled at ' + schedule_time if enable_automation else 'Disabled'}"
+    )
     console.print()
 
     if enable_automation:
@@ -2099,7 +2093,8 @@ def install_service(
     help="Also remove log files.",
 )
 @click.option(
-    "--yes", "-y",
+    "--yes",
+    "-y",
     is_flag=True,
     help="Skip confirmation prompt.",
 )
@@ -2279,13 +2274,15 @@ def service_restart() -> None:
 
 @main.command("service-logs")
 @click.option(
-    "--lines", "-n",
+    "--lines",
+    "-n",
     type=int,
     default=50,
     help="Number of lines to display (default: 50).",
 )
 @click.option(
-    "--follow", "-f",
+    "--follow",
+    "-f",
     is_flag=True,
     help="Follow log output (like tail -f).",
 )

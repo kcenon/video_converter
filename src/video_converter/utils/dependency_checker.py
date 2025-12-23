@@ -209,9 +209,7 @@ class DependencyChecker:
             logger.debug("Detected macOS version: %s", version)
 
             # Get macOS name
-            name_result = self._runner.run(
-                ["sw_vers", "-productName"], timeout=5.0
-            )
+            name_result = self._runner.run(["sw_vers", "-productName"], timeout=5.0)
             product_name = name_result.stdout.strip() if name_result.success else "macOS"
 
             if compare_versions(version, self.MIN_MACOS_VERSION) >= 0:

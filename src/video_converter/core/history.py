@@ -37,7 +37,7 @@ import hashlib
 import json
 import logging
 import threading
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
@@ -51,6 +51,7 @@ class StatsPeriod(Enum):
     WEEK = "week"
     MONTH = "month"
     ALL = "all"
+
 
 if TYPE_CHECKING:
     pass
@@ -524,9 +525,7 @@ class ConversionHistory:
                 if record.output_size is not None:
                     stats.total_output_bytes += record.output_size
 
-            stats.total_saved_bytes = (
-                stats.total_source_bytes - stats.total_output_bytes
-            )
+            stats.total_saved_bytes = stats.total_source_bytes - stats.total_output_bytes
 
             # Find first and last conversion times within period
             timestamps = [r.converted_at for r in successful if r.converted_at]
@@ -599,30 +598,29 @@ class ConversionHistory:
         """
         import csv
 
-        with self._lock:
-            with open(path, "w", newline="", encoding="utf-8") as f:
-                fieldnames = [
-                    "id",
-                    "source_path",
-                    "output_path",
-                    "source_codec",
-                    "output_codec",
-                    "source_size",
-                    "output_size",
-                    "converted_at",
-                    "success",
-                    "error_message",
-                    "size_saved",
-                    "compression_ratio",
-                ]
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                writer.writeheader()
+        with self._lock, open(path, "w", newline="", encoding="utf-8") as f:
+            fieldnames = [
+                "id",
+                "source_path",
+                "output_path",
+                "source_codec",
+                "output_codec",
+                "source_size",
+                "output_size",
+                "converted_at",
+                "success",
+                "error_message",
+                "size_saved",
+                "compression_ratio",
+            ]
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
 
-                for record in self._records.values():
-                    row = record.to_dict()
-                    row["size_saved"] = record.size_saved
-                    row["compression_ratio"] = f"{record.compression_ratio:.2%}"
-                    writer.writerow(row)
+            for record in self._records.values():
+                row = record.to_dict()
+                row["size_saved"] = record.size_saved
+                row["compression_ratio"] = f"{record.compression_ratio:.2%}"
+                writer.writerow(row)
 
         logger.info(f"Exported history to {path}")
 

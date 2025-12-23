@@ -841,7 +841,9 @@ class PropertyComparer:
             converted_value=f"{conv_res[0]}x{conv_res[1]}",
             matches=matches,
             severity=ComparisonSeverity.ERROR,
-            message="" if matches else f"Resolution mismatch: {orig_res[0]}x{orig_res[1]} → {conv_res[0]}x{conv_res[1]}",
+            message=""
+            if matches
+            else f"Resolution mismatch: {orig_res[0]}x{orig_res[1]} → {conv_res[0]}x{conv_res[1]}",
         )
 
     def _compare_fps(
@@ -896,7 +898,9 @@ class PropertyComparer:
             matches=matches,
             tolerance=self.fps_tolerance,
             severity=ComparisonSeverity.WARNING,
-            message="" if matches else f"FPS mismatch: {orig_fps:.3f} → {conv_fps:.3f} (diff: {diff:.4f})",
+            message=""
+            if matches
+            else f"FPS mismatch: {orig_fps:.3f} → {conv_fps:.3f} (diff: {diff:.4f})",
         )
 
     def _compare_duration(
@@ -926,7 +930,9 @@ class PropertyComparer:
             matches=matches,
             tolerance=self.duration_tolerance,
             severity=ComparisonSeverity.WARNING,
-            message="" if matches else f"Duration mismatch: {orig_duration:.2f}s → {conv_duration:.2f}s (diff: {diff:.2f}s)",
+            message=""
+            if matches
+            else f"Duration mismatch: {orig_duration:.2f}s → {conv_duration:.2f}s (diff: {diff:.2f}s)",
         )
 
     def _compare_aspect_ratio(
@@ -984,7 +990,9 @@ class PropertyComparer:
             converted_value=conv_ratio,
             matches=matches,
             severity=ComparisonSeverity.ERROR,
-            message="" if matches else f"Aspect ratio mismatch: {orig_ratio:.4f} → {conv_ratio:.4f}",
+            message=""
+            if matches
+            else f"Aspect ratio mismatch: {orig_ratio:.4f} → {conv_ratio:.4f}",
         )
 
     def _compare_audio_codec(
@@ -1084,7 +1092,9 @@ class PropertyComparer:
             converted_value=conv_channels,
             matches=matches,
             severity=ComparisonSeverity.ERROR,
-            message="" if matches else f"Audio channels mismatch: {orig_channels} → {conv_channels}",
+            message=""
+            if matches
+            else f"Audio channels mismatch: {orig_channels} → {conv_channels}",
         )
 
 

@@ -92,9 +92,7 @@ class GPSCoordinates:
         if not -90 <= self.latitude <= 90:
             raise ValueError(f"Latitude must be between -90 and 90: {self.latitude}")
         if not -180 <= self.longitude <= 180:
-            raise ValueError(
-                f"Longitude must be between -180 and 180: {self.longitude}"
-            )
+            raise ValueError(f"Longitude must be between -180 and 180: {self.longitude}")
 
     def __str__(self) -> str:
         """Return human-readable coordinate string."""
@@ -210,10 +208,7 @@ class GPSCoordinates:
         dlat = math.radians(other.latitude - self.latitude)
         dlon = math.radians(other.longitude - self.longitude)
 
-        a = (
-            math.sin(dlat / 2) ** 2
-            + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
-        )
+        a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
         return R * c
@@ -477,9 +472,7 @@ class GPSHandler:
         Returns:
             True if GPS was copied successfully.
         """
-        return self._processor.copy_gps(
-            source, dest, overwrite_original=overwrite_original
-        )
+        return self._processor.copy_gps(source, dest, overwrite_original=overwrite_original)
 
     def verify(
         self,

@@ -646,9 +646,7 @@ class PhotosVideoFilter:
         self._library = library
         self._include_albums = set(include_albums) if include_albums else None
         self._exclude_albums = (
-            set(exclude_albums)
-            if exclude_albums is not None
-            else set(self.DEFAULT_EXCLUDE_ALBUMS)
+            set(exclude_albums) if exclude_albums is not None else set(self.DEFAULT_EXCLUDE_ALBUMS)
         )
         self._codec_detector: CodecDetector | None = None
 
@@ -661,6 +659,7 @@ class PhotosVideoFilter:
         """
         if self._codec_detector is None:
             from video_converter.processors.codec_detector import CodecDetector
+
             self._codec_detector = CodecDetector()
         return self._codec_detector
 
@@ -703,6 +702,7 @@ class PhotosVideoFilter:
                 CorruptedVideoError,
                 InvalidVideoError,
             )
+
             info = self.codec_detector.analyze(video.path)
             return info.codec
         except (InvalidVideoError, CorruptedVideoError, FileNotFoundError) as e:

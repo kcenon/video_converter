@@ -47,8 +47,8 @@ from video_converter.processors.timestamp import (
     TimestampError,
     TimestampReadError,
     TimestampSyncError,
-    TimestampSyncResult,
     TimestampSynchronizer,
+    TimestampSyncResult,
     TimestampVerificationResult,
 )
 from video_converter.processors.verification import (

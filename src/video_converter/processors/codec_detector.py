@@ -274,9 +274,7 @@ class CodecDetector:
     """
 
     # Supported container formats
-    SUPPORTED_CONTAINERS = frozenset({
-        "mp4", "mov", "m4v", "mkv", "avi", "webm", "mts", "m2ts"
-    })
+    SUPPORTED_CONTAINERS = frozenset({"mp4", "mov", "m4v", "mkv", "avi", "webm", "mts", "m2ts"})
 
     def __init__(
         self,

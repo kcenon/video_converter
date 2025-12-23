@@ -23,16 +23,15 @@ Example:
 from __future__ import annotations
 
 import atexit
-import os
 import shutil
 import tempfile
 import uuid
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Generator
+    from collections.abc import Generator
 
 from video_converter.core.logger import get_logger
 

@@ -74,9 +74,7 @@ class CommandTimeoutError(Exception):
     def __init__(self, command: str, timeout: float) -> None:
         self.command = command
         self.timeout = timeout
-        super().__init__(
-            f"Command '{command}' timed out after {timeout:.1f} seconds."
-        )
+        super().__init__(f"Command '{command}' timed out after {timeout:.1f} seconds.")
 
 
 class CommandExecutionError(Exception):
@@ -168,9 +166,7 @@ class CommandRunner:
             )
 
             if check and not cmd_result.success:
-                raise CommandExecutionError(
-                    command_name, cmd_result.returncode, cmd_result.stderr
-                )
+                raise CommandExecutionError(command_name, cmd_result.returncode, cmd_result.stderr)
 
             return cmd_result
 
@@ -221,9 +217,7 @@ class CommandRunner:
             )
 
             if check and not cmd_result.success:
-                raise CommandExecutionError(
-                    command_name, cmd_result.returncode, cmd_result.stderr
-                )
+                raise CommandExecutionError(command_name, cmd_result.returncode, cmd_result.stderr)
 
             return cmd_result
 
@@ -346,9 +340,7 @@ class CommandRunner:
             )
 
             if check and not cmd_result.success:
-                raise CommandExecutionError(
-                    command_name, cmd_result.returncode, cmd_result.stderr
-                )
+                raise CommandExecutionError(command_name, cmd_result.returncode, cmd_result.stderr)
 
             return cmd_result
 
@@ -398,8 +390,10 @@ class FFprobeRunner:
         """
         args = [
             self.FFPROBE_CMD,
-            "-v", "error",
-            "-print_format", "json",
+            "-v",
+            "error",
+            "-print_format",
+            "json",
         ]
 
         if show_format:
@@ -498,7 +492,8 @@ class FFprobeRunner:
 
         args = [
             self.FFPROBE_CMD,
-            "-v", "error",
+            "-v",
+            "error",
             str(path),
         ]
 

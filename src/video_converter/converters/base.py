@@ -39,7 +39,6 @@ from video_converter.core.types import (
     ConversionResult,
 )
 from video_converter.utils.command_runner import (
-    CommandExecutionError,
     CommandNotFoundError,
     CommandRunner,
     FFprobeRunner,

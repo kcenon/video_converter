@@ -476,9 +476,7 @@ class MetadataPreserver:
             except Exception as e:
                 logger.warning(f"Failed to set keywords: {e}")
 
-        logger.info(
-            f"Photos metadata application {'succeeded' if success else 'partially failed'}"
-        )
+        logger.info(f"Photos metadata application {'succeeded' if success else 'partially failed'}")
         return success
 
     def verify_metadata(

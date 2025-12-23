@@ -17,11 +17,10 @@ Example:
 
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
 from typing import TextIO
 
-from video_converter.core.types import ConversionReport, ConversionResult
+from video_converter.core.types import ConversionReport
 
 
 def _format_size(size_bytes: int) -> str:

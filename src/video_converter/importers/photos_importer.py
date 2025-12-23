@@ -81,8 +81,7 @@ class PhotosNotRunningError(PhotosImportError):
             video_path: Path to the video that was being imported.
         """
         super().__init__(
-            "Photos.app could not be activated. "
-            "Ensure Photos is installed and accessible.",
+            "Photos.app could not be activated. Ensure Photos is installed and accessible.",
             video_path=video_path,
         )
 
@@ -448,9 +447,7 @@ end tell
             >>> # Delete the original video
             >>> importer.handle_original(uuid, OriginalHandling.DELETE)
         """
-        logger.info(
-            f"Handling original video {original_uuid}: {handling.value}"
-        )
+        logger.info(f"Handling original video {original_uuid}: {handling.value}")
 
         if handling == OriginalHandling.KEEP:
             logger.debug("Keeping original video - no action required")
