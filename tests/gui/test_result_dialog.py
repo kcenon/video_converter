@@ -52,12 +52,19 @@ def create_mock_result(
     Returns:
         Mock ConversionResult object.
     """
+    # Create mock paths with proper name property
+    mock_input_path = MagicMock()
+    mock_input_path.name = input_name
+    mock_input_path.__str__ = lambda self: f"/path/to/{input_name}"
+
+    mock_output_path = MagicMock()
+    mock_output_path.name = output_name
+    mock_output_path.__str__ = lambda self: f"/path/to/{output_name}"
+    mock_output_path.exists.return_value = True
+
     mock_request = MagicMock()
-    mock_request.input_path = Path(f"/path/to/{input_name}")
-    mock_request.input_path.name = input_name
-    mock_request.output_path = Path(f"/path/to/{output_name}")
-    mock_request.output_path.name = output_name
-    mock_request.output_path.exists.return_value = True
+    mock_request.input_path = mock_input_path
+    mock_request.output_path = mock_output_path
 
     mock_result = MagicMock()
     mock_result.success = success

@@ -287,8 +287,9 @@ class TestVideoGrid:
         grid = VideoGrid()
         qtbot.addWidget(grid)
 
-        # Empty label should be visible
-        assert grid._empty_label.isVisible() is True
+        # Empty label should exist and not be hidden
+        assert grid._empty_label is not None
+        assert grid._empty_label.isHidden() is False
         assert "No videos" in grid._empty_label.text()
 
     def test_add_single_video(self, qtbot: QtBot) -> None:
@@ -361,7 +362,7 @@ class TestVideoGrid:
         grid.clear()
 
         assert len(grid._thumbnails) == 0
-        assert grid._empty_label.isVisible() is True
+        assert grid._empty_label.isHidden() is False
 
     def test_selection_on_click(self, qtbot: QtBot) -> None:
         """Test that clicking a thumbnail selects it."""
