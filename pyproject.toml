@@ -155,6 +155,7 @@ source = ["src/video_converter"]
 branch = true
 omit = [
     "src/video_converter/utils/applescript.py",
+    "src/video_converter/gui/*",
 ]
 
 [tool.coverage.report]
