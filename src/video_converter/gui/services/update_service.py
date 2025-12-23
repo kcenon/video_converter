@@ -273,7 +273,9 @@ class UpdateService(QObject):
             return None
 
         if destination is None:
-            destination = Path.home() / "Downloads" / f"VideoConverter-{self._last_release.version}.dmg"
+            destination = (
+                Path.home() / "Downloads" / f"VideoConverter-{self._last_release.version}.dmg"
+            )
 
         try:
             request = urllib.request.Request(

@@ -370,13 +370,11 @@ class PhotosView(QWidget):
 
             # Add icon for special albums
             if album.album_id == "__all__":
-                item.setIcon(0, self.style().standardIcon(
-                    self.style().StandardPixmap.SP_DirHomeIcon
-                ))
+                item.setIcon(
+                    0, self.style().standardIcon(self.style().StandardPixmap.SP_DirHomeIcon)
+                )
             else:
-                item.setIcon(0, self.style().standardIcon(
-                    self.style().StandardPixmap.SP_DirIcon
-                ))
+                item.setIcon(0, self.style().standardIcon(self.style().StandardPixmap.SP_DirIcon))
 
             self.album_tree.addTopLevelItem(item)
 

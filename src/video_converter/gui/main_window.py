@@ -333,18 +333,12 @@ class MainWindow(QMainWindow):
         """Connect conversion service signals to views."""
         # Connect ConvertView signals
         self.convert_view.conversion_started.connect(self._on_conversion_started)
-        self.convert_view.conversion_cancelled.connect(
-            self._conversion_service.cancel_all
-        )
+        self.convert_view.conversion_cancelled.connect(self._conversion_service.cancel_all)
 
         # Connect QueueView signals
         self.queue_view.pause_all_requested.connect(self._conversion_service.pause_all)
-        self.queue_view.resume_all_requested.connect(
-            self._conversion_service.resume_all
-        )
-        self.queue_view.cancel_all_requested.connect(
-            self._conversion_service.cancel_all
-        )
+        self.queue_view.resume_all_requested.connect(self._conversion_service.resume_all)
+        self.queue_view.cancel_all_requested.connect(self._conversion_service.cancel_all)
 
         # Connect service signals to QueueView
         self._conversion_service.task_added.connect(self._on_task_added)
@@ -362,9 +356,7 @@ class MainWindow(QMainWindow):
             settings: Conversion settings dictionary.
         """
         # Apply saved settings to conversion settings
-        enhanced_settings = self._settings_manager.apply_to_conversion_settings(
-            settings.copy()
-        )
+        enhanced_settings = self._settings_manager.apply_to_conversion_settings(settings.copy())
 
         # Add task to queue
         self._conversion_service.add_task(file_path, settings=enhanced_settings)
@@ -459,9 +451,7 @@ class MainWindow(QMainWindow):
             failed: Number of failed conversions.
         """
         total = successful + failed
-        self.statusBar().showMessage(
-            f"Completed: {successful}/{total} succeeded, {failed} failed"
-        )
+        self.statusBar().showMessage(f"Completed: {successful}/{total} succeeded, {failed} failed")
 
     def _connect_photos_service(self) -> None:
         """Connect photos service to photos view."""

@@ -285,9 +285,7 @@ class DropZone(QWidget):
 
         return valid_files
 
-    def _extract_videos_from_folder(
-        self, folder: Path, recursive: bool = False
-    ) -> list[str]:
+    def _extract_videos_from_folder(self, folder: Path, recursive: bool = False) -> list[str]:
         """Extract video files from a folder.
 
         Args:
@@ -307,9 +305,7 @@ class DropZone(QWidget):
             pass
         return sorted(videos)
 
-    def _set_drag_over(
-        self, is_over: bool, *, valid: bool = True, file_count: int = 0
-    ) -> None:
+    def _set_drag_over(self, is_over: bool, *, valid: bool = True, file_count: int = 0) -> None:
         """Set drag over state with visual feedback.
 
         Updates the drop zone appearance to indicate:
