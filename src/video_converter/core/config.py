@@ -68,12 +68,16 @@ class EncodingConfig(BaseModel):
         quality: Quality setting (1-100, higher is better).
         crf: Constant Rate Factor for encoding (18-28, lower is better quality).
         preset: Encoding preset affecting speed vs compression trade-off.
+        bit_depth: Output bit depth (8 or 10). 10-bit for HDR content.
+        hdr: Enable HDR encoding parameters for 10-bit content.
     """
 
     mode: Literal["hardware", "software"] = "hardware"
     quality: int = Field(default=45, ge=1, le=100)
     crf: int = Field(default=22, ge=18, le=28)
     preset: Literal["fast", "medium", "slow"] = "medium"
+    bit_depth: Literal[8, 10] = 8
+    hdr: bool = False
 
 
 class PathsConfig(BaseModel):
@@ -164,6 +168,28 @@ class FolderConfig(BaseModel):
     )
 
 
+class VmafConfig(BaseModel):
+    """VMAF quality analysis settings.
+
+    VMAF (Video Multimethod Assessment Fusion) is a perceptual video quality
+    assessment algorithm that predicts subjective quality scores.
+
+    Attributes:
+        enabled: Whether to measure VMAF quality score after conversion.
+        threshold: Minimum acceptable VMAF score (0-100). 93.0 is visually lossless.
+        sample_interval: Frame sampling interval for VMAF analysis (1=all, 30=faster).
+        fail_action: Action when VMAF is below threshold.
+            - "warn": Log warning but keep file.
+            - "retry": Retry with adjusted settings.
+            - "fail": Delete file and mark as failed.
+    """
+
+    enabled: bool = False
+    threshold: float = Field(default=93.0, ge=0.0, le=100.0)
+    sample_interval: int = Field(default=30, ge=1)
+    fail_action: Literal["warn", "retry", "fail"] = "warn"
+
+
 class ProcessingConfig(BaseModel):
     """Processing settings for conversion workflow.
 
@@ -171,11 +197,19 @@ class ProcessingConfig(BaseModel):
         max_concurrent: Maximum concurrent conversions.
         validate_quality: Whether to validate output quality.
         preserve_original: Whether to preserve original files.
+        move_processed: Whether to move processed originals to paths.processed.
+        move_failed: Whether to move failed files to paths.failed.
+        check_disk_space: Whether to check disk space before processing.
+        min_free_space_gb: Minimum free disk space in gigabytes.
     """
 
     max_concurrent: int = Field(default=2, ge=1, le=8)
     validate_quality: bool = True
     preserve_original: bool = True
+    move_processed: bool = False
+    move_failed: bool = False
+    check_disk_space: bool = True
+    min_free_space_gb: float = Field(default=1.0, ge=0.1)
 
 
 class NotificationConfig(BaseModel):
@@ -236,6 +270,7 @@ class Config(BaseSettings):
     photos: PhotosConfig = Field(default_factory=PhotosConfig)
     folder: FolderConfig = Field(default_factory=FolderConfig)
     processing: ProcessingConfig = Field(default_factory=ProcessingConfig)
+    vmaf: VmafConfig = Field(default_factory=VmafConfig)
     notification: NotificationConfig = Field(default_factory=NotificationConfig)
 
     @classmethod
@@ -433,6 +468,7 @@ __all__ = [
     "PhotosConfig",
     "FolderConfig",
     "ProcessingConfig",
+    "VmafConfig",
     "NotificationConfig",
     "DEFAULT_CONFIG_DIR",
     "DEFAULT_CONFIG_FILE",
