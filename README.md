@@ -635,7 +635,7 @@ Features (coming soon):
   - [x] Enhanced service management
 - [ ] v0.3.0.0 - GUI application (in development)
   - [x] Phase 1: PySide6 setup and project structure
-  - [ ] Phase 2: Main window and navigation
+  - [x] Phase 2: Main window and navigation
   - [ ] Phase 3: Conversion view and progress
   - [ ] Phase 4: Photos library browser
   - [ ] Phase 5: Queue management
