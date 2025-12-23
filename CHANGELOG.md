@@ -85,6 +85,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `test_helpers.py` - Helper function tests (parse_time, format_duration, format_size)
   - CLI-specific fixtures in `conftest.py` (mock converters, handlers, managers)
   - 141 test cases covering 17 CLI commands
+- **UpdateService Test Coverage** (#159): Comprehensive test suite for `UpdateService` in `tests/gui/test_update_service.py`:
+  - `ReleaseInfo` dataclass creation and `from_github_response()` parsing
+  - Version comparison logic (`parse_version`, `is_newer_version`)
+  - `UpdateCheckWorker` thread signal emissions
+  - `UpdateService` async update checking and error handling
+  - `check_for_updates_sync()` blocking method for CLI
+  - Browser integration tests (open download page)
+  - Mock GitHub API responses (no network calls during tests)
+  - 36 test cases covering all UpdateService functionality
 
 ## [0.2.0.0] - 2025-12-23
 
