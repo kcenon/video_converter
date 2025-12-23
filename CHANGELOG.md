@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+#### Extended Config Schema for VMAF, HDR, and Processing Settings (#173)
+- **VmafConfig model** added for VMAF quality analysis settings
+  - `enabled`: Enable/disable VMAF measurement
+  - `threshold`: Minimum acceptable VMAF score (default: 93.0 for visually lossless)
+  - `sample_interval`: Frame sampling interval (default: 30 for faster analysis)
+  - `fail_action`: Action when below threshold ("warn", "retry", "fail")
+- **EncodingConfig extended** with `bit_depth` (8/10) and `hdr` (bool) fields
+  - Supports HDR10 encoding with 10-bit depth
+- **ProcessingConfig extended** with disk space and file management options
+  - `move_processed`: Move processed originals to `paths.processed`
+  - `move_failed`: Move failed files to `paths.failed`
+  - `check_disk_space`: Enable disk space monitoring
+  - `min_free_space_gb`: Minimum free space threshold (default: 1.0 GB)
+- **CLI VMAF options now use config defaults** when not explicitly specified
+- **All OrchestratorConfig instantiations** updated to read from Config
+  - `convert`, batch, `photos convert`, and resume commands
+  - GUI ConversionService integration
+- **`paths.processed` and `paths.failed`** now connected to processing workflow
+
 #### Version Unification (#172)
 - **Unified version source** to use `pyproject.toml` as single source of truth via `importlib.metadata`
   - `__init__.py` now loads version from package metadata
