@@ -183,6 +183,9 @@ video-converter run --source photos --limit 10
 # Combine multiple filters
 video-converter run --source photos --albums "Travel" --from-date 2024-06-01 --limit 50
 
+# Enable concurrent processing (1-8 workers)
+video-converter run --source photos --max-concurrent 4
+
 # Re-import converted videos back to Photos library
 video-converter run --source photos --reimport
 
@@ -195,6 +198,12 @@ video-converter run --source photos --reimport --keep-originals
 # Re-import and delete originals (requires confirmation)
 video-converter run --source photos --reimport --delete-originals --confirm-delete
 ```
+
+#### Processing Options
+
+| Option | Description |
+|--------|-------------|
+| `--max-concurrent N` | Maximum concurrent conversions (1-8, default: from config) |
 
 #### Re-import Options
 
