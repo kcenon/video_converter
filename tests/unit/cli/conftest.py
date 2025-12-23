@@ -25,7 +25,7 @@ def cli_runner() -> CliRunner:
     Returns:
         CliRunner: Configured CLI runner with separated stderr.
     """
-    return CliRunner(mix_stderr=False)
+    return CliRunner()
 
 
 @pytest.fixture
@@ -35,7 +35,7 @@ def isolated_cli_runner() -> Generator[CliRunner, None, None]:
     Yields:
         CliRunner: CLI runner in an isolated temporary filesystem.
     """
-    runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     with runner.isolated_filesystem():
         yield runner
 
