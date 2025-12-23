@@ -403,3 +403,54 @@ class TestPhotosReimportValidation:
 
         # Should not fail due to invalid options
         assert "Invalid value for '--archive-album'" not in result.output
+
+
+class TestPhotosMaxConcurrentOption:
+    """Tests for --max-concurrent option with Photos source."""
+
+    def test_max_concurrent_option_available(self, cli_runner: CliRunner) -> None:
+        """Test that --max-concurrent option is available."""
+        result = cli_runner.invoke(main, ["run", "--help"])
+
+        assert "--max-concurrent" in result.output
+
+    def test_max_concurrent_option_accepted(self, cli_runner: CliRunner) -> None:
+        """Test that valid --max-concurrent value is accepted."""
+        result = cli_runner.invoke(
+            main,
+            ["run", "--source", "photos", "--max-concurrent", "4"],
+        )
+
+        # Should not fail due to invalid option
+        assert "Invalid value for '--max-concurrent'" not in result.output
+
+    def test_max_concurrent_invalid_below_range(self, cli_runner: CliRunner) -> None:
+        """Test that --max-concurrent below 1 is rejected."""
+        result = cli_runner.invoke(
+            main,
+            ["run", "--source", "photos", "--max-concurrent", "0"],
+        )
+
+        assert result.exit_code != 0
+        assert "--max-concurrent must be between 1 and 8" in result.output
+
+    def test_max_concurrent_invalid_above_range(self, cli_runner: CliRunner) -> None:
+        """Test that --max-concurrent above 8 is rejected."""
+        result = cli_runner.invoke(
+            main,
+            ["run", "--source", "photos", "--max-concurrent", "10"],
+        )
+
+        assert result.exit_code != 0
+        assert "--max-concurrent must be between 1 and 8" in result.output
+
+    def test_max_concurrent_with_valid_values(self, cli_runner: CliRunner) -> None:
+        """Test that all valid --max-concurrent values (1-8) are accepted."""
+        for value in [1, 2, 4, 8]:
+            result = cli_runner.invoke(
+                main,
+                ["run", "--source", "photos", "--max-concurrent", str(value)],
+            )
+
+            # Should not fail due to invalid option value
+            assert "--max-concurrent must be between" not in result.output

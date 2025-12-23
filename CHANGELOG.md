@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+#### Photos Convert Orchestrator Integration (#171)
+- **Refactored Photos batch conversion** to use `orchestrator.run()` instead of direct `converter.convert()` calls
+  - Enables concurrent processing via `--max-concurrent` option (1-8 workers)
+  - Session persistence for recovery after interruption
+  - Disk space monitoring with automatic pause when disk is full
+  - VMAF quality measurement support for Photos conversions
+  - Automatic retry logic on encoder failures
+- **3-phase workflow implementation**:
+  - Phase 1: Export all videos from Photos library (sequential)
+  - Phase 2: Convert using orchestrator.run() (concurrent)
+  - Phase 3: Re-import successful conversions (with original handling)
+- **Added `--max-concurrent` option** for Photos mode to control parallel conversion workers
+
 #### CLI Convert Command Orchestrator Integration (#170)
 - **Refactored `convert` command** to use `orchestrator.convert_single()` instead of direct `converter.convert()` call
   - Enables full Orchestrator pipeline features for single file conversions

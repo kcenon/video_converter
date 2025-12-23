@@ -613,6 +613,12 @@ def convert(
     is_flag=True,
     help="Photos mode: Confirm deletion of original videos (required with --delete-originals).",
 )
+@click.option(
+    "--max-concurrent",
+    type=int,
+    default=None,
+    help="Photos mode: Maximum number of concurrent conversions (1-8, default: from config).",
+)
 @click.pass_context
 def run(
     ctx: click.Context,
@@ -634,6 +640,7 @@ def run(
     keep_originals: bool,
     archive_album: str,
     confirm_delete: bool,
+    max_concurrent: int | None,
 ) -> None:
     """Run batch conversion on multiple videos.
 
@@ -679,6 +686,9 @@ def run(
 
         # Re-import with custom archive album
         video-converter run --source photos --reimport --archive-album "Old H.264 Videos"
+
+        # Convert with concurrent processing (4 files at once)
+        video-converter run --source photos --max-concurrent 4
     """
     cli_ctx: CLIContext = ctx.obj
 
@@ -749,6 +759,12 @@ def run(
             )
             sys.exit(1)
 
+        # Validate max_concurrent
+        if max_concurrent is not None:
+            if max_concurrent < 1 or max_concurrent > 8:
+                console.print("[red]✗ --max-concurrent must be between 1 and 8[/red]")
+                sys.exit(1)
+
         _run_photos_conversion(
             cli_ctx=cli_ctx,
             output_dir=output_dir,
@@ -763,6 +779,7 @@ def run(
             delete_originals=delete_originals,
             keep_originals=keep_originals,
             archive_album=archive_album,
+            max_concurrent=max_concurrent,
         )
 
 
@@ -1029,6 +1046,7 @@ def _run_photos_conversion(
     delete_originals: bool = False,
     keep_originals: bool = False,
     archive_album: str = "Converted Originals",
+    max_concurrent: int | None = None,
 ) -> None:
     """Run conversion on Photos library videos.
 
@@ -1046,6 +1064,7 @@ def _run_photos_conversion(
         delete_originals: Whether to delete original videos after reimport.
         keep_originals: Whether to keep original videos alongside converted.
         archive_album: Album name for archiving originals.
+        max_concurrent: Maximum number of concurrent conversions.
     """
     from video_converter.extractors.photos_extractor import (
         PhotosAccessDeniedError,
@@ -1117,6 +1136,7 @@ def _run_photos_conversion(
                 delete_originals=delete_originals,
                 keep_originals=keep_originals,
                 archive_album=archive_album,
+                max_concurrent=max_concurrent,
             )
     except PhotosLibraryNotFoundError:
         display_photos_permission_error(
@@ -1189,8 +1209,16 @@ def _run_photos_batch_conversion(
     delete_originals: bool = False,
     keep_originals: bool = False,
     archive_album: str = "Converted Originals",
+    max_concurrent: int | None = None,
 ) -> None:
-    """Run batch conversion for Photos library videos.
+    """Run batch conversion for Photos library videos using Orchestrator.
+
+    This function uses orchestrator.run() for batch processing, enabling:
+    - Concurrent processing (--max-concurrent)
+    - Session recovery (--resume)
+    - Disk space monitoring
+    - VMAF quality measurement
+    - Automatic retry on failure
 
     Args:
         cli_ctx: CLI context.
@@ -1201,8 +1229,10 @@ def _run_photos_batch_conversion(
         delete_originals: Whether to delete original videos after reimport.
         keep_originals: Whether to keep original videos alongside converted.
         archive_album: Album name for archiving originals.
+        max_concurrent: Maximum number of concurrent conversions.
     """
     import time
+    from dataclasses import dataclass
 
     from video_converter.ui.progress import PhotosLibraryInfo
 
@@ -1216,6 +1246,7 @@ def _run_photos_batch_conversion(
         )
 
     config = cli_ctx.config
+    logger = logging.getLogger(__name__)
 
     # Create output directory if specified
     if output_dir:
@@ -1230,22 +1261,30 @@ def _run_photos_batch_conversion(
     if config.encoding.mode == "software":
         conv_mode = ConversionMode.SOFTWARE
 
-    # Create orchestrator
+    # Determine max_concurrent value
+    effective_max_concurrent = max_concurrent or config.processing.max_concurrent
+
+    # Create orchestrator with full pipeline features
     orch_config = OrchestratorConfig(
         mode=conv_mode,
         quality=config.encoding.quality,
         crf=config.encoding.crf,
         preset=config.encoding.preset,
         preserve_metadata=True,
+        preserve_timestamps=True,
         validate_output=config.processing.validate_quality,
+        max_concurrent=effective_max_concurrent,
+        enable_retry=True,
+        check_disk_space=True,
+        pause_on_disk_full=True,
     )
-    orchestrator = Orchestrator(config=orch_config, enable_session_persistence=False)
+    orchestrator = Orchestrator(config=orch_config, enable_session_persistence=True)
 
     # Calculate total size
     total_size = sum(v.size for v in candidates)
     estimated_savings = int(total_size * 0.5)  # ~50% savings estimate
 
-    # Progress display - use Photos-specific progress
+    # Progress display
     progress_manager = ProgressDisplayManager(quiet=cli_ctx.quiet, console=console)
     photos_progress = progress_manager.create_photos_progress(
         total_videos=len(candidates),
@@ -1268,19 +1307,26 @@ def _run_photos_batch_conversion(
         )
     )
 
-    photos_progress.start()
+    # Data structure to track video-to-path mapping for reimport
+    @dataclass
+    class ExportedVideo:
+        """Tracks exported video for reimport."""
 
-    # Statistics
-    successful = 0
-    failed = 0
-    total_original = 0
-    total_converted = 0
-    errors: list[str] = []
+        video: Any  # PhotosVideoInfo
+        exported_path: Path
+        output_path: Path
+
+    exported_videos: list[ExportedVideo] = []
+    export_errors: list[str] = []
     start_time = time.time()
+
+    # ===== Phase 1: Export all videos from Photos =====
+    console.print()
+    console.print("[bold cyan]Phase 1/3: Exporting from Photos library...[/bold cyan]")
+    photos_progress.start()
 
     try:
         for idx, video in enumerate(candidates):
-            # Format album and date info
             album = video.albums[0] if video.albums else None
             date_str = video.date.strftime("%Y-%m-%d") if video.date else None
 
@@ -1293,138 +1339,211 @@ def _run_photos_batch_conversion(
             )
 
             try:
-                # Export video from Photos with progress callback
+                # Export video from Photos
                 def on_export_progress(progress: float) -> None:
                     photos_progress.update_export_progress(progress * 100)
 
                 exported_path = handler.export_video(video, on_progress=on_export_progress)
-                photos_progress.update_export_progress(100)  # Mark export complete
-                total_original += video.size
+                photos_progress.update_export_progress(100)
 
                 # Generate output path
                 output_path = output_dir / f"{exported_path.stem}_h265.mp4"
 
-                # Create conversion request
-                from video_converter.core.types import ConversionRequest
-
-                request = ConversionRequest(
-                    input_path=exported_path,
-                    output_path=output_path,
-                    mode=conv_mode,
-                    quality=config.encoding.quality,
-                    crf=config.encoding.crf,
-                    preset=config.encoding.preset,
-                    preserve_metadata=True,
+                exported_videos.append(
+                    ExportedVideo(
+                        video=video,
+                        exported_path=exported_path,
+                        output_path=output_path,
+                    )
                 )
 
-                # Get converter
-                converter = orchestrator.converter_factory.get_converter(conv_mode)
-
-                # Run conversion with progress callback
-                def on_progress_info(info) -> None:
-                    if hasattr(info, "percentage"):
-                        eta_str = (
-                            f"{int(info.eta)}s"
-                            if hasattr(info, "eta") and info.eta
-                            else "calculating..."
-                        )
-                        photos_progress.update_convert_progress(
-                            percentage=info.percentage,
-                            speed=info.speed if hasattr(info, "speed") else 0.0,
-                            eta=eta_str,
-                        )
-
-                result = asyncio.run(converter.convert(request, on_progress_info=on_progress_info))
-
-                if result.success:
-                    total_converted += result.converted_size
-
-                    # Handle reimport if enabled
-                    reimport_success = True
-                    if reimport:
-                        try:
-                            importer = PhotosImporter()
-
-                            # Import converted video to Photos
-                            new_uuid = importer.import_video(output_path)
-
-                            # Verify import
-                            if importer.verify_import(new_uuid):
-                                # Determine handling mode
-                                if delete_originals:
-                                    handling_mode = OriginalHandling.DELETE
-                                elif keep_originals:
-                                    handling_mode = OriginalHandling.KEEP
-                                else:
-                                    handling_mode = OriginalHandling.ARCHIVE
-
-                                # Handle original video
-                                importer.handle_original(
-                                    original_uuid=video.uuid,
-                                    handling=handling_mode,
-                                    archive_album=archive_album,
-                                )
-                            else:
-                                reimport_success = False
-                                errors.append(f"{video.filename}: Re-import verification failed")
-
-                        except PhotosImportError as e:
-                            reimport_success = False
-                            errors.append(f"{video.filename}: Re-import failed - {e}")
-                        except OriginalHandlingError as e:
-                            # Import succeeded but original handling failed
-                            errors.append(f"{video.filename}: Original handling failed - {e}")
-
-                    if reimport_success:
-                        successful += 1
-                        photos_progress.complete_video(success=True, saved_bytes=result.size_saved)
-                    else:
-                        failed += 1
-                        photos_progress.complete_video(success=False)
-                else:
-                    failed += 1
-                    errors.append(f"{video.filename}: {result.error_message}")
-                    photos_progress.complete_video(success=False)
-
-                # Cleanup exported file
-                handler.cleanup_exported(exported_path)
+                # Mark export complete (convert will be done in batch)
+                photos_progress.complete_video(success=True, saved_bytes=0)
 
             except Exception as e:
-                failed += 1
-                errors.append(f"{video.filename}: {e}")
+                export_errors.append(f"{video.filename}: Export failed - {e}")
                 photos_progress.complete_video(success=False)
-                logger = logging.getLogger(__name__)
-                logger.warning(f"Failed to convert {video.filename}: {e}")
+                logger.warning(f"Failed to export {video.filename}: {e}")
 
     except KeyboardInterrupt:
         console.print()
-        console.print("[yellow]Conversion cancelled by user.[/yellow]")
+        console.print("[yellow]Export cancelled by user.[/yellow]")
+        # Cleanup any exported files
+        for ev in exported_videos:
+            try:
+                handler.cleanup_exported(ev.exported_path)
+            except Exception:
+                pass
         photos_progress.finish()
         sys.exit(130)
-    finally:
-        photos_progress.finish()
 
-    # Calculate elapsed time
-    elapsed_time = time.time() - start_time
-    total_saved = total_original - total_converted
+    photos_progress.finish()
 
-    # Display results using Photos-specific summary
-    photos_progress.show_summary(
-        successful=successful,
-        failed=failed,
-        total_saved=max(0, total_saved),
-        elapsed_time=elapsed_time,
+    if not exported_videos:
+        console.print("[yellow]No videos were exported successfully.[/yellow]")
+        if export_errors:
+            console.print("[red]Export errors:[/red]")
+            for error in export_errors[:5]:
+                console.print(f"  • {error}")
+        sys.exit(1)
+
+    console.print(f"[green]✓ Exported {len(exported_videos)} video(s)[/green]")
+    if export_errors:
+        console.print(f"[yellow]⚠ {len(export_errors)} export(s) failed[/yellow]")
+
+    # ===== Phase 2: Convert using Orchestrator =====
+    console.print()
+    console.print(
+        f"[bold cyan]Phase 2/3: Converting videos "
+        f"(max {effective_max_concurrent} concurrent)...[/bold cyan]"
     )
 
-    if errors:
+    # Prepare input paths for orchestrator
+    input_paths = [ev.exported_path for ev in exported_videos]
+
+    # Create path mapping for result lookup
+    path_to_video_map = {ev.exported_path: ev for ev in exported_videos}
+
+    # Progress callback for orchestrator
+    def on_orchestrator_progress(progress: Any) -> None:
+        """Handle progress updates from orchestrator."""
+        if not cli_ctx.quiet:
+            stage_name = progress.stage.value if progress.stage else "processing"
+            if progress.current_file:
+                console.print(
+                    f"  [{stage_name}] {progress.current_file}: "
+                    f"{progress.stage_progress * 100:.0f}%",
+                    end="\r",
+                )
+
+    # Run batch conversion with orchestrator
+    try:
+        report = asyncio.run(
+            orchestrator.run(
+                input_paths=input_paths,
+                output_dir=output_dir,
+                on_progress=on_orchestrator_progress,
+            )
+        )
+    except KeyboardInterrupt:
+        console.print()
+        console.print("[yellow]Conversion cancelled by user.[/yellow]")
+        orchestrator.cancel()
+        # Cleanup exported files
+        for ev in exported_videos:
+            try:
+                handler.cleanup_exported(ev.exported_path)
+            except Exception:
+                pass
+        sys.exit(130)
+
+    console.print()  # Clear progress line
+    console.print(
+        f"[green]✓ Conversion complete: {report.successful} succeeded, "
+        f"{report.failed} failed[/green]"
+    )
+
+    # ===== Phase 3: Reimport successful conversions =====
+    reimport_errors: list[str] = []
+    reimport_count = 0
+
+    if reimport and report.successful > 0:
+        console.print()
+        console.print("[bold cyan]Phase 3/3: Re-importing to Photos library...[/bold cyan]")
+
+        importer = PhotosImporter()
+
+        # Determine handling mode
+        if delete_originals:
+            handling_mode = OriginalHandling.DELETE
+        elif keep_originals:
+            handling_mode = OriginalHandling.KEEP
+        else:
+            handling_mode = OriginalHandling.ARCHIVE
+
+        for result in report.results:
+            if not result.success:
+                continue
+
+            # Find original video info
+            ev = path_to_video_map.get(result.request.input_path)
+            if not ev:
+                continue
+
+            try:
+                # Import converted video to Photos
+                new_uuid = importer.import_video(result.request.output_path)
+
+                # Verify import
+                if importer.verify_import(new_uuid):
+                    # Handle original video
+                    importer.handle_original(
+                        original_uuid=ev.video.uuid,
+                        handling=handling_mode,
+                        archive_album=archive_album,
+                    )
+                    reimport_count += 1
+                else:
+                    reimport_errors.append(f"{ev.video.filename}: Re-import verification failed")
+
+            except PhotosImportError as e:
+                reimport_errors.append(f"{ev.video.filename}: Re-import failed - {e}")
+            except OriginalHandlingError as e:
+                # Import succeeded but original handling failed
+                reimport_errors.append(f"{ev.video.filename}: Original handling failed - {e}")
+                reimport_count += 1  # Still count as success since import worked
+
+        console.print(f"[green]✓ Re-imported {reimport_count} video(s)[/green]")
+        if reimport_errors:
+            console.print(f"[yellow]⚠ {len(reimport_errors)} reimport(s) had issues[/yellow]")
+
+    # Cleanup exported files
+    for ev in exported_videos:
+        try:
+            handler.cleanup_exported(ev.exported_path)
+        except Exception:
+            pass
+
+    # Calculate statistics
+    elapsed_time = time.time() - start_time
+    total_original = sum(r.original_size for r in report.results if r.success and r.original_size)
+    total_converted = sum(
+        r.converted_size for r in report.results if r.success and r.converted_size
+    )
+    total_saved = max(0, total_original - total_converted)
+
+    # Display final summary
+    console.print()
+    console.print("[bold]═══ Summary ═══[/bold]")
+    console.print(f"  Total videos:     {len(candidates)}")
+    console.print(f"  Exported:         {len(exported_videos)}")
+    console.print(f"  Converted:        {report.successful}")
+    console.print(f"  Failed:           {report.failed + len(export_errors)}")
+    if reimport:
+        console.print(f"  Re-imported:      {reimport_count}")
+    console.print(f"  Space saved:      {total_saved / (1024 * 1024):.1f} MB")
+    console.print(f"  Time elapsed:     {elapsed_time:.1f}s")
+
+    # Show errors
+    all_errors = (
+        export_errors
+        + [
+            f"{r.request.input_path.name}: {r.error_message}"
+            for r in report.results
+            if not r.success
+        ]
+        + reimport_errors
+    )
+
+    if all_errors:
         console.print()
         console.print("[red]Errors:[/red]")
-        for error in errors[:5]:  # Show first 5 errors
+        for error in all_errors[:5]:
             console.print(f"  • {error}")
-        if len(errors) > 5:
-            console.print(f"  ... and {len(errors) - 5} more errors")
+        if len(all_errors) > 5:
+            console.print(f"  ... and {len(all_errors) - 5} more errors")
 
-    if failed > 0:
+    if report.failed + len(export_errors) > 0:
         sys.exit(1)
 
 
