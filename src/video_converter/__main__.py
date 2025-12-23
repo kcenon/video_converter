@@ -1234,7 +1234,6 @@ def _run_photos_batch_conversion(
     import time
     from dataclasses import dataclass
 
-    from video_converter.core.types import ConversionProgress
     from video_converter.ui.progress import PhotosLibraryInfo
 
     # Import reimport-related modules if needed
@@ -1406,7 +1405,7 @@ def _run_photos_batch_conversion(
     path_to_video_map = {ev.exported_path: ev for ev in exported_videos}
 
     # Progress callback for orchestrator
-    def on_orchestrator_progress(progress: ConversionProgress) -> None:
+    def on_orchestrator_progress(progress: Any) -> None:
         """Handle progress updates from orchestrator."""
         if not cli_ctx.quiet:
             stage_name = progress.stage.value if progress.stage else "processing"
