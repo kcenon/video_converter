@@ -10,15 +10,25 @@ from video_converter.gui.services.conversion_service import (
     ConversionTask,
     ConversionWorker,
 )
+from video_converter.gui.services.photos_service import (
+    AlbumInfo,
+    PhotosService,
+    PhotosWorker,
+    VideoDisplayInfo,
+)
 from video_converter.gui.services.settings_manager import (
     SettingsManager,
     get_default_settings,
 )
 
 __all__: list[str] = [
+    "AlbumInfo",
     "ConversionService",
     "ConversionTask",
     "ConversionWorker",
+    "PhotosService",
+    "PhotosWorker",
     "SettingsManager",
+    "VideoDisplayInfo",
     "get_default_settings",
 ]
