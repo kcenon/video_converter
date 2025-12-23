@@ -1,5 +1,7 @@
 # Video Converter
 
+[![CI](https://github.com/kcenon/video_converter/actions/workflows/ci.yml/badge.svg)](https://github.com/kcenon/video_converter/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/kcenon/video_converter/branch/main/graph/badge.svg)](https://codecov.io/gh/kcenon/video_converter)
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
 [![macOS](https://img.shields.io/badge/macOS-12.0+-000000.svg)](https://apple.com/macos)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
