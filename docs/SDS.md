@@ -96,29 +96,51 @@ SDS-{Module}-{Number}
 
 This system adopts a **4-Layer Architecture**:
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         Presentation Layer                               │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                      │
-│  │     CLI     │  │   Notifier  │  │ Log Viewer  │                      │
-│  └─────────────┘  └─────────────┘  └─────────────┘                      │
-├─────────────────────────────────────────────────────────────────────────┤
-│                         Application Layer                                │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                      │
-│  │ Orchestrator│  │  Scheduler  │  │   Config    │                      │
-│  └─────────────┘  └─────────────┘  └─────────────┘                      │
-├─────────────────────────────────────────────────────────────────────────┤
-│                          Domain Layer                                    │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐    │
-│  │  Extractor  │  │  Converter  │  │  Metadata   │  │  Validator  │    │
-│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘    │
-├─────────────────────────────────────────────────────────────────────────┤
-│                       Infrastructure Layer                               │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐    │
-│  │ FFmpeg API  │  │ osxphotos   │  │  ExifTool   │  │   Logger    │    │
-│  │  Adapter    │  │   Adapter   │  │   Adapter   │  │             │    │
-│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘    │
-└─────────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph PresentationLayer["Presentation Layer"]
+        CLI["CLI"]
+        GUI["GUI"]
+        Notifier["Notifier"]
+        LogViewer["Log Viewer"]
+    end
+
+    subgraph ApplicationLayer["Application Layer"]
+        Orchestrator["Orchestrator"]
+        Scheduler["Scheduler"]
+        Config["Config"]
+    end
+
+    subgraph DomainLayer["Domain Layer"]
+        Extractor["Extractor"]
+        Converter["Converter"]
+        Metadata["Metadata"]
+        Validator["Validator"]
+    end
+
+    subgraph InfrastructureLayer["Infrastructure Layer"]
+        FFmpegAdapter["FFmpeg Adapter"]
+        PhotosAdapter["osxphotos Adapter"]
+        ExifAdapter["ExifTool Adapter"]
+        Logger["Logger"]
+    end
+
+    CLI --> Orchestrator
+    GUI --> Orchestrator
+    Notifier --> Orchestrator
+
+    Orchestrator --> Scheduler
+    Orchestrator --> Config
+    Orchestrator --> Extractor
+    Orchestrator --> Converter
+    Orchestrator --> Metadata
+    Orchestrator --> Validator
+
+    Extractor --> PhotosAdapter
+    Converter --> FFmpegAdapter
+    Metadata --> ExifAdapter
+    Validator --> FFmpegAdapter
+    Orchestrator --> Logger
 ```
 
 ### 2.2 Package Structure Design
