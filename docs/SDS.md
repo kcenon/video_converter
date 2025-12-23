@@ -53,7 +53,7 @@ This document defines the detailed design of the Video Converter system. It prov
 | Item | Content |
 |------|---------|
 | System Name | Video Converter |
-| Target Version | v0.1.0.0+ |
+| Target Version | v0.2.0.0+ |
 | Design Scope | Entire system (Core modules, Automation, CLI) |
 
 > **Note**: This project uses 0.x.x.x versioning to indicate active development status.

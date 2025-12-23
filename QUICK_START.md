@@ -99,6 +99,91 @@ video-converter stats
 video-converter stats --detailed
 ```
 
+## Advanced Usage
+
+### Photos Library Re-Import
+
+Convert videos from Photos and import converted versions back:
+
+```bash
+# Re-import converted videos to Photos (archive originals)
+video-converter run --source photos --reimport
+
+# Re-import and delete originals (requires confirmation)
+video-converter run --source photos --reimport --delete-originals --confirm-delete
+
+# Re-import and keep both original and converted
+video-converter run --source photos --reimport --keep-originals
+```
+
+### Concurrent Processing
+
+Speed up batch conversions with parallel processing:
+
+```bash
+# Set max concurrent conversions
+video-converter config-set processing.max_concurrent 4
+
+# Run batch conversion (uses configured concurrency)
+video-converter run --source photos
+
+# Or use environment variable
+export VIDEO_CONVERTER_PROCESSING__MAX_CONCURRENT=4
+video-converter run --input-dir ~/Videos
+```
+
+### VMAF Quality Validation
+
+Ensure converted videos meet quality thresholds:
+
+```bash
+# Enable VMAF measurement during conversion
+video-converter convert input.mp4 --vmaf
+
+# Set custom VMAF threshold (default: 93)
+video-converter convert input.mp4 --vmaf --vmaf-threshold 85
+
+# Enable VMAF globally
+video-converter config-set processing.enable_vmaf true
+```
+
+### Service Management
+
+Control the automation service:
+
+```bash
+# Check current status with next run time
+video-converter status
+
+# Manually start/stop the service
+video-converter service-start
+video-converter service-stop
+
+# View service logs
+video-converter service-logs
+
+# Follow logs in real-time
+video-converter service-logs -f
+
+# View error logs
+video-converter service-logs --stderr
+```
+
+### iCloud File Handling
+
+Handle videos stored in iCloud:
+
+```bash
+# Auto-download iCloud files during conversion (default: enabled)
+video-converter config-set folder.auto_download_icloud true
+
+# Set download timeout (seconds)
+video-converter config-set folder.icloud_timeout 3600
+
+# Skip cloud-only files on timeout
+video-converter config-set folder.skip_icloud_on_timeout true
+```
+
 ## Getting Help
 
 ```bash
