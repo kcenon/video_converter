@@ -94,6 +94,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Browser integration tests (open download page)
   - Mock GitHub API responses (no network calls during tests)
   - 36 test cases covering all UpdateService functionality
+- **PhotosView Test Coverage** (#157): Comprehensive unit tests for `PhotosView` in `tests/gui/test_views.py`:
+  - View creation and initialization tests
+  - Album tree population and selection
+  - Video grid display and filtering (H.264, iCloud, favorites)
+  - Multi-selection with selection count and total size
+  - iCloud status display with warnings
+  - Permission error handling
+  - Loading indicator visibility
+  - Signal emission tests (`videos_selected`)
+  - 29 test cases achieving 96% code coverage
 
 ## [0.2.0.0] - 2025-12-23
 
