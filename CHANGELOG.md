@@ -121,6 +121,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `test_result_dialog.py`: Success/failure dialog states, statistics display
   - Format helpers (`_format_size`, `_format_duration`), action buttons
   - 64 test cases covering widget functionality
+- **Accessibility Tests** (#161): Comprehensive accessibility tests in `tests/gui/test_accessibility.py`:
+  - Keyboard navigation through all tabs (Tab key, Ctrl+1-5 shortcuts)
+  - Accessible names for widgets (buttons, sliders, combo boxes, checkboxes)
+  - Accessible descriptions for complex widgets (quality slider, error states)
+  - Focus indicators visibility on interactive elements
+  - Color contrast compliance (WCAG 2.1 relative luminance formula)
+  - Comprehensive accessibility audit (focus traps, form labels, status bar)
+  - 33 test cases covering accessibility requirements
 
 ## [0.2.0.0] - 2025-12-23
 
