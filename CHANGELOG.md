@@ -104,6 +104,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Loading indicator visibility
   - Signal emission tests (`videos_selected`)
   - 29 test cases achieving 96% code coverage
+- **VideoGrid and ResultDialog Test Coverage** (#158): Unit tests for `VideoGrid` and `ConversionResultDialog`:
+  - `test_video_grid.py`: `VideoItem` dataclass, `VideoThumbnail` widget, `VideoGrid` container
+  - Thumbnail click/double-click signals, selection state, iCloud/favorite badges
+  - Grid operations: add, clear, multi-select, selection tracking
+  - `test_result_dialog.py`: Success/failure dialog states, statistics display
+  - Format helpers (`_format_size`, `_format_duration`), action buttons
+  - 64 test cases covering widget functionality
 
 ## [0.2.0.0] - 2025-12-23
 
