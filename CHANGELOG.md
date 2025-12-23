@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### GUI Application
+- **Settings Persistence** (#140): `SettingsManager` service for persistent settings:
+  - JSON-based settings storage in `~/Library/Application Support/VideoConverter/`
+  - Automatic load on app startup and save on shutdown
+  - Settings categories: encoding, paths, automation, notifications
+  - Integration with `MainWindow` for seamless settings management
+  - `apply_to_conversion_settings()` for applying saved settings to conversions
 - **Main Window UI** (#138): PySide6-based main window with tab navigation:
   - `MainWindow` with 5 tabs: Home, Convert, Photos, Queue, Settings
   - `HomeView` with welcome section, drag & drop zone, and statistics bar
