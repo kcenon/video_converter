@@ -318,20 +318,20 @@ def _display_conversion_error(
 )
 @click.option(
     "--vmaf/--no-vmaf",
-    default=False,
-    help="Measure VMAF quality score after conversion (default: False).",
+    default=None,
+    help="Measure VMAF quality score after conversion. Uses config default if not specified.",
 )
 @click.option(
     "--vmaf-threshold",
     type=float,
-    default=93.0,
-    help="Minimum acceptable VMAF score (default: 93.0 for visually lossless).",
+    default=None,
+    help="Minimum acceptable VMAF score. Uses config default (93.0) if not specified.",
 )
 @click.option(
     "--vmaf-sample-interval",
     type=int,
-    default=30,
-    help="Frame sampling interval for VMAF analysis (default: 30, 1=all frames).",
+    default=None,
+    help="Frame sampling interval for VMAF analysis. Uses config default (30) if not specified.",
 )
 @click.pass_context
 def convert(
@@ -344,9 +344,9 @@ def convert(
     force: bool,
     preserve_metadata: bool,
     validate: bool,
-    vmaf: bool,
-    vmaf_threshold: float,
-    vmaf_sample_interval: int,
+    vmaf: bool | None,
+    vmaf_threshold: float | None,
+    vmaf_sample_interval: int | None,
 ) -> None:
     """Convert a single video file from H.264 to H.265.
 
@@ -413,6 +413,12 @@ def convert(
     conv_quality = quality if quality is not None else config.encoding.quality
     conv_preset = preset if preset is not None else config.encoding.preset
 
+    # Resolve VMAF settings
+    enable_vmaf = vmaf if vmaf is not None else config.vmaf.enabled
+    vmaf_thresh = vmaf_threshold if vmaf_threshold is not None else config.vmaf.threshold
+    vmaf_interval = vmaf_sample_interval if vmaf_sample_interval is not None else config.vmaf.sample_interval
+    vmaf_action = config.vmaf.fail_action
+
     # Get encoder name for display
     encoder_name = "hevc_videotoolbox" if conv_mode == ConversionMode.HARDWARE else "libx265"
 
@@ -434,9 +440,10 @@ def convert(
         preset=conv_preset,
         preserve_metadata=preserve_metadata,
         validate_output=validate,
-        enable_vmaf=vmaf,
-        vmaf_threshold=vmaf_threshold,
-        vmaf_sample_interval=vmaf_sample_interval,
+        enable_vmaf=enable_vmaf,
+        vmaf_threshold=vmaf_thresh,
+        vmaf_sample_interval=vmaf_interval,
+        vmaf_fail_action=vmaf_action,
     )
     orchestrator = Orchestrator(config=orch_config, enable_session_persistence=False)
 
@@ -873,6 +880,14 @@ def _run_batch_conversion(
         preserve_metadata=True,
         validate_output=config.processing.validate_quality,
         max_concurrent=config.processing.max_concurrent,
+        move_to_processed=config.paths.processed if config.processing.move_processed else None,
+        move_to_failed=config.paths.failed if config.processing.move_failed else None,
+        check_disk_space=config.processing.check_disk_space,
+        min_free_space=int(config.processing.min_free_space_gb * 1024 * 1024 * 1024),
+        enable_vmaf=config.vmaf.enabled,
+        vmaf_threshold=config.vmaf.threshold,
+        vmaf_sample_interval=config.vmaf.sample_interval,
+        vmaf_fail_action=config.vmaf.fail_action,
     )
     orchestrator = Orchestrator(config=orch_config)
 
@@ -1275,8 +1290,15 @@ def _run_photos_batch_conversion(
         validate_output=config.processing.validate_quality,
         max_concurrent=effective_max_concurrent,
         enable_retry=True,
-        check_disk_space=True,
+        move_to_processed=config.paths.processed if config.processing.move_processed else None,
+        move_to_failed=config.paths.failed if config.processing.move_failed else None,
+        check_disk_space=config.processing.check_disk_space,
+        min_free_space=int(config.processing.min_free_space_gb * 1024 * 1024 * 1024),
         pause_on_disk_full=True,
+        enable_vmaf=config.vmaf.enabled,
+        vmaf_threshold=config.vmaf.threshold,
+        vmaf_sample_interval=config.vmaf.sample_interval,
+        vmaf_fail_action=config.vmaf.fail_action,
     )
     orchestrator = Orchestrator(config=orch_config, enable_session_persistence=True)
 
@@ -1565,6 +1587,14 @@ def _run_resume_session(cli_ctx: CLIContext) -> None:
         quality=config.encoding.quality,
         crf=config.encoding.crf,
         preset=config.encoding.preset,
+        move_to_processed=config.paths.processed if config.processing.move_processed else None,
+        move_to_failed=config.paths.failed if config.processing.move_failed else None,
+        check_disk_space=config.processing.check_disk_space,
+        min_free_space=int(config.processing.min_free_space_gb * 1024 * 1024 * 1024),
+        enable_vmaf=config.vmaf.enabled,
+        vmaf_threshold=config.vmaf.threshold,
+        vmaf_sample_interval=config.vmaf.sample_interval,
+        vmaf_fail_action=config.vmaf.fail_action,
     )
     orchestrator = Orchestrator(config=orch_config)
 
