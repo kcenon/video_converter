@@ -580,6 +580,27 @@ Photos Library ──▶ H.264 Detection ──▶ VideoToolbox ──▶ H.265 
 | [Architecture](docs/architecture/) | System architecture and diagrams |
 | [Development Plan](docs/development-plan.md) | Development phases and timeline |
 
+## GUI Application (Preview)
+
+> **Note**: The GUI is currently under development for v0.3.0.0
+
+Install and run the GUI application:
+
+```bash
+# Install with GUI dependencies
+pip install -e ".[gui]"
+
+# Run the GUI application
+video-converter-gui
+```
+
+Features (coming soon):
+- Drag & drop video files
+- Photos library browser
+- Real-time conversion progress
+- Menubar app for background monitoring
+- Dark mode support
+
 ## Technology Stack
 
 - **Python 3.10+**: Core application
@@ -587,6 +608,7 @@ Photos Library ──▶ H.264 Detection ──▶ VideoToolbox ──▶ H.265 
 - **osxphotos**: macOS Photos library access
 - **ExifTool**: Metadata extraction and preservation
 - **launchd**: macOS native automation
+- **PySide6**: GUI application (optional)
 
 ## Performance
 
@@ -611,7 +633,15 @@ Photos Library ──▶ H.264 Detection ──▶ VideoToolbox ──▶ H.265 
   - [x] Photos library re-import
   - [x] iCloud file support
   - [x] Enhanced service management
-- [ ] v0.3.0.0 - GUI application
+- [ ] v0.3.0.0 - GUI application (in development)
+  - [x] Phase 1: PySide6 setup and project structure
+  - [ ] Phase 2: Main window and navigation
+  - [ ] Phase 3: Conversion view and progress
+  - [ ] Phase 4: Photos library browser
+  - [ ] Phase 5: Queue management
+  - [ ] Phase 6: Settings view
+  - [ ] Phase 7: Menubar app
+  - [ ] Phase 8: macOS packaging
 - [ ] v0.4.0.0 - AV1 codec support
 
 ## Contributing
