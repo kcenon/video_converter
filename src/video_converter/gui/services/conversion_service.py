@@ -108,8 +108,12 @@ class ConversionWorker(QObject):
                 validate_output=app_config.processing.validate_quality,
                 preserve_timestamps=True,
                 preserve_metadata=True,
-                move_to_processed=app_config.paths.processed if app_config.processing.move_processed else None,
-                move_to_failed=app_config.paths.failed if app_config.processing.move_failed else None,
+                move_to_processed=app_config.paths.processed
+                if app_config.processing.move_processed
+                else None,
+                move_to_failed=app_config.paths.failed
+                if app_config.processing.move_failed
+                else None,
                 check_disk_space=app_config.processing.check_disk_space,
                 min_free_space=int(app_config.processing.min_free_space_gb * 1024 * 1024 * 1024),
                 enable_vmaf=app_config.vmaf.enabled,

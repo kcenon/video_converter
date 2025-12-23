@@ -416,7 +416,9 @@ def convert(
     # Resolve VMAF settings
     enable_vmaf = vmaf if vmaf is not None else config.vmaf.enabled
     vmaf_thresh = vmaf_threshold if vmaf_threshold is not None else config.vmaf.threshold
-    vmaf_interval = vmaf_sample_interval if vmaf_sample_interval is not None else config.vmaf.sample_interval
+    vmaf_interval = (
+        vmaf_sample_interval if vmaf_sample_interval is not None else config.vmaf.sample_interval
+    )
     vmaf_action = config.vmaf.fail_action
 
     # Get encoder name for display
