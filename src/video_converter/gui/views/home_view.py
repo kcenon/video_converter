@@ -25,17 +25,20 @@ class HomeView(QWidget):
     """Home/Dashboard view.
 
     Provides the main landing view with:
-    - Drag & drop zone for video files
+    - Drag & drop zone for video files (single and multiple)
+    - Folder drop support
     - Quick access buttons
     - Recent conversions list
     - Summary statistics
 
     Signals:
-        file_dropped: Emitted when a file is dropped on the drop zone.
+        file_dropped: Emitted when a single file is dropped on the drop zone.
+        files_dropped: Emitted when multiple files are dropped on the drop zone.
         browse_photos_requested: Emitted when Photos browse is requested.
     """
 
     file_dropped = Signal(str)
+    files_dropped = Signal(list)
     browse_photos_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -69,6 +72,7 @@ class HomeView(QWidget):
         # Drop zone
         self.drop_zone = DropZone()
         self.drop_zone.file_dropped.connect(self.file_dropped.emit)
+        self.drop_zone.files_dropped.connect(self.files_dropped.emit)
         layout.addWidget(self.drop_zone)
 
         # Quick action buttons

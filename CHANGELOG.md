@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### GUI Application
+- **Drag and Drop Support** (#141): Comprehensive drag and drop functionality:
+  - Folder drag support to extract video files automatically
+  - Visual feedback showing file count during drag operations
+  - Blue border for valid files, red border for invalid files
+  - Multiple file drop support with batch queue integration
+  - Automatic batch addition to conversion queue with saved settings
 - **Settings Persistence** (#140): `SettingsManager` service for persistent settings:
   - JSON-based settings storage in `~/Library/Application Support/VideoConverter/`
   - Automatic load on app startup and save on shutdown
