@@ -7,10 +7,9 @@ from the Photos library.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QMouseEvent
+from PySide6.QtGui import QMouseEvent, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -19,9 +18,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
-if TYPE_CHECKING:
-    from PySide6.QtGui import QPixmap
 
 
 @dataclass
@@ -283,3 +279,21 @@ class VideoGrid(QWidget):
             List of selected paths.
         """
         return list(self._selected_paths)
+
+    def update_thumbnail(self, path: str, pixmap: QPixmap) -> None:
+        """Update thumbnail for a specific video.
+
+        Args:
+            path: Video path.
+            pixmap: New thumbnail pixmap.
+        """
+        if path in self._thumbnails:
+            thumbnail = self._thumbnails[path]
+            scaled = pixmap.scaled(
+                VideoThumbnail.THUMBNAIL_SIZE,
+                VideoThumbnail.THUMBNAIL_SIZE,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            thumbnail.thumbnail_label.setPixmap(scaled)
+            thumbnail.thumbnail_label.setStyleSheet("")
