@@ -104,11 +104,13 @@ class SettingsView(QWidget):
 
         # Default encoder
         self.encoder_combo = QComboBox()
-        self.encoder_combo.addItems([
-            "VideoToolbox (Hardware)",
-            "libx265 (Software)",
-            "Auto (Prefer Hardware)",
-        ])
+        self.encoder_combo.addItems(
+            [
+                "VideoToolbox (Hardware)",
+                "libx265 (Software)",
+                "Auto (Prefer Hardware)",
+            ]
+        )
         self.encoder_combo.setCurrentIndex(2)  # Auto
         form.addRow("Default Encoder:", self.encoder_combo)
 
@@ -129,28 +131,32 @@ class SettingsView(QWidget):
 
         # Preset
         self.preset_combo = QComboBox()
-        self.preset_combo.addItems([
-            "ultrafast",
-            "superfast",
-            "veryfast",
-            "faster",
-            "fast",
-            "medium",
-            "slow",
-            "slower",
-            "veryslow",
-        ])
+        self.preset_combo.addItems(
+            [
+                "ultrafast",
+                "superfast",
+                "veryfast",
+                "faster",
+                "fast",
+                "medium",
+                "slow",
+                "slower",
+                "veryslow",
+            ]
+        )
         self.preset_combo.setCurrentText("medium")
         form.addRow("Encoding Preset:", self.preset_combo)
 
         # Audio settings
         self.audio_combo = QComboBox()
-        self.audio_combo.addItems([
-            "Copy (No re-encode)",
-            "AAC 128kbps",
-            "AAC 192kbps",
-            "AAC 256kbps",
-        ])
+        self.audio_combo.addItems(
+            [
+                "Copy (No re-encode)",
+                "AAC 128kbps",
+                "AAC 192kbps",
+                "AAC 256kbps",
+            ]
+        )
         form.addRow("Audio Handling:", self.audio_combo)
 
         # Concurrent jobs
@@ -196,12 +202,14 @@ class SettingsView(QWidget):
 
         # Naming pattern
         self.naming_combo = QComboBox()
-        self.naming_combo.addItems([
-            "{name}_hevc.{ext}",
-            "{name}.hevc.{ext}",
-            "{name} (H.265).{ext}",
-            "HEVC/{name}.{ext}",
-        ])
+        self.naming_combo.addItems(
+            [
+                "{name}_hevc.{ext}",
+                "{name}.hevc.{ext}",
+                "{name} (H.265).{ext}",
+                "HEVC/{name}.{ext}",
+            ]
+        )
         form.addRow("Output Naming:", self.naming_combo)
 
         parent_layout.addWidget(group)

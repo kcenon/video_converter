@@ -59,9 +59,7 @@ class HomeView(QWidget):
         welcome_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(welcome_label)
 
-        subtitle_label = QLabel(
-            "Convert H.264 videos to H.265 (HEVC) with hardware acceleration"
-        )
+        subtitle_label = QLabel("Convert H.264 videos to H.265 (HEVC) with hardware acceleration")
         subtitle_label.setObjectName("subtitleLabel")
         subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(subtitle_label)

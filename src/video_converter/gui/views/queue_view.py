@@ -281,9 +281,7 @@ class QueueView(QWidget):
             self.overall_progress.setValue(0)
             return
 
-        total_progress = sum(
-            card.progress for card in self._progress_cards.values()
-        )
+        total_progress = sum(card.progress for card in self._progress_cards.values())
         average_progress = total_progress / len(self._progress_cards)
         self.overall_progress.setValue(int(average_progress))
 
@@ -308,9 +306,7 @@ class QueueView(QWidget):
     def _on_clear_completed(self) -> None:
         """Clear completed conversions."""
         completed_ids = [
-            task_id
-            for task_id, card in self._progress_cards.items()
-            if card.is_completed
+            task_id for task_id, card in self._progress_cards.items() if card.is_completed
         ]
         for task_id in completed_ids:
             self.remove_conversion(task_id)

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -133,7 +134,7 @@ class VideoThumbnail(QFrame):
         self.setProperty("selected", selected)
         self.style().polish(self)
 
-    def mousePressEvent(self, event) -> None:
+    def mousePressEvent(self, event: QMouseEvent) -> None:
         """Handle mouse press.
 
         Args:
@@ -143,7 +144,7 @@ class VideoThumbnail(QFrame):
             self.clicked.emit(self._item.path)
         super().mousePressEvent(event)
 
-    def mouseDoubleClickEvent(self, event) -> None:
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
         """Handle mouse double click.
 
         Args:

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -122,7 +123,7 @@ class RecentConversionItem(QFrame):
         else:
             return f"{size_bytes / 1_000:.0f}KB"
 
-    def mousePressEvent(self, event) -> None:
+    def mousePressEvent(self, event: QMouseEvent) -> None:
         """Handle mouse press.
 
         Args:

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### GUI Application
+- **Main Window UI** (#138): PySide6-based main window with tab navigation:
+  - `MainWindow` with 5 tabs: Home, Convert, Photos, Queue, Settings
+  - `HomeView` with welcome section, drag & drop zone, and statistics bar
+  - `DropZone` widget with visual feedback for drag & drop video files
+  - `RecentConversionsList` for displaying conversion history
+  - macOS-native theming with dark mode support
+  - Keyboard shortcuts for tab navigation (Cmd+1-5)
+  - Menu bar with File, Edit, View, Help menus
+
 #### Testing
 - **CLI Test Coverage** (#128): Comprehensive test suite for CLI commands in `tests/unit/cli/`:
   - `test_convert_cmd.py` - Convert command tests (VMAF, metadata, encoding modes)
