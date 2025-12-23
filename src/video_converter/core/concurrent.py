@@ -26,11 +26,12 @@ import asyncio
 import logging
 import os
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
@@ -170,9 +171,7 @@ class ResourceMonitor:
                 self.MEMORY_CRITICAL_THRESHOLD,
             )
 
-            recommended = self._calculate_recommended_concurrency(
-                cpu_level, memory_level
-            )
+            recommended = self._calculate_recommended_concurrency(cpu_level, memory_level)
 
             return ResourceStatus(
                 cpu_percent=cpu_percent,
@@ -361,21 +360,18 @@ class ConcurrentProcessor:
         effective_concurrency = self._max_concurrent
         if self._adaptive_concurrency and self._resource_monitor:
             status = self._resource_monitor.get_status()
-            effective_concurrency = min(
-                self._max_concurrent, status.recommended_concurrency
-            )
+            effective_concurrency = min(self._max_concurrent, status.recommended_concurrency)
 
         self._semaphore = asyncio.Semaphore(effective_concurrency)
 
         logger.info(
-            f"Starting batch processing: {len(items)} jobs, "
-            f"max concurrent: {effective_concurrency}"
+            f"Starting batch processing: {len(items)} jobs, max concurrent: {effective_concurrency}"
         )
 
         # Create tasks for all items
         tasks = []
         for i, item in enumerate(items):
-            job_progress = self._create_job_progress(i, item)
+            self._create_job_progress(i, item)
             task = asyncio.create_task(
                 self._process_with_semaphore(i, item, processor, on_progress)
             )

@@ -135,7 +135,9 @@ class StatisticsReporter:
 
         lines.append(f"│  Total Original:       {original_str:<{w - 26}}│")
         lines.append(f"│  Total Converted:      {converted_str:<{w - 26}}│")
-        lines.append(f"│  Storage Saved:        {saved_str} ({saved_pct:.1f}%){' ' * (w - 38 - len(saved_str))}│")
+        lines.append(
+            f"│  Storage Saved:        {saved_str} ({saved_pct:.1f}%){' ' * (w - 38 - len(saved_str))}│"
+        )
         lines.append(f"├{'─' * w}┤")
 
         # Compression info
@@ -274,7 +276,7 @@ class StatisticsReporter:
 
         with open(output_path, "w", newline="", encoding="utf-8") as f:
             # Write summary as comment
-            f.write(f"# Video Converter Statistics Export\n")
+            f.write("# Video Converter Statistics Export\n")
             f.write(f"# Period: {stats.period}\n")
             f.write(f"# Total Converted: {stats.total_converted}\n")
             f.write(f"# Storage Saved: {_format_size(stats.total_saved_bytes)}\n")

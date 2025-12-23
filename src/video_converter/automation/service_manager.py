@@ -277,9 +277,7 @@ class ServiceManager:
                 return load_result
 
             # Build schedule description
-            schedule_desc = self._build_schedule_description(
-                hour, minute, weekday, watch_paths
-            )
+            schedule_desc = self._build_schedule_description(hour, minute, weekday, watch_paths)
 
             logger.info(f"Service installed successfully: {schedule_desc}")
             return ServiceResult(
@@ -838,8 +836,15 @@ class ServiceManager:
 
         if hour is not None:
             if weekday is not None:
-                days = ["Sunday", "Monday", "Tuesday", "Wednesday",
-                        "Thursday", "Friday", "Saturday"]
+                days = [
+                    "Sunday",
+                    "Monday",
+                    "Tuesday",
+                    "Wednesday",
+                    "Thursday",
+                    "Friday",
+                    "Saturday",
+                ]
                 day_name = days[weekday] if 0 <= weekday <= 6 else str(weekday)
                 parts.append(f"Every {day_name} at {hour:02d}:{minute:02d}")
             else:
@@ -1004,12 +1009,14 @@ class ServiceManager:
                     if "converted" in line.lower():
                         # Try to extract number of videos
                         import re
+
                         match = re.search(r"(\d+)\s*videos?\s*converted", line, re.I)
                         if match:
                             info.videos_converted = int(match.group(1))
                     if "saved" in line.lower():
                         # Try to extract bytes saved
                         import re
+
                         match = re.search(r"(\d+\.?\d*)\s*(GB|MB|KB|B)\s*saved", line, re.I)
                         if match:
                             value = float(match.group(1))
@@ -1068,6 +1075,7 @@ class ServiceManager:
 
         try:
             from video_converter.core.history import get_history
+
             history = get_history()
             stats = history.get_statistics()
             total_converted = stats.total_converted

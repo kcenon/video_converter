@@ -91,8 +91,13 @@ select = [
     "SIM",    # flake8-simplify
 ]
 ignore = [
-    "E501",   # line too long (handled by formatter)
-    "B008",   # do not perform function calls in argument defaults
+    "E501",    # line too long (handled by formatter)
+    "B008",    # do not perform function calls in argument defaults
+    "ARG001",  # unused function argument (often intentional for API consistency)
+    "ARG002",  # unused method argument (often intentional for API consistency)
+    "SIM102",  # nested if statements (readability preference)
+    "SIM105",  # contextlib.suppress (try-except-pass is more explicit)
+    "SIM108",  # ternary operator (readability preference)
 ]
 
 [tool.ruff.lint.isort]

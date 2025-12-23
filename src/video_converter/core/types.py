@@ -28,11 +28,11 @@ Example:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Callable
 
 
 class ConversionMode(Enum):
@@ -371,9 +371,7 @@ class ConversionReport:
         else:
             self.failed += 1
             if result.error_message:
-                self.errors.append(
-                    f"{result.request.input_path.name}: {result.error_message}"
-                )
+                self.errors.append(f"{result.request.input_path.name}: {result.error_message}")
 
         self.warnings.extend(result.warnings)
 
@@ -493,18 +491,12 @@ class SessionState:
         if self.output_dir is not None and isinstance(self.output_dir, str):
             self.output_dir = Path(self.output_dir)
         # Normalize temporary files
-        self.temporary_files = [
-            Path(f) if isinstance(f, str) else f for f in self.temporary_files
-        ]
+        self.temporary_files = [Path(f) if isinstance(f, str) else f for f in self.temporary_files]
 
     @property
     def total_videos(self) -> int:
         """Get total number of videos in the session."""
-        return (
-            len(self.pending_videos)
-            + len(self.completed_videos)
-            + len(self.failed_videos)
-        )
+        return len(self.pending_videos) + len(self.completed_videos) + len(self.failed_videos)
 
     @property
     def progress(self) -> float:
@@ -609,15 +601,9 @@ class SessionState:
             started_at=datetime.fromisoformat(data["started_at"]),
             updated_at=datetime.fromisoformat(data["updated_at"]),
             current_index=data.get("current_index", 0),
-            pending_videos=[
-                VideoEntry.from_dict(v) for v in data.get("pending_videos", [])
-            ],
-            completed_videos=[
-                VideoEntry.from_dict(v) for v in data.get("completed_videos", [])
-            ],
-            failed_videos=[
-                VideoEntry.from_dict(v) for v in data.get("failed_videos", [])
-            ],
+            pending_videos=[VideoEntry.from_dict(v) for v in data.get("pending_videos", [])],
+            completed_videos=[VideoEntry.from_dict(v) for v in data.get("completed_videos", [])],
+            failed_videos=[VideoEntry.from_dict(v) for v in data.get("failed_videos", [])],
             temporary_files=[Path(f) for f in data.get("temporary_files", [])],
             output_dir=Path(data["output_dir"]) if data.get("output_dir") else None,
             config_snapshot=data.get("config_snapshot", {}),

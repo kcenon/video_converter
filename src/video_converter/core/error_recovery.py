@@ -184,7 +184,7 @@ class ErrorRecoveryManager:
         self,
         error_message: str | None,
         result: ConversionResult | None = None,
-        validation: "ValidationResult | None" = None,
+        validation: ValidationResult | None = None,
     ) -> ErrorCategory:
         """Classify an error into a category for recovery action.
 

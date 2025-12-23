@@ -185,9 +185,7 @@ class ProgressParser:
             minutes = int(match.group(2))
             seconds = int(match.group(3))
             centiseconds = int(match.group(4))
-            info.current_time = (
-                hours * 3600 + minutes * 60 + seconds + centiseconds / 100
-            )
+            info.current_time = hours * 3600 + minutes * 60 + seconds + centiseconds / 100
 
         # Parse bitrate
         if match := self._BITRATE_PATTERN.search(line):

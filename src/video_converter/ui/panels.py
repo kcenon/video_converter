@@ -87,8 +87,7 @@ def _display_access_denied(console: Console) -> None:
 
     content.append("Quick access:\n", style="bold")
     content.append(
-        '  open "x-apple.systempreferences:'
-        'com.apple.preference.security?Privacy_AllFiles"',
+        '  open "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"',
         style="dim cyan",
     )
 

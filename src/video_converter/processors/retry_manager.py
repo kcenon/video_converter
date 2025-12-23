@@ -44,7 +44,6 @@ from video_converter.core.types import (
 )
 
 if TYPE_CHECKING:
-    from video_converter.converters.base import BaseConverter
     from video_converter.converters.factory import ConverterFactory
     from video_converter.processors.quality_validator import (
         ValidationResult,
@@ -274,7 +273,7 @@ class RetryManager:
     def _classify_failure(
         self,
         result: ConversionResult,
-        validation: "ValidationResult | None",
+        validation: ValidationResult | None,
     ) -> FailureType:
         """Classify the type of failure.
 
@@ -368,8 +367,8 @@ class RetryManager:
     async def execute_with_retry(
         self,
         request: ConversionRequest,
-        converter_factory: "ConverterFactory",
-        validator: "VideoValidator | None" = None,
+        converter_factory: ConverterFactory,
+        validator: VideoValidator | None = None,
     ) -> RetryResult:
         """Execute conversion with automatic retry on failure.
 
@@ -451,13 +450,10 @@ class RetryManager:
                 result.final_result = conversion_result
                 result.total_attempts = attempt_num
                 result.final_strategy = strategy
-                result.total_duration_seconds = sum(
-                    a.duration_seconds for a in result.attempts
-                )
+                result.total_duration_seconds = sum(a.duration_seconds for a in result.attempts)
 
                 logger.info(
-                    f"Conversion succeeded on attempt {attempt_num} "
-                    f"with strategy {strategy.value}"
+                    f"Conversion succeeded on attempt {attempt_num} with strategy {strategy.value}"
                 )
                 return result
 
@@ -482,8 +478,7 @@ class RetryManager:
         result.original_preserved = self.config.preserve_original_on_failure
 
         logger.error(
-            f"All {self.config.max_attempts} retry attempts failed for "
-            f"{request.input_path.name}"
+            f"All {self.config.max_attempts} retry attempts failed for {request.input_path.name}"
         )
 
         return result
@@ -491,8 +486,8 @@ class RetryManager:
     def execute_with_retry_sync(
         self,
         request: ConversionRequest,
-        converter_factory: "ConverterFactory",
-        validator: "VideoValidator | None" = None,
+        converter_factory: ConverterFactory,
+        validator: VideoValidator | None = None,
     ) -> RetryResult:
         """Synchronous wrapper for execute_with_retry.
 
@@ -506,9 +501,7 @@ class RetryManager:
         """
         import asyncio
 
-        return asyncio.run(
-            self.execute_with_retry(request, converter_factory, validator)
-        )
+        return asyncio.run(self.execute_with_retry(request, converter_factory, validator))
 
 
 __all__ = [

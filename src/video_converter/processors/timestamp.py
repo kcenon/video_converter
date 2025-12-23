@@ -322,9 +322,7 @@ class TimestampSynchronizer:
 
         # Sync birth time (macOS-specific)
         if sync_birth_time and source_timestamps.birth_time:
-            birth_synced = self._set_birth_time(
-                dest, source_timestamps.birth_time, warnings
-            )
+            birth_synced = self._set_birth_time(dest, source_timestamps.birth_time, warnings)
 
         success = (
             (not sync_modification_time or mtime_synced)
@@ -401,15 +399,9 @@ class TimestampSynchronizer:
         if modification_date or access_date:
             try:
                 current_stat = path.stat()
-                atime = (
-                    access_date.timestamp()
-                    if access_date
-                    else current_stat.st_atime
-                )
+                atime = access_date.timestamp() if access_date else current_stat.st_atime
                 mtime = (
-                    modification_date.timestamp()
-                    if modification_date
-                    else current_stat.st_mtime
+                    modification_date.timestamp() if modification_date else current_stat.st_mtime
                 )
                 os.utime(path, (atime, mtime))
                 mtime_synced = modification_date is not None
@@ -488,9 +480,7 @@ class TimestampSynchronizer:
             if result.returncode == 0:
                 # touch doesn't set birth time, but at least we set mtime
                 logger.debug("Used touch to set timestamp: %s", path)
-                warnings.append(
-                    "Used touch instead of SetFile - birth time may not be preserved"
-                )
+                warnings.append("Used touch instead of SetFile - birth time may not be preserved")
                 return False
         except FileNotFoundError:
             pass
@@ -580,8 +570,7 @@ class TimestampSynchronizer:
         if check_birth_time and orig_timestamps.birth_time:
             if conv_timestamps.birth_time:
                 diff = abs(
-                    (orig_timestamps.birth_time - conv_timestamps.birth_time)
-                    .total_seconds()
+                    (orig_timestamps.birth_time - conv_timestamps.birth_time).total_seconds()
                 )
                 birth_match = diff <= tolerance_seconds
                 if birth_match:
@@ -599,8 +588,9 @@ class TimestampSynchronizer:
         if check_modification_time:
             if orig_timestamps.modification_time and conv_timestamps.modification_time:
                 diff = abs(
-                    (orig_timestamps.modification_time - conv_timestamps.modification_time)
-                    .total_seconds()
+                    (
+                        orig_timestamps.modification_time - conv_timestamps.modification_time
+                    ).total_seconds()
                 )
                 mtime_match = diff <= tolerance_seconds
                 if mtime_match:
@@ -614,9 +604,8 @@ class TimestampSynchronizer:
                 mtime_match = False
                 details_parts.append("Modification time missing in converted file")
 
-        passed = (
-            (not check_birth_time or birth_match or not self.is_macos)
-            and (not check_modification_time or mtime_match)
+        passed = (not check_birth_time or birth_match or not self.is_macos) and (
+            not check_modification_time or mtime_match
         )
 
         return TimestampVerificationResult(

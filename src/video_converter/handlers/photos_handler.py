@@ -158,8 +158,7 @@ class PhotosSourceHandler:
         self._permission_error: str | None = None
 
         logger.debug(
-            f"PhotosSourceHandler initialized: "
-            f"library_path={library_path}, temp_dir={temp_dir}"
+            f"PhotosSourceHandler initialized: library_path={library_path}, temp_dir={temp_dir}"
         )
 
     @property

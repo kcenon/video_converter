@@ -90,29 +90,17 @@ class ConverterFactory:
             if self._hardware_converter and self._hardware_converter.is_available():
                 return self._hardware_converter
             if fallback:
-                logger.warning(
-                    "Hardware encoder not available, falling back to software"
-                )
-                if (
-                    self._software_converter
-                    and self._software_converter.is_available()
-                ):
+                logger.warning("Hardware encoder not available, falling back to software")
+                if self._software_converter and self._software_converter.is_available():
                     return self._software_converter
-            raise EncoderNotAvailableError(
-                "Hardware encoder (VideoToolbox) is not available"
-            )
+            raise EncoderNotAvailableError("Hardware encoder (VideoToolbox) is not available")
 
         if mode == ConversionMode.SOFTWARE:
             if self._software_converter and self._software_converter.is_available():
                 return self._software_converter
             if fallback:
-                logger.warning(
-                    "Software encoder not available, falling back to hardware"
-                )
-                if (
-                    self._hardware_converter
-                    and self._hardware_converter.is_available()
-                ):
+                logger.warning("Software encoder not available, falling back to hardware")
+                if self._hardware_converter and self._hardware_converter.is_available():
                     return self._hardware_converter
             raise EncoderNotAvailableError("Software encoder (libx265) is not available")
 
@@ -168,9 +156,7 @@ class ConverterFactory:
             True if VideoToolbox encoder is available.
         """
         self._ensure_initialized()
-        return bool(
-            self._hardware_converter and self._hardware_converter.is_available()
-        )
+        return bool(self._hardware_converter and self._hardware_converter.is_available())
 
     def is_software_available(self) -> bool:
         """Check if software encoding is available.
@@ -179,9 +165,7 @@ class ConverterFactory:
             True if libx265 encoder is available.
         """
         self._ensure_initialized()
-        return bool(
-            self._software_converter and self._software_converter.is_available()
-        )
+        return bool(self._software_converter and self._software_converter.is_available())
 
 
 # Module-level factory instance for convenience

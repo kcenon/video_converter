@@ -72,8 +72,7 @@ class SoftwareConverter(BaseConverter):
 
     # HDR x265 parameters for BT.2020 PQ (HDR10)
     HDR_X265_PARAMS = (
-        "hdr-opt=1:repeat-headers=1:"
-        "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc"
+        "hdr-opt=1:repeat-headers=1:colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc"
     )
 
     def __init__(self) -> None:
@@ -129,11 +128,7 @@ class SoftwareConverter(BaseConverter):
         crf = max(self.MIN_CRF, min(self.MAX_CRF, request.crf))
 
         # Validate preset
-        preset = (
-            request.preset
-            if request.preset in self.VALID_PRESETS
-            else self.DEFAULT_PRESET
-        )
+        preset = request.preset if request.preset in self.VALID_PRESETS else self.DEFAULT_PRESET
 
         # Validate bit depth
         bit_depth = (
@@ -175,12 +170,14 @@ class SoftwareConverter(BaseConverter):
         command.extend(["-c:a", request.audio_mode])
 
         # Metadata handling
-        command.extend([
-            "-map_metadata",
-            "0",  # Copy all metadata
-            "-movflags",
-            "+faststart+use_metadata_tags",  # Enable streaming and preserve metadata tags
-        ])
+        command.extend(
+            [
+                "-map_metadata",
+                "0",  # Copy all metadata
+                "-movflags",
+                "+faststart+use_metadata_tags",  # Enable streaming and preserve metadata tags
+            ]
+        )
 
         # Output
         command.append(str(request.output_path))

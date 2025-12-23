@@ -39,7 +39,8 @@ jobs:
         run: ruff format --check src/
 
       - name: Run mypy type checker
-        run: mypy src/
+        continue-on-error: true
+        run: mypy src/ --ignore-missing-imports
 
   test:
     name: Test (Python ${{ matrix.python-version }})

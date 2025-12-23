@@ -112,9 +112,7 @@ class FFmpegProgressParser:
             minutes = int(match.group(2))
             seconds = int(match.group(3))
             centiseconds = int(match.group(4))
-            progress.time_seconds = (
-                hours * 3600 + minutes * 60 + seconds + centiseconds / 100
-            )
+            progress.time_seconds = hours * 3600 + minutes * 60 + seconds + centiseconds / 100
 
         # Parse bitrate
         if match := self._BITRATE_PATTERN.search(line):
@@ -126,9 +124,7 @@ class FFmpegProgressParser:
 
         # Calculate percentage
         if self.total_duration > 0 and progress.time_seconds > 0:
-            progress.percentage = min(
-                100.0, (progress.time_seconds / self.total_duration) * 100
-            )
+            progress.percentage = min(100.0, (progress.time_seconds / self.total_duration) * 100)
 
         self._last_progress = progress
         return progress

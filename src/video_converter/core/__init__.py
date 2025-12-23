@@ -8,6 +8,14 @@ Note:
     >>> from video_converter.core.orchestrator import Orchestrator
 """
 
+from video_converter.core.concurrent import (
+    AggregatedProgress,
+    ConcurrentProcessor,
+    JobProgress,
+    ResourceLevel,
+    ResourceMonitor,
+    ResourceStatus,
+)
 from video_converter.core.config import (
     AutomationConfig,
     Config,
@@ -16,6 +24,13 @@ from video_converter.core.config import (
     PathsConfig,
     PhotosConfig,
     ProcessingConfig,
+)
+from video_converter.core.error_recovery import (
+    DEFAULT_MIN_FREE_SPACE,
+    ERROR_RECOVERY_MAPPING,
+    DiskSpaceInfo,
+    ErrorRecoveryManager,
+    FailureRecord,
 )
 from video_converter.core.history import (
     ConversionHistory,
@@ -34,27 +49,12 @@ from video_converter.core.logger import (
     get_logger,
     set_log_level,
 )
-from video_converter.core.concurrent import (
-    AggregatedProgress,
-    ConcurrentProcessor,
-    JobProgress,
-    ResourceLevel,
-    ResourceMonitor,
-    ResourceStatus,
-)
 from video_converter.core.session import (
     SessionCorruptedError,
     SessionNotFoundError,
     SessionStateError,
     SessionStateManager,
     get_session_manager,
-)
-from video_converter.core.error_recovery import (
-    DEFAULT_MIN_FREE_SPACE,
-    DiskSpaceInfo,
-    ERROR_RECOVERY_MAPPING,
-    ErrorRecoveryManager,
-    FailureRecord,
 )
 from video_converter.core.types import (
     BatchStatus,
@@ -146,7 +146,10 @@ def __getattr__(name: str):
             Orchestrator,
             OrchestratorConfig,
         )
-        return {"Orchestrator": Orchestrator,
-                "OrchestratorConfig": OrchestratorConfig,
-                "ConversionTask": ConversionTask}[name]
+
+        return {
+            "Orchestrator": Orchestrator,
+            "OrchestratorConfig": OrchestratorConfig,
+            "ConversionTask": ConversionTask,
+        }[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -166,14 +166,12 @@ class AppleScriptRunner:
                 logger.debug(f"AppleScript succeeded: {result.result[:100]}")
             else:
                 logger.warning(
-                    f"AppleScript failed (code {result.returncode}): "
-                    f"{result.stderr[:200]}"
+                    f"AppleScript failed (code {result.returncode}): {result.stderr[:200]}"
                 )
 
             if check and not result.success:
                 raise AppleScriptExecutionError(
-                    f"AppleScript failed with code {result.returncode}: "
-                    f"{result.stderr.strip()}",
+                    f"AppleScript failed with code {result.returncode}: {result.stderr.strip()}",
                     script=script,
                     stderr=result.stderr,
                 )

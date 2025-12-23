@@ -35,7 +35,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -76,8 +76,11 @@ from video_converter.core.types import (
     SessionStatus,
     VideoEntry,
 )
+from video_converter.extractors.icloud_handler import (
+    DownloadProgress,
+    iCloudHandler,
+)
 from video_converter.processors.quality_validator import (
-    ValidationResult,
     ValidationStrictness,
     VideoValidator,
 )
@@ -87,15 +90,9 @@ from video_converter.processors.retry_manager import (
 )
 from video_converter.processors.timestamp import TimestampSynchronizer
 from video_converter.processors.vmaf_analyzer import (
-    VmafAnalyzer,
     VmafAnalysisError,
+    VmafAnalyzer,
     VmafNotAvailableError,
-    VmafQualityLevel,
-)
-from video_converter.extractors.icloud_handler import (
-    CloudStatus,
-    DownloadProgress,
-    iCloudHandler,
 )
 
 if TYPE_CHECKING:
@@ -351,7 +348,6 @@ class Orchestrator:
 
             # File is in iCloud
             in_cloud = True
-            stub_path_found = stub_path
         else:
             # Use provided video_info
             if not video_info.in_cloud:
@@ -360,7 +356,6 @@ class Orchestrator:
                 return False, f"File not found: {input_path}"
 
             in_cloud = True
-            stub_path_found = video_info.stub_path
 
         # File is in iCloud, need to download
         logger.info(f"File is in iCloud, initiating download: {input_path.name}")
@@ -464,9 +459,7 @@ class Orchestrator:
             result = retry_result.final_result
             result.retry_count = retry_result.total_attempts
             result.retry_strategy_used = (
-                retry_result.final_strategy.value
-                if retry_result.final_strategy
-                else None
+                retry_result.final_strategy.value if retry_result.final_strategy else None
             )
             result.retry_history = [a.to_dict() for a in retry_result.attempts]
             logger.info(
@@ -477,9 +470,7 @@ class Orchestrator:
 
         failed_result.retry_count = retry_result.total_attempts
         failed_result.retry_strategy_used = (
-            retry_result.final_strategy.value
-            if retry_result.final_strategy
-            else None
+            retry_result.final_strategy.value if retry_result.final_strategy else None
         )
         failed_result.retry_history = [a.to_dict() for a in retry_result.attempts]
 
@@ -488,8 +479,7 @@ class Orchestrator:
             failed_result.warnings.extend(retry_result.final_result.warnings)
 
         logger.error(
-            f"All retry attempts failed for {input_path.name}: "
-            f"{retry_result.get_failure_report()}"
+            f"All retry attempts failed for {input_path.name}: {retry_result.get_failure_report()}"
         )
 
         return failed_result
@@ -645,9 +635,7 @@ class Orchestrator:
             output_path = self._create_output_path(input_path)
 
         # Ensure file is available (handles iCloud download)
-        available, error = await self._ensure_file_available(
-            input_path, video_info, on_progress
-        )
+        available, error = await self._ensure_file_available(input_path, video_info, on_progress)
 
         if not available:
             return ConversionResult(
@@ -703,9 +691,7 @@ class Orchestrator:
 
         if not result.success:
             if self.retry_manager:
-                return await self._retry_conversion(
-                    request, result, on_progress, input_path
-                )
+                return await self._retry_conversion(request, result, on_progress, input_path)
             return result
 
         if self._cancelled:
@@ -737,21 +723,15 @@ class Orchestrator:
                     if output_path.exists():
                         output_path.unlink()
                     result.success = False
-                    result.error_message = (
-                        f"Validation failed: {', '.join(validation.errors)}"
-                    )
+                    result.error_message = f"Validation failed: {', '.join(validation.errors)}"
                     result.warnings.extend(validation.warnings)
-                    return await self._retry_conversion(
-                        request, result, on_progress, input_path
-                    )
+                    return await self._retry_conversion(request, result, on_progress, input_path)
 
                 # No retry - clean up and report
                 if output_path.exists():
                     output_path.unlink()
                 result.success = False
-                result.error_message = (
-                    f"Validation failed: {', '.join(validation.errors)}"
-                )
+                result.error_message = f"Validation failed: {', '.join(validation.errors)}"
                 result.warnings.extend(validation.warnings)
                 return result
 
@@ -773,8 +753,7 @@ class Orchestrator:
                 result.warnings.extend(vmaf_result.warnings)
 
                 logger.info(
-                    f"VMAF score: {vmaf_result.scores.mean:.2f} "
-                    f"({vmaf_result.quality_level.value})"
+                    f"VMAF score: {vmaf_result.scores.mean:.2f} ({vmaf_result.quality_level.value})"
                 )
 
                 # Handle VMAF threshold check
@@ -830,9 +809,7 @@ class Orchestrator:
             )
 
             if not timestamp_result.success:
-                result.warnings.append(
-                    f"Timestamp sync incomplete: {timestamp_result.warnings}"
-                )
+                result.warnings.append(f"Timestamp sync incomplete: {timestamp_result.warnings}")
             elif timestamp_result.warnings:
                 result.warnings.extend(timestamp_result.warnings)
 
@@ -969,13 +946,9 @@ class Orchestrator:
 
         # Use concurrent processing if max_concurrent > 1
         if self.config.max_concurrent > 1:
-            await self._process_tasks_concurrent(
-                report, on_progress, total_tasks
-            )
+            await self._process_tasks_concurrent(report, on_progress, total_tasks)
         else:
-            await self._process_tasks_sequential(
-                report, on_progress, total_tasks
-            )
+            await self._process_tasks_sequential(report, on_progress, total_tasks)
 
         # Complete
         report.completed_at = datetime.now()
@@ -1071,7 +1044,7 @@ class Orchestrator:
         )
 
         # Create a mapping of task index to task for result handling
-        task_map = {i: task for i, task in enumerate(self._tasks)}
+        task_map = dict(enumerate(self._tasks))
 
         def on_aggregated_progress(agg_progress: AggregatedProgress) -> None:
             """Handle aggregated progress from concurrent processor."""
@@ -1086,9 +1059,7 @@ class Orchestrator:
                         files_str += f" (+{len(agg_progress.current_files) - 3} more)"
                     message = f"Converting: {files_str}"
                 else:
-                    message = (
-                        f"Processing: {agg_progress.completed_jobs}/{agg_progress.total_jobs} completed"
-                    )
+                    message = f"Processing: {agg_progress.completed_jobs}/{agg_progress.total_jobs} completed"
 
                 self._emit_progress(
                     on_progress,
@@ -1181,9 +1152,7 @@ class Orchestrator:
         task.error = result.error_message
 
         # Classify the error
-        error_category = self.error_recovery_manager.classify_error(
-            result.error_message, result
-        )
+        error_category = self.error_recovery_manager.classify_error(result.error_message, result)
         recovery_action = self.error_recovery_manager.get_recovery_action(error_category)
 
         # Update session state
@@ -1206,10 +1175,7 @@ class Orchestrator:
         )
 
         # Handle disk space error specially
-        if (
-            error_category == ErrorCategory.DISK_SPACE_ERROR
-            and self.config.pause_on_disk_full
-        ):
+        if error_category == ErrorCategory.DISK_SPACE_ERROR and self.config.pause_on_disk_full:
             self._paused_reason = "Insufficient disk space"
             self.pause()
             logger.warning(
@@ -1467,9 +1433,7 @@ class Orchestrator:
         Returns:
             ConversionResult with success status and statistics.
         """
-        return asyncio.run(
-            self.convert_single(input_path, output_path, on_progress)
-        )
+        return asyncio.run(self.convert_single(input_path, output_path, on_progress))
 
     def run_sync(
         self,
@@ -1489,9 +1453,7 @@ class Orchestrator:
         Returns:
             ConversionReport with batch statistics.
         """
-        return asyncio.run(
-            self.run(input_paths, output_dir, on_progress, on_complete)
-        )
+        return asyncio.run(self.run(input_paths, output_dir, on_progress, on_complete))
 
     # Error recovery and manual retry methods
 
@@ -1579,10 +1541,7 @@ class Orchestrator:
                     error_message="Insufficient disk space for retry",
                 )
 
-        logger.info(
-            f"Retrying failed conversion: {input_path.name} "
-            f"(attempt {record.retry_count})"
-        )
+        logger.info(f"Retrying failed conversion: {input_path.name} (attempt {record.retry_count})")
 
         # Perform the conversion
         result = await self.convert_single(
