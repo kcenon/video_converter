@@ -148,12 +148,9 @@ class TestConvertCommand:
         mock_detector.analyze.return_value = mock_codec_info
         mock_detector_class.return_value = mock_detector
 
-        # Mock converter
-        mock_converter = MagicMock()
-        mock_converter.convert = AsyncMock(return_value=mock_conversion_result)
-
+        # Mock orchestrator.convert_single() - the new integration point
         mock_orchestrator = MagicMock()
-        mock_orchestrator.converter_factory.get_converter.return_value = mock_converter
+        mock_orchestrator.convert_single = AsyncMock(return_value=mock_conversion_result)
         mock_orchestrator_class.return_value = mock_orchestrator
 
         result = cli_runner.invoke(main, ["convert", str(input_file), str(output_file), "--force"])
@@ -182,12 +179,9 @@ class TestConvertCommand:
         mock_detector.analyze.return_value = mock_codec_info
         mock_detector_class.return_value = mock_detector
 
-        # Mock converter
-        mock_converter = MagicMock()
-        mock_converter.convert = AsyncMock(return_value=mock_conversion_result)
-
+        # Mock orchestrator.convert_single() - the new integration point
         mock_orchestrator = MagicMock()
-        mock_orchestrator.converter_factory.get_converter.return_value = mock_converter
+        mock_orchestrator.convert_single = AsyncMock(return_value=mock_conversion_result)
         mock_orchestrator_class.return_value = mock_orchestrator
 
         result = cli_runner.invoke(main, ["convert", str(input_file), "--mode", "software"])
@@ -215,12 +209,9 @@ class TestConvertCommand:
         mock_detector.analyze.return_value = mock_codec_info
         mock_detector_class.return_value = mock_detector
 
-        # Mock converter
-        mock_converter = MagicMock()
-        mock_converter.convert = AsyncMock(return_value=mock_conversion_result)
-
+        # Mock orchestrator.convert_single() - the new integration point
         mock_orchestrator = MagicMock()
-        mock_orchestrator.converter_factory.get_converter.return_value = mock_converter
+        mock_orchestrator.convert_single = AsyncMock(return_value=mock_conversion_result)
         mock_orchestrator_class.return_value = mock_orchestrator
 
         result = cli_runner.invoke(main, ["convert", str(input_file), "--quality", "85"])
@@ -249,12 +240,9 @@ class TestConvertCommand:
         mock_detector.analyze.return_value = mock_codec_info
         mock_detector_class.return_value = mock_detector
 
-        # Mock converter
-        mock_converter = MagicMock()
-        mock_converter.convert = AsyncMock(return_value=mock_conversion_result)
-
+        # Mock orchestrator.convert_single() - the new integration point
         mock_orchestrator = MagicMock()
-        mock_orchestrator.converter_factory.get_converter.return_value = mock_converter
+        mock_orchestrator.convert_single = AsyncMock(return_value=mock_conversion_result)
         mock_orchestrator_class.return_value = mock_orchestrator
 
         result = cli_runner.invoke(main, ["convert", str(input_file), "--preset", "fast"])
@@ -293,12 +281,9 @@ class TestConvertCommand:
         mock_detector.analyze.return_value = mock_codec_info
         mock_detector_class.return_value = mock_detector
 
-        # Mock converter
-        mock_converter = MagicMock()
-        mock_converter.convert = AsyncMock(return_value=mock_conversion_result)
-
+        # Mock orchestrator.convert_single() - the new integration point
         mock_orchestrator = MagicMock()
-        mock_orchestrator.converter_factory.get_converter.return_value = mock_converter
+        mock_orchestrator.convert_single = AsyncMock(return_value=mock_conversion_result)
         mock_orchestrator_class.return_value = mock_orchestrator
 
         result = cli_runner.invoke(main, ["convert", str(input_file)])
@@ -328,16 +313,13 @@ class TestConvertCommand:
         mock_detector.analyze.return_value = mock_codec_info
         mock_detector_class.return_value = mock_detector
 
-        # Mock failed conversion
+        # Mock failed conversion via orchestrator.convert_single()
         mock_result = MagicMock()
         mock_result.success = False
         mock_result.error_message = "FFmpeg failed: invalid video stream"
 
-        mock_converter = MagicMock()
-        mock_converter.convert = AsyncMock(return_value=mock_result)
-
         mock_orchestrator = MagicMock()
-        mock_orchestrator.converter_factory.get_converter.return_value = mock_converter
+        mock_orchestrator.convert_single = AsyncMock(return_value=mock_result)
         mock_orchestrator_class.return_value = mock_orchestrator
 
         result = cli_runner.invoke(main, ["convert", str(input_file)])
@@ -367,12 +349,9 @@ class TestConvertCommand:
         mock_detector.analyze.return_value = mock_codec_info
         mock_detector_class.return_value = mock_detector
 
-        # Mock converter
-        mock_converter = MagicMock()
-        mock_converter.convert = AsyncMock(return_value=mock_conversion_result)
-
+        # Mock orchestrator.convert_single() - the new integration point
         mock_orchestrator = MagicMock()
-        mock_orchestrator.converter_factory.get_converter.return_value = mock_converter
+        mock_orchestrator.convert_single = AsyncMock(return_value=mock_conversion_result)
         mock_orchestrator_class.return_value = mock_orchestrator
 
         result = cli_runner.invoke(main, ["-q", "convert", str(input_file)])
