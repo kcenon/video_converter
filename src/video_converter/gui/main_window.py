@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from video_converter.gui.dialogs.result_dialog import ConversionResultDialog
+from video_converter.gui.services.conversion_service import ConversionService
 from video_converter.gui.views.convert_view import ConvertView
 from video_converter.gui.views.home_view import HomeView
 from video_converter.gui.views.photos_view import PhotosView
@@ -54,11 +56,15 @@ class MainWindow(QMainWindow):
         """Initialize the main window."""
         super().__init__()
 
+        # Create conversion service
+        self._conversion_service = ConversionService(self)
+
         self._setup_window()
         self._setup_views()
         self._setup_navigation()
         self._setup_menu_bar()
         self._setup_status_bar()
+        self._connect_conversion_service()
 
     def _setup_window(self) -> None:
         """Configure window properties."""
@@ -256,3 +262,142 @@ class MainWindow(QMainWindow):
             "with Photos library integration.</p>"
             "<p>Copyright 2024 Video Converter Team</p>",
         )
+
+    def _connect_conversion_service(self) -> None:
+        """Connect conversion service signals to views."""
+        # Connect ConvertView signals
+        self.convert_view.conversion_started.connect(self._on_conversion_started)
+        self.convert_view.conversion_cancelled.connect(
+            self._conversion_service.cancel_all
+        )
+
+        # Connect QueueView signals
+        self.queue_view.pause_all_requested.connect(self._conversion_service.pause_all)
+        self.queue_view.resume_all_requested.connect(
+            self._conversion_service.resume_all
+        )
+        self.queue_view.cancel_all_requested.connect(
+            self._conversion_service.cancel_all
+        )
+
+        # Connect service signals to QueueView
+        self._conversion_service.task_added.connect(self._on_task_added)
+        self._conversion_service.progress_updated.connect(self._on_progress_updated)
+        self._conversion_service.task_completed.connect(self._on_task_completed)
+        self._conversion_service.task_failed.connect(self._on_task_failed)
+        self._conversion_service.all_completed.connect(self._on_all_completed)
+
+    @Slot(str, dict)
+    def _on_conversion_started(self, file_path: str, settings: dict) -> None:
+        """Handle conversion start from ConvertView.
+
+        Args:
+            file_path: Path to the input file.
+            settings: Conversion settings dictionary.
+        """
+        # Add task to queue
+        self._conversion_service.add_task(file_path, settings=settings)
+
+        # Switch to Queue view to show progress
+        self._set_current_tab(self.TAB_QUEUE)
+
+        # Update status bar
+        self.statusBar().showMessage(f"Converting: {file_path}")
+
+    @Slot(str, str, str)
+    def _on_task_added(self, task_id: str, file_name: str, file_size: str) -> None:
+        """Handle task added to queue.
+
+        Args:
+            task_id: Task ID.
+            file_name: Name of the video file.
+            file_size: File size string.
+        """
+        self.queue_view.add_conversion(task_id, file_name, file_size)
+
+    @Slot(str, float, object, object)
+    def _on_progress_updated(
+        self,
+        task_id: str,
+        progress: float,
+        eta_seconds: int | None,
+        speed: str | None,
+    ) -> None:
+        """Handle progress update from conversion service.
+
+        Args:
+            task_id: Task ID.
+            progress: Progress percentage.
+            eta_seconds: Estimated time remaining.
+            speed: Encoding speed string.
+        """
+        # Update queue view
+        eta_str = None
+        if eta_seconds is not None:
+            minutes = eta_seconds // 60
+            seconds = eta_seconds % 60
+            eta_str = f"{minutes}:{seconds:02d}"
+
+        self.queue_view.update_progress(task_id, progress, eta_str, speed)
+
+        # Update convert view if it's the current task
+        self.convert_view.update_progress(progress, eta_seconds, speed)
+
+        # Update status bar
+        self.statusBar().showMessage(f"Converting: {progress:.1f}%")
+
+    @Slot(str, object)
+    def _on_task_completed(self, task_id: str, result) -> None:
+        """Handle task completion.
+
+        Args:
+            task_id: Task ID.
+            result: ConversionResult object.
+        """
+        self.queue_view.mark_completed(task_id, success=True)
+        self.convert_view.conversion_complete(success=True)
+
+        # Show result dialog
+        if result:
+            dialog = ConversionResultDialog(result, self)
+            dialog.exec()
+
+        # Update status bar
+        self.statusBar().showMessage("Conversion complete")
+
+    @Slot(str, str)
+    def _on_task_failed(self, task_id: str, error: str) -> None:
+        """Handle task failure.
+
+        Args:
+            task_id: Task ID.
+            error: Error message.
+        """
+        self.queue_view.mark_completed(task_id, success=False)
+        self.convert_view.conversion_complete(success=False, message=error)
+
+        # Update status bar
+        self.statusBar().showMessage(f"Conversion failed: {error}")
+
+    @Slot(int, int)
+    def _on_all_completed(self, successful: int, failed: int) -> None:
+        """Handle all tasks completed.
+
+        Args:
+            successful: Number of successful conversions.
+            failed: Number of failed conversions.
+        """
+        total = successful + failed
+        self.statusBar().showMessage(
+            f"Completed: {successful}/{total} succeeded, {failed} failed"
+        )
+
+    def closeEvent(self, event) -> None:
+        """Handle window close event.
+
+        Args:
+            event: Close event.
+        """
+        # Shutdown conversion service
+        self._conversion_service.shutdown()
+        super().closeEvent(event)
