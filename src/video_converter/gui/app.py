@@ -66,9 +66,7 @@ class VideoConverterApp(QApplication):
         )
 
         # Connect menubar signals
-        self.menubar_app.show_main_window_requested.connect(
-            self._on_show_main_window_requested
-        )
+        self.menubar_app.show_main_window_requested.connect(self._on_show_main_window_requested)
         self.menubar_app.quit_requested.connect(self._on_quit_requested)
 
     def run(self) -> int:

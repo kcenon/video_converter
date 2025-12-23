@@ -147,6 +147,7 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
     "gui: marks tests as GUI tests requiring Qt (deselect with '-m \"not gui\"')",
+    "e2e: marks tests as end-to-end tests with actual conversions (deselect with '-m \"not e2e\"')",
 ]
 
 [tool.coverage.run]

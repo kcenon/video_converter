@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QObject, QThread, Signal, Slot
 
 if TYPE_CHECKING:
-    from video_converter.core.types import ConversionProgress, ConversionResult
+    pass
 
 
 logger = logging.getLogger(__name__)
@@ -477,7 +477,7 @@ class ConversionService(QObject):
         self.task_started.emit(task_id)
 
         # Use QMetaObject.invokeMethod for thread-safe call
-        from PySide6.QtCore import QMetaObject, Qt, Q_ARG
+        from PySide6.QtCore import Q_ARG, QMetaObject, Qt
 
         QMetaObject.invokeMethod(
             self._worker,

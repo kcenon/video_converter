@@ -51,12 +51,37 @@ pytest -m "not slow"
 
 # Skip integration tests
 pytest -m "not integration"
+
+# Skip E2E tests (run only quick tests)
+pytest -m "not e2e"
 ```
+
+### Running E2E Tests
+
+End-to-end tests perform actual video conversions and require:
+- FFmpeg installed
+- ExifTool installed
+- Sufficient disk space
+
+```bash
+# Run E2E tests
+pytest tests/gui/test_e2e.py -v -m e2e
+
+# Run all GUI tests including E2E
+pytest tests/gui/ -v
+```
+
+**Note:** E2E tests are slower (may take several minutes) and are excluded from regular CI runs. They run on:
+- Weekly schedule (Sunday 2 AM UTC)
+- Manual workflow dispatch
+- Commits containing `[e2e]` in the message
 
 ### Test Structure
 
 - `tests/unit/` - Unit tests for individual modules
   - `tests/unit/cli/` - CLI command tests (convert, run, stats, config, service)
+- `tests/gui/` - GUI tests with pytest-qt
+  - `tests/gui/test_e2e.py` - End-to-end tests with actual conversions
 - `tests/integration/` - Integration tests for component interactions
 - `tests/fixtures/` - Test data and fixture files
 - `tests/conftest.py` - Shared fixtures for all tests
@@ -101,7 +126,8 @@ All pull requests are automatically checked by GitHub Actions:
 
 - **Lint**: Ruff linter and formatter checks
 - **Type Check**: MyPy static type analysis
-- **Test**: pytest on Python 3.10, 3.11, 3.12
+- **Test**: pytest on Python 3.10, 3.11, 3.12 (excludes E2E tests)
+- **E2E Tests**: Runs on schedule, manual trigger, or `[e2e]` commits
 - **Dependency Review**: Security scanning for dependencies
 
 CI must pass before merging. Check the [Actions tab](https://github.com/kcenon/video_converter/actions) for build status.
