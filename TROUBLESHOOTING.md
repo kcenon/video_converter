@@ -6,6 +6,10 @@ Common issues and solutions for Video Converter.
 
 - [Installation Issues](#installation-issues)
 - [Conversion Errors](#conversion-errors)
+- [VMAF Analysis Issues](#vmaf-analysis-issues)
+- [Photos Re-Import Issues](#photos-re-import-issues)
+- [iCloud Issues](#icloud-issues)
+- [Concurrent Processing Issues](#concurrent-processing-issues)
 - [Service and Automation](#service-and-automation)
 - [Performance Issues](#performance-issues)
 - [Metadata Issues](#metadata-issues)
@@ -202,6 +206,278 @@ Error: Output validation failed. Compression ratio too low.
 3. Check if video is already H.265:
    ```bash
    ffprobe -v error -select_streams v:0 -show_entries stream=codec_name video.mp4
+   ```
+
+---
+
+## VMAF Analysis Issues
+
+### libvmaf Not Found
+
+**Symptom:**
+```
+Error: libvmaf not found. VMAF analysis is unavailable.
+```
+
+**Cause:**
+FFmpeg was not compiled with libvmaf support.
+
+**Solutions:**
+1. Reinstall FFmpeg with libvmaf:
+   ```bash
+   brew uninstall ffmpeg
+   brew install ffmpeg --with-libvmaf
+   ```
+
+2. If using Homebrew, check if libvmaf is available:
+   ```bash
+   brew info ffmpeg | grep vmaf
+   ```
+
+3. Verify VMAF support:
+   ```bash
+   ffmpeg -filters | grep vmaf
+   # Should show: libvmaf
+   ```
+
+4. If VMAF is not available, disable VMAF analysis:
+   ```bash
+   video-converter config-set processing.enable_vmaf false
+   ```
+
+### VMAF Score Below Threshold
+
+**Symptom:**
+```
+Warning: VMAF score 85.2 is below threshold 93.
+```
+
+**Solutions:**
+1. Lower the VMAF threshold for your use case:
+   ```bash
+   video-converter convert input.mp4 --vmaf --vmaf-threshold 80
+   ```
+
+2. Use software encoding for higher quality:
+   ```bash
+   video-converter convert input.mp4 --mode software --quality 85 --vmaf
+   ```
+
+3. Increase quality setting:
+   ```bash
+   video-converter convert input.mp4 --quality 30 --vmaf
+   ```
+
+---
+
+## Photos Re-Import Issues
+
+### Photos.app Not Responding
+
+**Symptom:**
+```
+Error: Photos.app did not respond within timeout.
+```
+
+**Solutions:**
+1. Open Photos.app manually first:
+   ```bash
+   open -a Photos
+   ```
+
+2. Wait for Photos to finish syncing with iCloud before importing
+
+3. Increase import timeout:
+   ```bash
+   # The default timeout is 300 seconds (5 minutes)
+   # For very large videos, this may need adjustment
+   ```
+
+4. Restart Photos.app and try again:
+   ```bash
+   killall Photos
+   open -a Photos
+   sleep 5
+   video-converter run --source photos --reimport
+   ```
+
+### AppleScript Permission Denied
+
+**Symptom:**
+```
+Error: AppleScript execution failed. Permission denied.
+```
+
+**Solutions:**
+1. Grant Automation permission:
+   - Open **System Settings** → **Privacy & Security** → **Automation**
+   - Find **Terminal** (or your terminal app)
+   - Enable **Photos** access
+
+2. Grant Accessibility permission if needed:
+   - Open **System Settings** → **Privacy & Security** → **Accessibility**
+   - Click the **+** button
+   - Add **Terminal.app** (or your terminal application)
+
+3. Reset AppleScript permissions:
+   ```bash
+   tccutil reset AppleEvents
+   ```
+   Then re-run and approve the permission prompt.
+
+### Import Failed - Duplicate Video
+
+**Symptom:**
+```
+Error: Video already exists in Photos library.
+```
+
+**Solutions:**
+1. This is expected behavior - the video was already imported
+2. Check if the original was properly archived:
+   ```bash
+   # Check archive album in Photos.app
+   ```
+3. Use `--keep-originals` to skip deletion of source files
+
+### Re-Import Metadata Not Preserved
+
+**Symptom:**
+Photos shows wrong date or missing location after re-import.
+
+**Solutions:**
+1. Ensure ExifTool is installed and working:
+   ```bash
+   exiftool -ver
+   ```
+
+2. Verify metadata was embedded in the converted file:
+   ```bash
+   exiftool -a -G1 converted_video.mp4 | grep -E "Date|GPS"
+   ```
+
+3. The Photos.app may take time to index new metadata - wait and check again
+
+---
+
+## iCloud Issues
+
+### iCloud Download Timeout
+
+**Symptom:**
+```
+Error: iCloud download timed out after 3600 seconds.
+```
+
+**Solutions:**
+1. Increase the timeout:
+   ```bash
+   video-converter config-set folder.icloud_timeout 7200
+   ```
+
+2. Download files manually first:
+   ```bash
+   brctl download /path/to/video.mp4
+   ```
+
+3. Skip cloud-only files:
+   ```bash
+   video-converter config-set folder.skip_icloud_on_timeout true
+   ```
+
+4. Check iCloud sync status in Finder - ensure you have sufficient local storage
+
+### iCloud Files Not Detected
+
+**Symptom:**
+Videos stored in iCloud are not found during scan.
+
+**Solutions:**
+1. Ensure iCloud Drive is enabled and signed in
+2. Check if files are visible in Finder (they appear with cloud icon)
+3. Enable auto-download:
+   ```bash
+   video-converter config-set folder.auto_download_icloud true
+   ```
+
+### brctl Command Not Found
+
+**Symptom:**
+```
+Error: brctl command not found.
+```
+
+**Solution:**
+The `brctl` command is part of macOS. If missing:
+1. Ensure you're running macOS 10.12 or later
+2. Check if CloudKit is functioning:
+   ```bash
+   which brctl
+   # Should show: /usr/bin/brctl
+   ```
+
+---
+
+## Concurrent Processing Issues
+
+### High Memory Usage During Batch Conversion
+
+**Symptom:**
+System becomes slow or unresponsive during batch conversion.
+
+**Solutions:**
+1. Reduce concurrent jobs:
+   ```bash
+   video-converter config-set processing.max_concurrent 1
+   ```
+
+2. Monitor memory usage:
+   ```bash
+   # The converter automatically monitors resources
+   # You can check Activity Monitor during conversion
+   ```
+
+3. Process in smaller batches:
+   ```bash
+   video-converter run --source photos --limit 10
+   ```
+
+### CPU Throttling
+
+**Symptom:**
+Conversion speed decreases over time.
+
+**Solutions:**
+1. This is normal thermal management - the Mac is protecting itself
+2. Use hardware encoding (lower CPU usage):
+   ```bash
+   video-converter config-set encoding.mode hardware
+   ```
+3. Reduce concurrent jobs to lower heat generation
+4. Ensure Mac has adequate ventilation
+
+### Conversion Jobs Stuck
+
+**Symptom:**
+Progress stops but process continues running.
+
+**Solutions:**
+1. Check for disk space issues:
+   ```bash
+   df -h
+   ```
+
+2. View logs for errors:
+   ```bash
+   video-converter service-logs --stderr
+   ```
+
+3. Kill and restart:
+   ```bash
+   # Find the process
+   ps aux | grep video-converter
+   # Kill if needed
+   kill -9 <PID>
    ```
 
 ---
