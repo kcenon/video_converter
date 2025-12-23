@@ -89,12 +89,37 @@ class ConversionWorker(QObject):
             Orchestrator instance.
         """
         if self._orchestrator is None:
+            from video_converter.core.config import Config
             from video_converter.core.orchestrator import Orchestrator, OrchestratorConfig
+            from video_converter.core.types import ConversionMode
+
+            app_config = Config.load()
+
+            # Resolve conversion mode
+            conv_mode = ConversionMode.HARDWARE
+            if app_config.encoding.mode == "software":
+                conv_mode = ConversionMode.SOFTWARE
 
             config = OrchestratorConfig(
-                validate_output=True,
+                mode=conv_mode,
+                quality=app_config.encoding.quality,
+                crf=app_config.encoding.crf,
+                preset=app_config.encoding.preset,
+                validate_output=app_config.processing.validate_quality,
                 preserve_timestamps=True,
                 preserve_metadata=True,
+                move_to_processed=app_config.paths.processed
+                if app_config.processing.move_processed
+                else None,
+                move_to_failed=app_config.paths.failed
+                if app_config.processing.move_failed
+                else None,
+                check_disk_space=app_config.processing.check_disk_space,
+                min_free_space=int(app_config.processing.min_free_space_gb * 1024 * 1024 * 1024),
+                enable_vmaf=app_config.vmaf.enabled,
+                vmaf_threshold=app_config.vmaf.threshold,
+                vmaf_sample_interval=app_config.vmaf.sample_interval,
+                vmaf_fail_action=app_config.vmaf.fail_action,
             )
             self._orchestrator = Orchestrator(config=config)
         return self._orchestrator

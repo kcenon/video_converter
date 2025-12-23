@@ -3,7 +3,9 @@
     "mode": "hardware",
     "quality": 45,
     "crf": 22,
-    "preset": "medium"
+    "preset": "medium",
+    "bit_depth": 8,
+    "hdr": false
   },
   "paths": {
     "output": "~/Videos/Converted",
@@ -23,7 +25,17 @@
   "processing": {
     "max_concurrent": 2,
     "validate_quality": true,
-    "preserve_original": true
+    "preserve_original": true,
+    "move_processed": false,
+    "move_failed": false,
+    "check_disk_space": true,
+    "min_free_space_gb": 1.0
+  },
+  "vmaf": {
+    "enabled": false,
+    "threshold": 93.0,
+    "sample_interval": 30,
+    "fail_action": "warn"
   },
   "notification": {
     "on_complete": true,

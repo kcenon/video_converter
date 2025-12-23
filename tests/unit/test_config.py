@@ -19,6 +19,7 @@ from video_converter.core.config import (
     PathsConfig,
     PhotosConfig,
     ProcessingConfig,
+    VmafConfig,
 )
 
 
@@ -40,6 +41,8 @@ class TestEncodingConfig:
         assert config.quality == 45
         assert config.crf == 22
         assert config.preset == "medium"
+        assert config.bit_depth == 8
+        assert config.hdr is False
 
     def test_custom_values(self) -> None:
         """Test encoding config with custom values."""
@@ -48,6 +51,17 @@ class TestEncodingConfig:
         assert config.quality == 80
         assert config.crf == 20
         assert config.preset == "slow"
+
+    def test_bit_depth_and_hdr(self) -> None:
+        """Test bit_depth and HDR settings."""
+        config = EncodingConfig(bit_depth=10, hdr=True)
+        assert config.bit_depth == 10
+        assert config.hdr is True
+
+    def test_bit_depth_validation(self) -> None:
+        """Test bit_depth validation with invalid value."""
+        with pytest.raises(ValueError):
+            EncodingConfig(bit_depth=12)  # Only 8 or 10 allowed
 
     def test_quality_validation_min(self) -> None:
         """Test quality minimum validation."""
@@ -172,6 +186,23 @@ class TestProcessingConfig:
         assert config.max_concurrent == 2
         assert config.validate_quality is True
         assert config.preserve_original is True
+        assert config.move_processed is False
+        assert config.move_failed is False
+        assert config.check_disk_space is True
+        assert config.min_free_space_gb == 1.0
+
+    def test_custom_processing_settings(self) -> None:
+        """Test processing config with custom values."""
+        config = ProcessingConfig(
+            move_processed=True,
+            move_failed=True,
+            check_disk_space=False,
+            min_free_space_gb=2.5,
+        )
+        assert config.move_processed is True
+        assert config.move_failed is True
+        assert config.check_disk_space is False
+        assert config.min_free_space_gb == 2.5
 
     def test_max_concurrent_validation_min(self) -> None:
         """Test max_concurrent minimum validation."""
@@ -182,6 +213,58 @@ class TestProcessingConfig:
         """Test max_concurrent maximum validation."""
         with pytest.raises(ValueError):
             ProcessingConfig(max_concurrent=9)
+
+    def test_min_free_space_validation(self) -> None:
+        """Test min_free_space_gb minimum validation."""
+        with pytest.raises(ValueError):
+            ProcessingConfig(min_free_space_gb=0.05)  # Minimum is 0.1
+
+
+class TestVmafConfig:
+    """Tests for VmafConfig model."""
+
+    def test_default_values(self) -> None:
+        """Test default VMAF config values."""
+        config = VmafConfig()
+        assert config.enabled is False
+        assert config.threshold == 93.0
+        assert config.sample_interval == 30
+        assert config.fail_action == "warn"
+
+    def test_custom_values(self) -> None:
+        """Test VMAF config with custom values."""
+        config = VmafConfig(
+            enabled=True,
+            threshold=90.0,
+            sample_interval=15,
+            fail_action="retry",
+        )
+        assert config.enabled is True
+        assert config.threshold == 90.0
+        assert config.sample_interval == 15
+        assert config.fail_action == "retry"
+
+    def test_threshold_validation_min(self) -> None:
+        """Test threshold minimum validation."""
+        config = VmafConfig(threshold=0.0)
+        assert config.threshold == 0.0
+
+    def test_threshold_validation_max(self) -> None:
+        """Test threshold maximum validation."""
+        config = VmafConfig(threshold=100.0)
+        assert config.threshold == 100.0
+        with pytest.raises(ValueError):
+            VmafConfig(threshold=100.1)
+
+    def test_sample_interval_validation(self) -> None:
+        """Test sample_interval minimum validation."""
+        with pytest.raises(ValueError):
+            VmafConfig(sample_interval=0)
+
+    def test_fail_action_validation(self) -> None:
+        """Test fail_action validation with invalid value."""
+        with pytest.raises(ValueError):
+            VmafConfig(fail_action="invalid")
 
 
 class TestNotificationConfig:
@@ -378,6 +461,7 @@ class TestConfigToDict:
         assert "automation" in result
         assert "photos" in result
         assert "processing" in result
+        assert "vmaf" in result
         assert "notification" in result
 
 
