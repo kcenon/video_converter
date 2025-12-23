@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 
 from video_converter.gui.dialogs.result_dialog import ConversionResultDialog
 from video_converter.gui.services.conversion_service import ConversionService
+from video_converter.gui.services.settings_manager import SettingsManager
 from video_converter.gui.views.convert_view import ConvertView
 from video_converter.gui.views.home_view import HomeView
 from video_converter.gui.views.photos_view import PhotosView
@@ -56,6 +57,10 @@ class MainWindow(QMainWindow):
         """Initialize the main window."""
         super().__init__()
 
+        # Create settings manager and load settings
+        self._settings_manager = SettingsManager(self)
+        self._settings_manager.load()
+
         # Create conversion service
         self._conversion_service = ConversionService(self)
 
@@ -65,6 +70,7 @@ class MainWindow(QMainWindow):
         self._setup_menu_bar()
         self._setup_status_bar()
         self._connect_conversion_service()
+        self._connect_settings_manager()
 
     def _setup_window(self) -> None:
         """Configure window properties."""
@@ -263,6 +269,32 @@ class MainWindow(QMainWindow):
             "<p>Copyright 2024 Video Converter Team</p>",
         )
 
+    def _connect_settings_manager(self) -> None:
+        """Connect settings manager with views."""
+        # Load saved settings into settings view
+        self.settings_view.load_settings(self._settings_manager.get())
+
+        # Connect settings view signals to manager
+        self.settings_view.settings_changed.connect(self._on_settings_changed)
+        self.settings_view.settings_saved.connect(self._on_settings_saved)
+
+    @Slot(dict)
+    def _on_settings_changed(self, settings: dict) -> None:
+        """Handle settings change from settings view.
+
+        Args:
+            settings: New settings dictionary.
+        """
+        self._settings_manager.set(settings)
+
+    @Slot()
+    def _on_settings_saved(self) -> None:
+        """Handle settings save request."""
+        if self._settings_manager.save():
+            self.statusBar().showMessage("Settings saved", 3000)
+        else:
+            self.statusBar().showMessage("Failed to save settings", 3000)
+
     def _connect_conversion_service(self) -> None:
         """Connect conversion service signals to views."""
         # Connect ConvertView signals
@@ -295,8 +327,13 @@ class MainWindow(QMainWindow):
             file_path: Path to the input file.
             settings: Conversion settings dictionary.
         """
+        # Apply saved settings to conversion settings
+        enhanced_settings = self._settings_manager.apply_to_conversion_settings(
+            settings.copy()
+        )
+
         # Add task to queue
-        self._conversion_service.add_task(file_path, settings=settings)
+        self._conversion_service.add_task(file_path, settings=enhanced_settings)
 
         # Switch to Queue view to show progress
         self._set_current_tab(self.TAB_QUEUE)
@@ -398,6 +435,10 @@ class MainWindow(QMainWindow):
         Args:
             event: Close event.
         """
+        # Save settings if there are unsaved changes
+        if self._settings_manager.is_dirty():
+            self._settings_manager.save()
+
         # Shutdown conversion service
         self._conversion_service.shutdown()
         super().closeEvent(event)
