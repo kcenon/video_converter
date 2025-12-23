@@ -1,0 +1,123 @@
+site_name: Video Converter Documentation
+site_description: Automated H.264 to H.265 video conversion for macOS with Photos library integration
+site_url: https://kcenon.github.io/video_converter/
+repo_url: https://github.com/kcenon/video_converter
+repo_name: kcenon/video_converter
+
+theme:
+  name: material
+  language: en
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            merge_init_into_class: true
+            separate_signature: true
+            signature_crossrefs: true
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+  - pymdownx.critic
+  - pymdownx.caret
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.tilde
+  - admonition
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Quick Start: quick-start.md
+      - Installation: installation.md
+      - Troubleshooting: troubleshooting.md
+  - User Guide:
+      - CLI Usage: guides/cli-usage.md
+      - Photos Library: guides/photos-workflow.md
+      - Folder Conversion: guides/folder-conversion.md
+      - Automation: guides/automation.md
+      - Advanced Usage: guides/advanced.md
+  - Examples:
+      - Basic Examples: examples/basic.md
+      - Batch Processing: examples/batch.md
+      - Photos Integration: examples/photos.md
+      - Error Handling: examples/error-handling.md
+      - Automation Setup: examples/automation.md
+  - Architecture:
+      - System Overview: architecture/01-system-architecture.md
+      - Sequence Diagrams: architecture/02-sequence-diagrams.md
+      - Data Flow: architecture/03-data-flow-and-states.md
+      - Processing Procedures: architecture/04-processing-procedures.md
+  - API Reference:
+      - Core: api/core.md
+      - Converters: api/converters.md
+      - Processors: api/processors.md
+      - Extractors: api/extractors.md
+      - Automation: api/automation.md
+      - Utils: api/utils.md
+  - Reference:
+      - Software Design (SDS): SDS.md
+      - Requirements (SRS): SRS.md
+      - Product Requirements (PRD): PRD.md
+      - Changelog: changelog.md
+      - Contributing: contributing.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/kcenon/video_converter
+  version:
+    provider: mike
+
+copyright: Copyright &copy; 2024 Video Converter Team

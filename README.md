@@ -1,6 +1,7 @@
 # Video Converter
 
 [![CI](https://github.com/kcenon/video_converter/actions/workflows/ci.yml/badge.svg)](https://github.com/kcenon/video_converter/actions/workflows/ci.yml)
+[![Documentation](https://github.com/kcenon/video_converter/actions/workflows/docs.yml/badge.svg)](https://kcenon.github.io/video_converter/)
 [![codecov](https://codecov.io/gh/kcenon/video_converter/branch/main/graph/badge.svg)](https://codecov.io/gh/kcenon/video_converter)
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
 [![macOS](https://img.shields.io/badge/macOS-12.0+-000000.svg)](https://apple.com/macos)
@@ -598,16 +599,18 @@ Photos Library ──▶ H.264 Detection ──▶ VideoToolbox ──▶ H.265 
 
 ## Documentation
 
+📚 **Full documentation available at: [kcenon.github.io/video_converter](https://kcenon.github.io/video_converter/)**
+
 | Document | Description |
 |----------|-------------|
 | [Quick Start](QUICK_START.md) | Get started in 5 minutes |
 | [Troubleshooting](TROUBLESHOOTING.md) | Common issues and solutions |
 | [Changelog](CHANGELOG.md) | Version history and changes |
+| [API Reference](https://kcenon.github.io/video_converter/api/core/) | Python API documentation |
+| [Architecture](docs/architecture/) | System architecture and diagrams |
 | [PRD](docs/PRD.md) | Product Requirements Document |
 | [SRS](docs/SRS.md) | Software Requirements Specification |
 | [SDS](docs/SDS.md) | Software Design Specification |
-| [Architecture](docs/architecture/) | System architecture and diagrams |
-| [Development Plan](docs/development-plan.md) | Development phases and timeline |
 
 ## GUI Application (Preview)
 
