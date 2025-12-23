@@ -83,15 +83,27 @@ ruff format src/
 mypy src/
 ```
 
+## Continuous Integration
+
+All pull requests are automatically checked by GitHub Actions:
+
+- **Lint**: Ruff linter and formatter checks
+- **Type Check**: MyPy static type analysis
+- **Test**: pytest on Python 3.10, 3.11, 3.12
+- **Dependency Review**: Security scanning for dependencies
+
+CI must pass before merging. Check the [Actions tab](https://github.com/kcenon/video_converter/actions) for build status.
+
 ## Pull Request Process
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/your-feature`)
 3. Make your changes
-4. Run tests and linting
+4. Run tests and linting locally
 5. Commit your changes with a descriptive message
 6. Push to your fork
 7. Create a Pull Request
+8. Ensure CI checks pass
 
 ## Commit Message Format
 
