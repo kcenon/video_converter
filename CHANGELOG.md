@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### GUI Application
+- **Photos Library Browser** (#143): Full Photos library integration for the GUI:
+  - `PhotosService` for async Photos library access in separate thread
+  - Album tree view with video counts loaded from Photos database
+  - Video grid with selectable thumbnails generated via ffmpeg
+  - H.264/iCloud/favorites filtering options
+  - Multi-select with total size calculation
+  - iCloud status display with warning for cloud-only videos
+  - Permission handling with link to System Settings
+  - Batch conversion integration (selected videos go to queue)
+  - Loading indicators for async operations
 - **Menubar App Integration** (#142): macOS system tray application for background monitoring:
   - Real-time conversion progress display in menubar menu
   - Text-based progress bar visualization (▓░)
