@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+#### Version Unification (#172)
+- **Unified version source** to use `pyproject.toml` as single source of truth via `importlib.metadata`
+  - `__init__.py` now loads version from package metadata
+  - `config.py` imports `__version__` instead of hardcoding version
+  - `build_app.sh` reads version dynamically via Python
+  - Removed version field from `config/default.json` (determined at runtime)
+- **Version updated** from scattered values (0.1.0, 0.2.0.0, 0.3.0, 1.0.0) to unified `0.2.1.0`
+- **Added version consistency tests** to ensure all version references remain synchronized
+
 #### Photos Convert Orchestrator Integration (#171)
 - **Refactored Photos batch conversion** to use `orchestrator.run()` instead of direct `converter.convert()` calls
   - Enables concurrent processing via `--max-concurrent` option (1-8 workers)

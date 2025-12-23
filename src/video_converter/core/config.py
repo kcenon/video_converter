@@ -35,6 +35,8 @@ from pydantic_settings import (
 )
 from pydantic_settings.sources import JsonConfigSettingsSource
 
+from video_converter import __version__
+
 # Default paths
 DEFAULT_CONFIG_DIR = Path.home() / ".config" / "video_converter"
 DEFAULT_CONFIG_FILE = DEFAULT_CONFIG_DIR / "config.json"
@@ -227,7 +229,7 @@ class Config(BaseSettings):
         extra="ignore",
     )
 
-    version: str = "1.0.0"
+    version: str = Field(default_factory=lambda: __version__)
     encoding: EncodingConfig = Field(default_factory=EncodingConfig)
     paths: PathsConfig = Field(default_factory=PathsConfig)
     automation: AutomationConfig = Field(default_factory=AutomationConfig)
