@@ -1506,9 +1506,7 @@ def _run_photos_batch_conversion(
 
     # Calculate statistics
     elapsed_time = time.time() - start_time
-    total_original = sum(
-        r.original_size for r in report.results if r.success and r.original_size
-    )
+    total_original = sum(r.original_size for r in report.results if r.success and r.original_size)
     total_converted = sum(
         r.converted_size for r in report.results if r.success and r.converted_size
     )
@@ -1527,11 +1525,15 @@ def _run_photos_batch_conversion(
     console.print(f"  Time elapsed:     {elapsed_time:.1f}s")
 
     # Show errors
-    all_errors = export_errors + [
-        f"{r.request.input_path.name}: {r.error_message}"
-        for r in report.results
-        if not r.success
-    ] + reimport_errors
+    all_errors = (
+        export_errors
+        + [
+            f"{r.request.input_path.name}: {r.error_message}"
+            for r in report.results
+            if not r.success
+        ]
+        + reimport_errors
+    )
 
     if all_errors:
         console.print()
