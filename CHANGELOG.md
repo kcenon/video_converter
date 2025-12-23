@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Testing
+- **CLI Test Coverage** (#128): Comprehensive test suite for CLI commands in `tests/unit/cli/`:
+  - `test_convert_cmd.py` - Convert command tests (VMAF, metadata, encoding modes)
+  - `test_run_cmd.py` - Batch conversion tests (folder/Photos modes, filters)
+  - `test_status_cmd.py` - Status command tests for all service states
+  - `test_config_cmd.py` - Configuration command tests (view, set, setup wizard)
+  - `test_service_cmd.py` - Service management tests (install, uninstall, control)
+  - `test_stats_cmd.py` - Statistics command tests (view, export, periods)
+  - `test_error_handling.py` - Error handling and edge case tests
+  - `test_helpers.py` - Helper function tests (parse_time, format_duration, format_size)
+  - CLI-specific fixtures in `conftest.py` (mock converters, handlers, managers)
+  - 141 test cases covering 17 CLI commands
+
 ## [0.2.0.0] - 2025-12-23
 
 ### Fixed

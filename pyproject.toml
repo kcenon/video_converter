@@ -139,7 +139,6 @@ markers = [
 source = ["src/video_converter"]
 branch = true
 omit = [
-    "src/video_converter/__main__.py",
     "src/video_converter/utils/applescript.py",
 ]
 
