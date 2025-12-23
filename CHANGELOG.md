@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0.0] - 2025-12-23
+
 ### Fixed
 - **Session State Deadlock** (#116): Resolved deadlock in `SessionStateManager` by using `threading.RLock()` instead of `threading.Lock()`. The nested lock acquisition when `create_session()` called `save()` was causing test hangs.
 
@@ -16,331 +18,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-#### Test Infrastructure Improvements (#116)
-- Added `mock_osxphotos` fixture in `conftest.py` for proper handling of lazy-imported `osxphotos` module
-- Updated `test_config_version` to validate version format instead of hardcoded value
-- Refactored `test_photos_extractor.py` to use fixture instead of `@patch` decorator for better compatibility with lazy imports
-- **Test Coverage**: Verified 81.62% unit test coverage, exceeding the 80% target
+#### Core Features
+- **VMAF Quality Measurement** (#26): `VmafAnalyzer` class for perceptual video quality measurement with VMAF score calculation, `VmafScores` dataclass (min, mean, max, percentiles), `VmafQualityLevel` enum (visually lossless >= 93), frame sampling, `quick_analyze()` for fast estimation, and async support. 46 comprehensive unit tests.
+- **Concurrent Processing** (#31): `ConcurrentProcessor` for parallel video processing with configurable max concurrent jobs, `ResourceMonitor` for system resource tracking, `AggregatedProgress` for combined progress, semaphore-based concurrency limiting, and thread-safe job management. 32 test cases.
+- **Error Recovery** (#32): `ErrorRecoveryManager` with `ErrorCategory` and `RecoveryAction` enums, automatic error classification, disk space monitoring, `FailureRecord` tracking, manual retry API, and partial output cleanup.
+- **Retry Logic** (#27): `RetryManager` with four-stage retry (same settings → switch encoder → adjust quality → final attempt), automatic encoder fallback (HW ↔ SW), CRF adjustment, `RetryConfig`, `RetryAttempt` tracking, and `RetryResult`. 35 unit tests.
 
-#### Integration Tests for v0.2.0.0 Features (#115)
-- `test_vmaf_integration.py` - VMAF quality validation workflow (29 tests):
-  - VmafAnalyzer availability and analysis methods
-  - VmafQualityLevel thresholds (93 for lossless, 80 for high, 60 for good)
-  - VmafScores and VmafResult dataclasses
-  - Quick analyze and validation workflow integration
-- `test_concurrent_integration.py` - Concurrent processing support (24 tests):
-  - ResourceMonitor level categorization and concurrency recommendations
-  - ConcurrentProcessor batch processing with async/await
-  - JobProgress and AggregatedProgress tracking
-  - Adaptive concurrency under resource pressure
-- `test_error_recovery_integration.py` - Error recovery and retry strategies (34 tests):
-  - ErrorClassifier for categorizing error messages
-  - RecoveryAction mappings for different error categories
-  - FailureRecord tracking and RetryManager strategies
-  - Disk space checking and cleanup operations
-- `test_icloud_folder_integration.py` - iCloud folder support (31 tests):
-  - FolderExtractor iCloud stub detection (`.filename.icloud` format)
-  - iCloudHandler status checking, download triggering, and eviction
-  - CloudStatus enum and FolderVideoInfo iCloud properties
-  - Nested folder scanning with iCloud file handling
-- `test_statistics_integration.py` - Statistics reporting (47 tests):
-  - Size and duration formatting utilities
-  - StatisticsReporter summary, compact, and detailed formats
-  - JSON and CSV export with comment headers
-  - Period display formatting (today, week, month, all time)
-- `test_notification_integration.py` - macOS notification integration (49 tests):
-  - NotificationManager configuration and availability checking
-  - AppleScript-based notification sending
-  - Batch notification formatting and type determination
-  - Graceful degradation on non-macOS platforms
+#### Photos Integration
+- **Photos Re-Import** (#101): `PhotosImporter` class for importing converted videos back to Photos library via AppleScript, `import_video()`, `verify_import()`, `get_video_info()` methods, configurable timeout, and comprehensive exception hierarchy (`PhotosImportError`, `PhotosNotRunningError`, `ImportTimeoutError`, `DuplicateVideoError`, `ImportFailedError`).
+- **Metadata Preservation** (#103): `MetadataPreserver` class with `VideoMetadataSnapshot`, `capture_metadata()`, `embed_metadata_in_file()` via ExifTool, `apply_photos_metadata()` via AppleScript, `verify_metadata()` with `MetadataTolerance` presets, and `VerificationResult`.
+- **Original Handling** (#102): `OriginalHandling` enum (DELETE, ARCHIVE, KEEP), `handle_original()` method, CLI options (`--reimport`, `--delete-originals`, `--keep-originals`, `--archive-album`, `--confirm-delete`), and AppleScript integration.
+- **Permission Guidance** (#96): `--check-permissions` flag, rich panel display for permission errors, `display_photos_permission_error()`, `display_photos_permission_success()`, `display_photos_library_info()`, and quick access to System Settings.
+- **Progress Display** (#97): `PhotosProgressDisplay` with library info panel, two-phase progress tracking (Export/Convert), metadata display, styled summary panel, and `_NullPhotosProgress` for quiet mode.
 
-#### Original Video Handling Options for Photos Re-import (#102)
-- `OriginalHandling` enum with three options:
-  - `DELETE`: Permanently remove original video after successful re-import
-  - `ARCHIVE`: Move original to an archive album for later review
-  - `KEEP`: Keep both original and converted versions
-- `PhotosImporter.handle_original()` method for processing originals after re-import
-- CLI options for controlling original video handling:
-  - `--reimport/--no-reimport`: Enable/disable re-import to Photos library
-  - `--delete-originals`: Delete originals (requires `--confirm-delete` for safety)
-  - `--keep-originals`: Keep both original and converted versions
-  - `--archive-album`: Custom album name for archiving (default: "Converted Originals")
-  - `--confirm-delete`: Safety confirmation required for deletion
-- Validation for mutually exclusive options (--delete-originals vs --keep-originals)
-- AppleScript integration for delete, archive, and album creation operations
-- Unit tests for `OriginalHandling` enum and `PhotosImporter` methods
-- Integration tests for CLI option validation
+#### Folder Support
+- **iCloud Drive Support** (#88): Automatic iCloud stub file detection (`.filename.icloud` format) in `FolderExtractor`, `_is_icloud_stub()`, `_get_original_path_from_stub()`, `in_cloud` and `stub_path` properties, `FolderConfig` with iCloud settings, and `_ensure_file_available()` in Orchestrator. 15 unit tests.
+- **Folder Extractor**: `FolderExtractor` class for direct video conversion from filesystem folders, recursive scanning with include/exclude patterns, video codec detection, `FolderVideoInfo` and `FolderStats` dataclasses. 62 test cases.
 
-#### Photos Re-Import Unit Tests (#104)
-- `test_photos_metadata_preservation.py` - Comprehensive tests for `MetadataPreserver` class:
-  - `VideoMetadataSnapshot` dataclass property and factory tests
-  - `MetadataTolerance` factory methods (default, strict, relaxed)
-  - `VerificationResult` dataclass tests for success/failure scenarios
-  - `capture_metadata()` method tests with PhotosVideoInfo mocks
-  - `embed_metadata_in_file()` tests for date, GPS, description, keywords
-  - `apply_photos_metadata()` tests for albums, favorites, hidden status
-  - `verify_metadata()` tests with tolerance handling and missing albums
-  - Internal helper method tests (`_set_favorite`, `_add_to_album`)
-- `test_photos_original_handling.py` - Tests for original video handling:
-  - DELETE option with AppleScript execution and error scenarios
-  - ARCHIVE option with album creation and video addition
-  - KEEP option verification (no-op behavior)
-  - Album creation functionality and failure handling
-  - Handling failure rollback scenarios
-  - AppleScript generation and special character escaping
-- `test_photos_reimport.py` - Integration tests for re-import workflow:
-  - CLI options availability (--reimport, --delete-originals, etc.)
-  - Option validation (mutual exclusivity, required flags)
-  - Full re-import workflow with mocked components
-  - Error handling and rollback scenarios
-  - Different handling options (DELETE, ARCHIVE, KEEP) tests
+#### Automation
+- **Service Management** (#35): Public `load()`, `unload()`, `restart()` methods in `ServiceManager`, permission checking, CLI commands (`service-start`, `service-stop`, `service-load`, `service-unload`, `service-restart`, `service-logs`), `--follow` and `--stderr` options.
+- **Status Query** (#36): `calculate_next_run()`, `get_last_run_info()`, `get_detailed_status()` methods, `LastRunInfo` and `DetailedServiceStatus` dataclasses, enhanced CLI `status` command with next run time and statistics. 26 tests.
 
-#### Photos CLI Unit Tests (#98)
-- `test_photos_handler.py` - Comprehensive tests for `PhotosSourceHandler` class:
-  - `PhotosConversionOptions` and `PhotosConversionResult` dataclass validation
-  - Permission checking flow with mock library and errors
-  - Candidate filtering by favorites, hidden status, date range, albums, and limit
-  - Video export and cleanup operations
-  - Context manager and lazy loading behavior
-- `test_photos_permissions.py` - Tests for permission handling and UI panels:
-  - Permission instructions and error message content
-  - Exception hierarchy (`PhotosLibraryError`, `PhotosAccessDeniedError`, `PhotosLibraryNotFoundError`)
-  - Permission check flow scenarios (success, denied, not found)
-  - Rich panel display functions for access denied and library not found errors
-- `test_photos_progress.py` - Tests for progress display components:
-  - `PhotosProgressDisplay` initialization and lifecycle
-  - Export and convert progress updates
-  - `_NullPhotosProgress` null object pattern for quiet mode
-  - Size formatting and summary display
-- `test_photos_cli.py` - CLI integration tests:
-  - `--source photos` option availability and execution
-  - Filtering options: `--albums`, `--exclude-albums`, `--from-date`, `--to-date`, `--favorites-only`, `--limit`
-  - `--dry-run` and `--check-permissions` options
-  - Error handling for invalid inputs
+#### UI/UX
+- **Rich Progress Display** (#38): `ui/progress.py` module with `SingleFileProgressDisplay`, `BatchProgressDisplay`, `IndeterminateSpinner`, `ProgressDisplayManager`, custom Rich columns (`SizeProgressColumn`, `SpeedColumn`, `ETAColumn`), and null object pattern for quiet mode. 35 unit tests.
+- **Statistics Reporter**: `StatisticsReporter` class with `StatsPeriod` enum, time-based filtering (today, week, month, all), enhanced `stats` CLI command, `stats-export` for JSON/CSV, `--detailed` and `--period` options.
+- **macOS Notifications**: `NotificationManager` class with automatic batch completion notifications, success/partial/failure types, summary statistics, `NotificationConfig`, and Orchestrator integration.
 
-#### Photos-Specific Progress Display (#97)
-- `PhotosProgressDisplay` class for Photos library conversion with rich UI
-- Library info panel showing path, video count, total size, and estimated savings
-- Two-phase progress tracking: Export (file transfer) and Convert (encoding)
-- Photos-specific metadata display: album name, date taken, file size
-- Styled summary panel with conversion statistics (successful, failed, saved, elapsed time)
-- `_NullPhotosProgress` for quiet mode support (Null Object pattern)
-- `PhotosLibraryInfo` dataclass for library information display
-- `create_photos_progress()` method added to `ProgressDisplayManager`
-- Export progress callback integration in `_run_photos_batch_conversion`
+#### Quality & Validation
+- **Metadata Verification** (#22): `MetadataVerifier` class for comprehensive metadata comparison, `ToleranceSettings` (date: 1s, GPS: 0.000001°, duration: 0.1s), `CheckResult` and `VerificationResult` dataclasses, category-based verification, and tolerance profiles. 43 test cases.
+- **Timestamp Sync** (#21): `TimestampSynchronizer` for copying timestamps, `FileTimestamps` dataclass, birth time support on macOS via SetFile, `TimestampVerificationResult`, `preserve_timestamps` config option. 23 test cases.
+- **Conversion History** (#18): `ConversionHistory` class for duplicate prevention, `ConversionRecord` dataclass, `HistoryStatistics`, UUID and file hash identification, JSON persistence, export functionality. 41 test cases.
 
-#### Photos Library Permission Check and User Guidance (#96)
-- `--check-permissions` flag for verifying Photos library access before conversion
-- Rich panel display for permission errors with step-by-step instructions
-- `display_photos_permission_error()` function for access denied and not found errors
-- `display_photos_permission_success()` function for successful permission check
-- `display_photos_library_info()` function for library statistics display
-- Quick access command to open System Settings directly
-- Improved error handling with `PhotosLibraryNotFoundError` and `PhotosAccessDeniedError`
+#### Other
+- **iCloud Download** (#16): `iCloudHandler` for detecting and downloading iCloud videos, `CloudStatus` enum, stub file analysis, brctl download triggering, `DownloadProgress` tracking, `icloud_timeout` and `skip_cloud_only` options.
+- **Real-time Progress** (#11): `ProgressInfo` dataclass with ETA calculation, `ProgressParser` for FFmpeg output, `ProgressMonitor` with throttling, `create_simple_callback` helper.
+- **10-bit HDR Encoding**: `bit_depth` option for 8/10-bit, `hdr` option for HDR10 (BT.2020 PQ), libx265 10-bit support with yuv420p10le.
 
-#### Metadata Preservation for Photos Re-Import (#103)
-- `MetadataPreserver` class for preserving metadata during Photos re-import workflow
-- `VideoMetadataSnapshot` dataclass for capturing complete video metadata
-- `capture_metadata()` method to snapshot original video metadata (albums, favorites, date, location)
-- `embed_metadata_in_file()` method to embed date/GPS metadata via ExifTool before import
-- `apply_photos_metadata()` method to apply Albums/favorites via AppleScript after import
-- `verify_metadata()` method to validate metadata preservation with configurable tolerance
-- `MetadataTolerance` dataclass with default, strict, and relaxed presets
-- `VerificationResult` dataclass with detailed comparison results
-- Exception classes: `MetadataPreservationError`, `MetadataEmbedError`, `MetadataApplicationError`
-- Integration with existing `MetadataProcessor` for ExifTool operations
-- Support for preserving: albums, favorites, hidden status, date, location, description, keywords
-
-#### Photos Library Re-Import Support (#101)
-- `PhotosImporter` class for importing converted videos back to Photos library
-- AppleScript integration via `osascript` command for Photos.app automation
-- `import_video()` method to import video files and return UUID
-- `verify_import()` method to confirm successful import by UUID
-- `get_video_info()` method to retrieve imported video metadata
-- Configurable timeout (default 5 minutes) for large video imports
-- Comprehensive exception hierarchy:
-  - `PhotosImportError`: Base exception for import operations
-  - `PhotosNotRunningError`: Photos.app activation failure
-  - `ImportTimeoutError`: Operation timeout
-  - `DuplicateVideoError`: Video already exists in library
-  - `ImportFailedError`: General import failure
-- New `AppleScriptRunner` utility class for safe AppleScript execution
-- `escape_applescript_string()` utility for safe string injection
-
-#### iCloud Drive Folder Support (#88)
-- Automatic detection of iCloud stub files (`.filename.icloud` format) in `FolderExtractor`
-- `_is_icloud_stub()` and `_is_video_stub()` methods for stub file detection
-- `_get_original_path_from_stub()` for inferring actual filename from stub
-- `in_cloud` and `stub_path` properties in `FolderVideoInfo` dataclass
-- `scan()` method now includes iCloud files with `include_icloud` parameter
-- `get_video_info()` handles both local and iCloud stub files
-- `in_cloud` counter in `FolderStats` for iCloud file statistics
-- `_ensure_file_available()` in Orchestrator for automatic iCloud download
-- Integration with existing `iCloudHandler` for download management
-- New `FolderConfig` class with iCloud-specific settings:
-  - `auto_download_icloud`: Enable/disable automatic downloads (default: True)
-  - `icloud_timeout`: Download timeout in seconds (default: 3600)
-  - `skip_icloud_on_timeout`: Skip on timeout instead of error (default: True)
-  - `include_patterns` and `exclude_patterns` for file filtering
-- `OrchestratorConfig` extended with iCloud options
-- 15 comprehensive unit tests for iCloud folder support
-
-#### VMAF Quality Measurement (#26)
-- `VmafAnalyzer` class for perceptual video quality measurement
-- VMAF score calculation between original and converted videos
-- `VmafScores` dataclass with min, mean, max, 5th/95th percentile statistics
-- `VmafQualityLevel` enum for score interpretation (visually lossless >= 93)
-- Support for frame sampling via `sample_interval` for faster analysis
-- Graceful handling when libvmaf is not available (`is_available()` check)
-- `quick_analyze()` method for fast quality estimation (1:30 sampling)
-- Human-readable quality assessment via `get_quality_assessment()`
-- Async support with `analyze_async()` method
-- 46 comprehensive unit tests
-- Exported from `video_converter.processors` package
-
-#### macOS Notification Center Integration
-- `NotificationManager` class for sending macOS notifications
-- Automatic notifications on batch conversion completion
-- Support for success, partial success, and failure notification types
-- Summary statistics (videos converted, space saved) in notification body
-- `NotificationConfig` for customizing sound and grouping options
-- Orchestrator integration with `enable_notifications` option
-- Comprehensive unit tests for notification functionality
-
-#### Statistics and Reporting
-- Time-based filtering for conversion statistics (today, week, month, all)
-- `StatsPeriod` enum for period selection
-- `StatisticsReporter` class for formatted output with box drawing
-- Enhanced `stats` CLI command with real history integration
-- `stats-export` CLI command for JSON/CSV export
-- `--detailed` flag for showing recent conversions
-- `--period` option for time-based statistics filtering
-- `--include-records` option for exporting individual conversion records
-- Comprehensive unit tests for statistics features
-
-#### Rich Progress Bar Display (#38)
-- New `ui/progress.py` module with Rich-based progress display components
-- `SingleFileProgressDisplay` class showing filename, progress bar, size (original -> current), ETA, and encoding speed
-- `BatchProgressDisplay` class with combined overall and per-file progress tracking
-- `IndeterminateSpinner` class for operations with unknown duration
-- `ProgressDisplayManager` for unified progress creation with quiet mode support
-- Null object pattern implementations for quiet mode (no output pollution)
-- Custom Rich columns: `SizeProgressColumn`, `SpeedColumn`, `ETAColumn`
-- Integration with existing `ProgressInfo` from `converters/progress.py`
-- 35 unit tests for all progress display components
-
-#### Service Status Query (#36)
-- `calculate_next_run()` method for computing next scheduled execution time
-- `get_last_run_info()` method for parsing service logs to get last run details
-- `get_detailed_status()` method combining status, schedule, history, and statistics
-- `LastRunInfo` dataclass for last run timestamp, success status, and statistics
-- `DetailedServiceStatus` dataclass for comprehensive service information
-- `format_bytes()` helper function for human-readable byte display
-- Enhanced CLI `status` command with next run time, last run result, and conversion statistics
-- Launchd weekday to Python weekday conversion for accurate schedule calculation
-- 26 new tests for service status functionality
-
-#### launchctl Wrapper for Service Management (#35)
-- Public `load()`, `unload()`, `restart()` methods in ServiceManager
-- Permission checking for plist files before loading
-- CLI commands: `service-start`, `service-stop`, `service-load`, `service-unload`, `service-restart`, `service-logs`
-- `--follow` and `--stderr` options for service-logs command
-- Tests for load/unload/restart operations and permission checks
-
-#### Failure Isolation and Error Recovery (#32)
-- ErrorCategory enum for classifying conversion failures (input, encoding, validation, metadata, disk space, permission)
-- RecoveryAction enum for recommended recovery actions per error category
-- ErrorRecoveryManager class for centralized error handling
-- Automatic error classification based on error message patterns
-- Disk space monitoring with configurable minimum threshold
-- Automatic pause on low disk space with `pause_on_disk_full` option
-- Partial output file cleanup on conversion failure
-- FailureRecord dataclass for tracking failed conversions
-- Manual retry API: `retry_failed()`, `retry_all_failed()` methods
-- Failure summary with statistics by error category
-- Failed file movement with collision handling
-
-#### Concurrent Processing Support (#31)
-- ConcurrentProcessor class for parallel video processing with configurable max concurrent jobs
-- ResourceMonitor for system resource tracking (CPU, memory utilization)
-- AggregatedProgress for combined progress tracking across concurrent jobs
-- Semaphore-based concurrency limiting to prevent system overload
-- Automatic switching between sequential and concurrent processing based on max_concurrent setting
-- Thread-safe job progress management
-- Comprehensive unit tests (32 test cases)
-
-#### Validation Retry Logic (#27)
-- RetryManager class with configurable retry strategies
-- Four-stage retry: same settings → switch encoder → adjust quality → final attempt
-- Automatic encoder fallback (Hardware ↔ Software) on encoder-related failures
-- CRF adjustment for compression issues with configurable step size
-- RetryConfig for customizing max attempts, encoder switching, quality adjustment
-- RetryAttempt tracking with timing and failure classification
-- RetryResult with comprehensive failure reporting
-- Retry tracking fields in ConversionResult (retry_count, retry_strategy_used, retry_history)
-- Enable/disable retry via OrchestratorConfig.enable_retry
-- 35 unit tests covering all retry scenarios
-
-#### Metadata Verification System (#22)
-- MetadataVerifier class for comprehensive metadata comparison between original and converted files
-- ToleranceSettings dataclass for configurable comparison thresholds (date: 1s, GPS: 0.000001°, duration: 0.1s)
-- CheckResult and VerificationResult dataclasses for structured verification results
-- Support for date/time, GPS, camera, video, and audio metadata verification
-- Category-based verification with selectable categories
-- Pre-configured tolerance profiles (strict, default, relaxed)
-- Comprehensive unit tests (43 test cases)
-
-#### File Timestamp Synchronization (#21)
-- TimestampSynchronizer class for copying timestamps from original to converted files
-- FileTimestamps dataclass for timestamp extraction and management
-- Support for birth time (creation date) on macOS via SetFile command
-- Modification time and access time synchronization using os.utime
-- TimestampVerificationResult for comparing timestamps with configurable tolerance
-- Integration with Orchestrator pipeline (METADATA stage)
-- preserve_timestamps config option (default: True)
-- Comprehensive unit tests (23 test cases)
-
-#### Conversion History for Duplicate Prevention (#18)
-- ConversionHistory class for tracking converted videos
-- ConversionRecord dataclass for storing conversion metadata
-- HistoryStatistics for aggregated conversion statistics
-- Support for UUID (Photos) and file hash identification
-- JSON persistence with atomic file writes
-- Export functionality (JSON, CSV formats)
-- Thread-safe operations with RLock
-- Comprehensive unit tests (41 test cases)
-
-#### iCloud Video Download Handling (#16)
-- iCloudHandler class for detecting and downloading iCloud-stored videos
-- CloudStatus enum (LOCAL, CLOUD_ONLY, DOWNLOADING, FAILED, UNKNOWN)
-- Automatic iCloud status detection using stub file analysis
-- Download triggering via macOS brctl command (requires macOS 12+)
-- Download progress tracking with DownloadProgress dataclass
-- Configurable download timeout (icloud_timeout option)
-- Option to skip cloud-only videos (skip_cloud_only option)
-- Eviction support for freeing local storage space
-
-#### Real-time Progress Monitoring (#11)
-- ProgressInfo dataclass with ETA calculation properties (eta_seconds, eta_formatted)
-- ProgressParser for parsing FFmpeg stderr output
-- ProgressMonitor for callback-based progress updates with throttling
-- create_simple_callback helper for console progress display
-- Support for both simple (float 0-1) and detailed (ProgressInfo) callbacks in BaseConverter
-- Human-readable size formatting (size_formatted property)
-
-#### 10-bit HDR Encoding Support
-- Add `bit_depth` option for 8-bit and 10-bit encoding
-- Add `hdr` option for HDR10 (BT.2020 PQ) color space encoding
-- Software encoder (libx265) now supports 10-bit output with yuv420p10le pixel format
-- HDR x265-params for professional-grade HDR content preservation
-
-#### Folder Extractor
-- FolderExtractor class for direct video conversion from filesystem folders
-- Recursive directory scanning with include/exclude pattern filtering
-- Video codec detection and conversion candidate identification
-- FolderVideoInfo and FolderStats dataclasses for structured video information
-- Comprehensive error handling (FolderNotFoundError, FolderAccessDeniedError, InvalidVideoFileError)
-- Unit tests with 62 test cases covering all functionality
+#### Test Infrastructure
+- **Integration Tests** (#115): `test_vmaf_integration.py` (29 tests), `test_concurrent_integration.py` (24 tests), `test_error_recovery_integration.py` (34 tests), `test_icloud_folder_integration.py` (31 tests), `test_statistics_integration.py` (47 tests), `test_notification_integration.py` (49 tests).
+- **Test Coverage** (#116): Verified 81.62% unit test coverage, exceeding 80% target. Added `mock_osxphotos` fixture, updated `test_config_version`, refactored `test_photos_extractor.py`.
+- **Photos CLI Tests** (#98): `test_photos_handler.py`, `test_photos_permissions.py`, `test_photos_progress.py`, `test_photos_cli.py`.
+- **Photos Re-Import Tests** (#104): `test_photos_metadata_preservation.py`, `test_photos_original_handling.py`, `test_photos_reimport.py`.
 
 ## [0.1.0.0] - 2025-12-22
 
@@ -409,5 +127,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Product Requirements Document (PRD)
 - Architecture documentation
 
+[Unreleased]: https://github.com/kcenon/video_converter/compare/v0.2.0.0...HEAD
+[0.2.0.0]: https://github.com/kcenon/video_converter/compare/v0.1.0.0...v0.2.0.0
 [0.1.0.0]: https://github.com/kcenon/video_converter/releases/tag/v0.1.0.0
-[Unreleased]: https://github.com/kcenon/video_converter/compare/v0.1.0.0...HEAD
