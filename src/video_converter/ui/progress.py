@@ -930,7 +930,13 @@ class PhotosProgressDisplay:
 
     def _refresh_display(self) -> None:
         """Refresh the live display with updated components."""
-        if self._live is None:
+        if (
+            self._live is None
+            or self._overall_progress is None
+            or self._current_video_info is None
+            or self._export_progress is None
+            or self._convert_progress is None
+        ):
             return
 
         progress_group = Group(
