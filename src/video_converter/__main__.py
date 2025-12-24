@@ -1703,7 +1703,6 @@ def clean(ctx: click.Context, output_dir: Path | None, confirm: bool) -> None:
         # Clean a specific directory
         video-converter clean --output-dir ~/Desktop/Converted --confirm
     """
-    import shutil
 
     # Get config
     cli_ctx: CLIContext = ctx.obj
@@ -1843,7 +1842,7 @@ def scan(ctx: click.Context, path: Path | None, min_size: int, limit: int | None
     min_size_bytes = min_size * BYTES_PER_MB
 
     console.print()
-    console.print(f"[bold]Scanning for videos not in Photos library...[/bold]")
+    console.print("[bold]Scanning for videos not in Photos library...[/bold]")
     console.print(f"[dim]Search path: {search_path}[/dim]")
     console.print()
 
