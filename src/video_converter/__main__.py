@@ -40,6 +40,7 @@ from video_converter.utils.constants import (
 
 # Rich console for formatted output
 console = Console()
+console_err = Console(stderr=True)
 
 
 @dataclass
@@ -681,9 +682,8 @@ def run(
     # Handle check-permissions mode for Photos
     if check_permissions:
         if source != "photos":
-            console.print(
-                "[yellow]--check-permissions is only valid for Photos mode[/yellow]",
-                err=True,
+            console_err.print(
+                "[yellow]--check-permissions is only valid for Photos mode[/yellow]"
             )
             sys.exit(1)
         _check_photos_permissions(cli_ctx)
@@ -697,7 +697,7 @@ def run(
     # Validate input directory for folder mode
     if source == "folder":
         if input_dir is None:
-            console.print("[red]✗ --input-dir is required for folder mode[/red]", err=True)
+            console_err.print("[red]✗ --input-dir is required for folder mode[/red]")
             sys.exit(1)
 
         # Scan for videos
@@ -1021,7 +1021,7 @@ def _check_photos_permissions(cli_ctx: CLIContext) -> None:
         )
         sys.exit(1)
     except Exception as e:
-        console.print(f"[red]Error checking permissions: {e}[/red]", err=True)
+        console_err.print(f"[red]Error checking permissions: {e}[/red]")
         sys.exit(1)
 
 
@@ -2283,7 +2283,7 @@ def config_set(ctx: click.Context, key: str, value: str) -> None:
     # Parse the key path
     parts = key.split(".")
     if len(parts) != 2:
-        console.print(f"[red]✗ Invalid key format: {key}[/red]", err=True)
+        console_err.print(f"[red]✗ Invalid key format: {key}[/red]")
         console.print("[dim]Use format: section.key (e.g., encoding.mode)[/dim]")
         sys.exit(1)
 
@@ -2300,14 +2300,14 @@ def config_set(ctx: click.Context, key: str, value: str) -> None:
     }
 
     if section not in section_map:
-        console.print(f"[red]✗ Unknown section: {section}[/red]", err=True)
+        console_err.print(f"[red]✗ Unknown section: {section}[/red]")
         console.print(f"[dim]Available sections: {', '.join(section_map.keys())}[/dim]")
         sys.exit(1)
 
     section_obj = section_map[section]
 
     if not hasattr(section_obj, attr):
-        console.print(f"[red]✗ Unknown attribute: {attr} in section {section}[/red]", err=True)
+        console_err.print(f"[red]✗ Unknown attribute: {attr} in section {section}[/red]")
         sys.exit(1)
 
     # Convert value to appropriate type
@@ -2329,7 +2329,7 @@ def config_set(ctx: click.Context, key: str, value: str) -> None:
         console.print(f"[green]✓ Set {key} = {new_value}[/green]")
 
     except (ValueError, TypeError) as e:
-        console.print(f"[red]✗ Invalid value: {e}[/red]", err=True)
+        console_err.print(f"[red]✗ Invalid value: {e}[/red]")
         sys.exit(1)
 
 

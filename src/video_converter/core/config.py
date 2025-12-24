@@ -25,7 +25,7 @@ from __future__ import annotations
 import json
 import threading
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import (
@@ -468,13 +468,14 @@ class Config(BaseSettings):
         """
         return DEFAULT_CONFIG_DIR
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert configuration to dictionary.
 
         Returns:
             Dictionary representation of configuration.
         """
-        return self.model_dump()
+        result: dict[str, Any] = self.model_dump()
+        return result
 
 
 __all__ = [

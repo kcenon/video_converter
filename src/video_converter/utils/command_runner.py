@@ -564,7 +564,7 @@ class ExifToolRunner:
         args.append(str(path))
 
         result = self._runner.run(args, timeout=timeout, check=True)
-        data = json.loads(result.stdout)
+        data: list[dict[str, Any]] = json.loads(result.stdout)
 
         # ExifTool returns a list with one dict per file
         return data[0] if data else {}
@@ -597,7 +597,7 @@ class ExifToolRunner:
         args.append(str(path))
 
         result = await self._runner.run_async(args, timeout=timeout, check=True)
-        data = json.loads(result.stdout)
+        data: list[dict[str, Any]] = json.loads(result.stdout)
 
         return data[0] if data else {}
 

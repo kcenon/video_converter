@@ -218,7 +218,7 @@ class MetadataProcessor:
             if not result.success:
                 raise MetadataExtractionError(path, result.stderr)
 
-            data = json.loads(result.stdout)
+            data: list[dict[str, Any]] = json.loads(result.stdout)
             return data[0] if data else {}
 
         except json.JSONDecodeError as e:

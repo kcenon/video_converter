@@ -37,6 +37,7 @@ from rich.progress import (
     ProgressColumn,
     SpinnerColumn,
     Task,
+    TaskID,
     TaskProgressColumn,
     TextColumn,
     TimeRemainingColumn,
@@ -136,7 +137,7 @@ class SingleFileProgressDisplay:
     original_size: int = 0
     console: Console = field(default_factory=Console)
     _progress: Progress | None = field(default=None, init=False, repr=False)
-    _task_id: int | None = field(default=None, init=False, repr=False)
+    _task_id: TaskID | None = field(default=None, init=False, repr=False)
     _live: Live | None = field(default=None, init=False, repr=False)
 
     def _format_size(self, size_bytes: int) -> str:
@@ -255,8 +256,8 @@ class BatchProgressDisplay:
     console: Console = field(default_factory=Console)
     _overall_progress: Progress | None = field(default=None, init=False, repr=False)
     _file_progress: Progress | None = field(default=None, init=False, repr=False)
-    _overall_task_id: int | None = field(default=None, init=False, repr=False)
-    _file_task_id: int | None = field(default=None, init=False, repr=False)
+    _overall_task_id: TaskID | None = field(default=None, init=False, repr=False)
+    _file_task_id: TaskID | None = field(default=None, init=False, repr=False)
     _live: Live | None = field(default=None, init=False, repr=False)
     _completed_count: int = field(default=0, init=False, repr=False)
     _total_saved_bytes: int = field(default=0, init=False, repr=False)
@@ -450,7 +451,7 @@ class IndeterminateSpinner:
     message: str
     console: Console = field(default_factory=Console)
     _progress: Progress | None = field(default=None, init=False, repr=False)
-    _task_id: int | None = field(default=None, init=False, repr=False)
+    _task_id: TaskID | None = field(default=None, init=False, repr=False)
 
     def start(self) -> None:
         """Start the spinner."""
@@ -584,7 +585,7 @@ class ProgressDisplayManager:
         )
 
     @contextmanager
-    def spinner(self, message: str) -> Generator[IndeterminateSpinner | _NullSpinner]:
+    def spinner(self, message: str) -> Generator[IndeterminateSpinner | _NullSpinner, None, None]:
         """Context manager for indeterminate spinner.
 
         Args:
@@ -655,9 +656,9 @@ class PhotosProgressDisplay:
     _overall_progress: Progress | None = field(default=None, init=False, repr=False)
     _export_progress: Progress | None = field(default=None, init=False, repr=False)
     _convert_progress: Progress | None = field(default=None, init=False, repr=False)
-    _overall_task_id: int | None = field(default=None, init=False, repr=False)
-    _export_task_id: int | None = field(default=None, init=False, repr=False)
-    _convert_task_id: int | None = field(default=None, init=False, repr=False)
+    _overall_task_id: TaskID | None = field(default=None, init=False, repr=False)
+    _export_task_id: TaskID | None = field(default=None, init=False, repr=False)
+    _convert_task_id: TaskID | None = field(default=None, init=False, repr=False)
     _live: Live | None = field(default=None, init=False, repr=False)
     _completed_count: int = field(default=0, init=False, repr=False)
     _failed_count: int = field(default=0, init=False, repr=False)
