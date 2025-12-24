@@ -1,5 +1,8 @@
 # 시스템 아키텍처
 
+> **Version:** 1.1.0
+> **Last Updated:** 2024-12-24
+
 ## 1. 전체 시스템 구조
 
 ### 1.1 계층형 아키텍처
@@ -121,10 +124,10 @@ graph TB
 | Video Extractor | osxphotos | Photos 라이브러리에서 비디오 추출 |
 | Codec Detector | FFprobe | 비디오 코덱 분석 |
 | Video Converter | FFmpeg | H.264→H.265 변환 |
-| Metadata Manager | ExifTool | 메타데이터 보존/복원 |
-| Quality Validator | FFmpeg/VMAF | 변환 품질 검증 |
+| Metadata Processor | ExifTool | 메타데이터 보존/복원 |
+| Video Validator | FFmpeg | 변환 결과 검증 |
 | Reporter | Python | 통계 및 보고서 생성 |
-| Notifier | AppleScript | macOS 알림 발송 |
+| Notification | AppleScript | macOS 알림 발송 |
 
 ## 2. 모듈 구조
 
@@ -145,30 +148,31 @@ graph TB
         end
 
         subgraph converters["converters"]
-            HW_CONV["hardware_converter.py"]
-            SW_CONV["software_converter.py"]
-            CONV_BASE["base_converter.py"]
+            HW_CONV["hardware.py"]
+            SW_CONV["software.py"]
+            CONV_BASE["base.py"]
         end
 
         subgraph processors["processors"]
             CODEC_DET["codec_detector.py"]
-            META_PROC["metadata_processor.py"]
+            META_PROC["metadata.py"]
             QUALITY_VAL["quality_validator.py"]
         end
 
         subgraph automation["automation"]
-            LAUNCHD_MGR["launchd_manager.py"]
-            FOLDER_ACT["folder_action.py"]
+            LAUNCHD["launchd.py"]
+            SERVICE_MGR["service_manager.py"]
+            NOTIF["notification.py"]
         end
 
         subgraph reporters["reporters"]
             STATS_REP["statistics_reporter.py"]
-            NOTIF_MGR["notification_manager.py"]
+            BATCH_REP["batch_reporter.py"]
         end
 
         subgraph utils["utils"]
             FILE_UTIL["file_utils.py"]
-            CMD_UTIL["command_utils.py"]
+            CMD_RUNNER["command_runner.py"]
         end
     end
 
@@ -241,15 +245,15 @@ classDiagram
         +is_hevc(path) bool
     }
 
-    class MetadataManager {
+    class MetadataProcessor {
         +extract(path) Metadata
         +apply(source, target)
         +sync_timestamps(source, target)
     }
 
-    class QualityValidator {
-        +validate(original, converted) ValidationResult
-        +calculate_vmaf(ref, dist) float
+    class VideoValidator {
+        +validate(path) ValidationResult
+        +compare(original, converted) ComparisonResult
         +check_file_integrity(path) bool
     }
 
@@ -280,10 +284,10 @@ classDiagram
     VideoConverter <|.. SoftwareConverter
     HardwareConverter --> CodecDetector
     SoftwareConverter --> CodecDetector
-    HardwareConverter --> MetadataManager
-    SoftwareConverter --> MetadataManager
-    HardwareConverter --> QualityValidator
-    SoftwareConverter --> QualityValidator
+    HardwareConverter --> MetadataProcessor
+    SoftwareConverter --> MetadataProcessor
+    HardwareConverter --> VideoValidator
+    SoftwareConverter --> VideoValidator
     VideoExtractor ..> Video
     VideoConverter ..> ConversionResult
 ```
@@ -433,7 +437,6 @@ video_converter/
 │       │   └── logger.py            # 로깅 설정
 │       ├── extractors/
 │       │   ├── __init__.py
-│       │   ├── base.py              # 추상 베이스 클래스
 │       │   ├── photos_extractor.py  # Photos 라이브러리 추출
 │       │   └── folder_extractor.py  # 폴더 감시 추출
 │       ├── converters/
@@ -445,19 +448,20 @@ video_converter/
 │       │   ├── __init__.py
 │       │   ├── codec_detector.py    # 코덱 감지
 │       │   ├── metadata.py          # 메타데이터 처리
-│       │   └── validator.py         # 품질 검증
+│       │   └── quality_validator.py # 품질 검증
 │       ├── automation/
 │       │   ├── __init__.py
 │       │   ├── launchd.py           # launchd 설정 생성
-│       │   └── folder_action.py     # Folder Action 스크립트
+│       │   ├── notification.py      # macOS 알림 발송
+│       │   └── service_manager.py   # 서비스 관리
 │       ├── reporters/
 │       │   ├── __init__.py
-│       │   ├── statistics.py        # 통계 리포터
-│       │   └── notifier.py          # 알림 관리
+│       │   ├── statistics_reporter.py  # 통계 리포터
+│       │   └── batch_reporter.py       # 배치 리포터
 │       └── utils/
 │           ├── __init__.py
 │           ├── file_utils.py        # 파일 유틸리티
-│           └── command_utils.py     # 명령 실행 유틸리티
+│           └── command_runner.py    # 명령 실행 유틸리티
 ├── config/
 │   ├── default.json                 # 기본 설정
 │   └── launchd/
@@ -702,3 +706,12 @@ graph TD
 | FFmpeg | 5.0+ | `brew install ffmpeg` |
 | ExifTool | 12.0+ | `brew install exiftool` |
 | osxphotos | 0.70+ | `pip install osxphotos` |
+
+---
+
+## 9. 변경 이력
+
+| 버전 | 날짜 | 변경 내용 |
+|------|------|-----------|
+| 1.0.0 | 2024-01-01 | 초기 문서 작성 |
+| 1.1.0 | 2024-12-24 | 파일명 및 클래스명 실제 구현과 일치하도록 업데이트 (Issue #192) |
