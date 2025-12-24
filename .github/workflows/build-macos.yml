@@ -1,0 +1,87 @@
+name: Build macOS App
+
+on:
+  push:
+    branches: [main, 'feature/**']
+    paths:
+      - 'src/**'
+      - 'packaging/macos/**'
+      - 'pyproject.toml'
+      - '.github/workflows/build-macos.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'packaging/macos/**'
+      - 'pyproject.toml'
+      - '.github/workflows/build-macos.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[gui,packaging]"
+
+      - name: Verify installation
+        run: |
+          python -c "from video_converter import __version__; print(f'Version: {__version__}')"
+          python -c "from PySide6 import __version__; print(f'PySide6: {__version__}')"
+          python -c "import PyInstaller; print(f'PyInstaller: {PyInstaller.__version__}')"
+
+      - name: Build macOS app bundle
+        run: |
+          cd packaging/macos
+          chmod +x build_app.sh
+          ./build_app.sh --clean
+
+      - name: Verify app bundle
+        run: |
+          ls -la dist/
+          test -d "dist/Video Converter.app"
+          # Basic app bundle structure check
+          test -f "dist/Video Converter.app/Contents/Info.plist"
+          test -f "dist/Video Converter.app/Contents/MacOS/Video Converter"
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Create DMG
+        run: |
+          cd packaging/macos
+          chmod +x create_dmg.sh
+          ./create_dmg.sh
+
+      - name: Verify DMG
+        run: |
+          ls -la dist/*.dmg
+          # Get version from pyproject.toml
+          VERSION=$(grep -m1 'version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          test -f "dist/VideoConverter-${VERSION}.dmg"
+
+      - name: Upload app bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Video-Converter-app
+          path: dist/Video Converter.app
+          if-no-files-found: error
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Video-Converter-dmg
+          path: dist/*.dmg
+          if-no-files-found: error

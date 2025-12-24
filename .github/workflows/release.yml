@@ -12,14 +12,83 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    name: Create Release
-    runs-on: macos-latest
+  build-macos:
+    name: Build macOS App
+    runs-on: macos-14
+    outputs:
+      version: ${{ steps.version.outputs.VERSION }}
+      dmg_sha256: ${{ steps.checksum.outputs.SHA256 }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Get version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Verify version matches pyproject.toml
+        run: |
+          PYPROJECT_VERSION=$(grep -m1 'version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          TAG_VERSION=${{ steps.version.outputs.VERSION }}
+          if [ "$PYPROJECT_VERSION" != "$TAG_VERSION" ]; then
+            echo "Error: Tag version ($TAG_VERSION) does not match pyproject.toml version ($PYPROJECT_VERSION)"
+            exit 1
+          fi
+          echo "Version verified: $PYPROJECT_VERSION"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[gui,packaging]"
+
+      - name: Build macOS app bundle
+        run: |
+          cd packaging/macos
+          chmod +x build_app.sh
+          ./build_app.sh --clean
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Create DMG
+        run: |
+          cd packaging/macos
+          chmod +x create_dmg.sh
+          ./create_dmg.sh
+
+      - name: Calculate DMG checksum
+        id: checksum
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          DMG_FILE="dist/VideoConverter-${VERSION}.dmg"
+          SHA256=$(shasum -a 256 "$DMG_FILE" | awk '{print $1}')
+          echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
+          echo "DMG SHA256: $SHA256"
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: dist/*.dmg
+          if-no-files-found: error
+
+  build-python:
+    name: Build Python Package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -38,11 +107,33 @@ jobs:
       - name: Verify package
         run: twine check dist/*
 
+      - name: Upload Python artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: Create Release
+    needs: [build-macos, build-python]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f
+
       - name: Extract release notes from CHANGELOG
         id: changelog
         run: |
-          # Extract version from tag (remove 'v' prefix)
-          VERSION=${GITHUB_REF_NAME#v}
+          VERSION=${{ needs.build-macos.outputs.version }}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
           # Extract release notes for this version from CHANGELOG.md
@@ -62,9 +153,54 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          files: |
+            artifacts/macos-dmg/*.dmg
+            artifacts/python-dist/*.whl
+            artifacts/python-dist/*.tar.gz
           body_path: release_notes.md
+          append_body: true
+          body: |
+            ---
+
+            ## Installation
+
+            ### macOS App (GUI)
+            Download `VideoConverter-${{ needs.build-macos.outputs.version }}.dmg` and drag to Applications.
+
+            **Homebrew Cask (after tap is updated):**
+            ```bash
+            brew install --cask video-converter
+            ```
+
+            ### CLI (Python)
+            ```bash
+            pip install video-converter
+            ```
+
+            ## Checksums
+            **DMG SHA256:** `${{ needs.build-macos.outputs.dmg_sha256 }}`
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [build-python, release]
+    runs-on: ubuntu-latest
+    if: github.repository == 'kcenon/video_converter'
+    environment:
+      name: pypi
+      url: https://pypi.org/project/video-converter/
+    steps:
+      - name: Download Python artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true
