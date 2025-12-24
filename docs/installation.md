@@ -30,13 +30,17 @@ Complete installation guide for Video Converter.
 git clone https://github.com/kcenon/video_converter.git
 cd video_converter
 
-# Create and activate virtual environment
-python3 -m venv .venv
+# Create and activate virtual environment (Python 3.12 recommended)
+python3.12 -m venv .venv
 source .venv/bin/activate
 
 # Install
 pip3 install -e .
 ```
+
+!!! warning "Python Version"
+    Use **Python 3.10-3.12**. Python 3.13+ is not yet fully supported due to
+    `pyobjc` compatibility. Check with: `python3.12 --version`
 
 !!! note "Virtual Environment Required"
     Modern macOS requires using a virtual environment for Python packages.

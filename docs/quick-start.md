@@ -24,8 +24,8 @@ brew install exiftool
 git clone https://github.com/kcenon/video_converter.git
 cd video_converter
 
-# Create and activate virtual environment
-python3 -m venv .venv
+# Create and activate virtual environment (use Python 3.12)
+python3.12 -m venv .venv
 source .venv/bin/activate
 
 # Install
