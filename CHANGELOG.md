@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+#### Extract Magic Numbers to Constants Module (#176)
+- **Centralized constants module** (`utils/constants.py`) with all magic numbers and default values
+  - Size units: `BYTES_PER_KB`, `BYTES_PER_MB`, `BYTES_PER_GB`
+  - Timeouts: `ICLOUD_DOWNLOAD_TIMEOUT`, `VMAF_ANALYSIS_TIMEOUT`
+  - Quality settings: `DEFAULT_QUALITY`, `DEFAULT_CRF`, VMAF thresholds
+  - Encoding presets: `ENCODING_PRESETS`, `SUPPORTED_BIT_DEPTHS`
+  - File extensions: `VIDEO_EXTENSIONS` as immutable frozenset
+  - Processing: `MIN_FREE_DISK_SPACE`, concurrent conversion limits
+- **Helper functions** for consistent formatting across codebase
+  - `bytes_to_human()`: Convert bytes to human-readable format
+  - `format_duration()`: Format seconds as "X hr Y min" or "X min Y sec"
+- **Eliminated code duplication** across 8 modules
+  - `__main__.py`, `core/config.py`, `core/orchestrator.py`
+  - `converters/hardware.py`, `converters/software.py`
+  - `extractors/icloud_handler.py`, `processors/vmaf_analyzer.py`
+- **Comprehensive test coverage** with 34 tests in `test_constants.py`
+
 ### Fixed
 
 #### CI Build Fixes (#181)
