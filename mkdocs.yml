@@ -83,6 +83,8 @@ nav:
       - Installation: installation.md
       - Troubleshooting: troubleshooting.md
   - User Guide:
+      - GUI Quick Start: guides/gui-quickstart.md
+      - GUI Usage: guides/gui-usage.md
       - CLI Usage: guides/cli-usage.md
       - Photos Library: guides/photos-workflow.md
       - Folder Conversion: guides/folder-conversion.md

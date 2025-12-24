@@ -2,6 +2,104 @@
 
 Common issues and solutions.
 
+## GUI Application Issues
+
+### App Won't Launch
+
+**Cause:** macOS security settings or missing dependencies.
+
+**Solutions:**
+
+1. **Check macOS version** - Requires macOS 12.0 (Monterey) or later
+2. **Allow in Security Settings:**
+   - Go to **System Settings** > **Privacy & Security**
+   - Scroll to "App was blocked from opening"
+   - Click **Open Anyway**
+3. **Reset quarantine attribute:**
+   ```bash
+   xattr -d com.apple.quarantine /Applications/Video\ Converter.app
+   ```
+
+### "Video Converter" is Damaged (Gatekeeper Error)
+
+**Cause:** App not signed or quarantine flag set.
+
+**Solution:**
+```bash
+xattr -cr /Applications/Video\ Converter.app
+```
+
+### Photos Library Access Denied
+
+**Cause:** App doesn't have Photos permission.
+
+**Solution:**
+1. Open **System Settings** > **Privacy & Security** > **Photos**
+2. Enable Video Converter in the list
+3. Restart Video Converter
+
+!!! tip
+    If Video Converter doesn't appear in the list, launch the app and try accessing the Photos tab first.
+
+### GUI Appears Frozen
+
+**Cause:** Large batch conversion or memory pressure.
+
+**Solutions:**
+
+1. **Wait a moment** - UI may be updating
+2. **Reduce concurrent conversions** in Settings (try 1)
+3. **Check Activity Monitor** for memory usage
+4. **Force quit and restart:**
+   ```bash
+   killall "Video Converter"
+   ```
+
+### Menubar Icon Not Appearing
+
+**Cause:** Menubar disabled or system resources.
+
+**Solutions:**
+
+1. Check **Settings** > **Notification Settings** > **Show in Menubar**
+2. Restart the application
+3. Check if menubar is full (use Bartender or similar)
+
+### Drag and Drop Not Working
+
+**Cause:** Permission or file type issue.
+
+**Solutions:**
+
+1. Ensure file is a supported format (`.mp4`, `.mov`, `.avi`, `.mkv`, `.m4v`)
+2. Check **System Settings** > **Privacy & Security** > **Files and Folders**
+3. Grant Video Converter access to your files
+
+### Queue Stuck in "Converting" State
+
+**Cause:** FFmpeg process hung or crashed.
+
+**Solutions:**
+
+1. Click **Cancel All** in Queue tab
+2. Check for FFmpeg processes:
+   ```bash
+   ps aux | grep ffmpeg
+   killall ffmpeg
+   ```
+3. Restart Video Converter
+
+### Window Too Small or Off-Screen
+
+**Cause:** Saved window position is invalid.
+
+**Solution:** Reset window position:
+```bash
+defaults delete com.video-converter.app NSWindow.Frame
+```
+
+---
+
 ## Installation Issues
 
 ### "FFmpeg not found"
