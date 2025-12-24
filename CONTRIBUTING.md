@@ -124,11 +124,45 @@ mypy src/
 
 All pull requests are automatically checked by GitHub Actions:
 
-- **Lint**: Ruff linter and formatter checks
-- **Type Check**: MyPy static type analysis
-- **Test**: pytest on Python 3.10, 3.11, 3.12 (excludes E2E tests)
-- **E2E Tests**: Runs on schedule, manual trigger, or `[e2e]` commits
-- **Dependency Review**: Security scanning for dependencies
+### Core CI Workflows
+
+| Workflow | Trigger | Description |
+|----------|---------|-------------|
+| **CI** | Push/PR to main | Lint, type check, unit tests (Python 3.10-3.12), GUI tests |
+| **E2E Tests** | Schedule/`[e2e]` commits | Full end-to-end tests with actual conversions |
+| **CodeQL** | Push/PR to main, Weekly | Security vulnerability and code quality analysis |
+| **Compatibility** | Schedule/`[compat]` commits | Tests on macos-13, macos-14, macos-15 |
+| **Dependency Review** | PR only | Security scanning for dependencies |
+
+### Release Workflow
+
+The unified release workflow (`release.yml`) triggers on `v*` tags and:
+1. Runs full test suite as quality gate
+2. Builds signed and notarized macOS app
+3. Builds Python package
+4. Creates GitHub Release with all artifacts
+5. Publishes to PyPI
+6. Updates Homebrew Cask
+
+### Environment Configuration
+
+All workflows use consistent settings:
+- **macOS**: `macos-14` (Apple Silicon)
+- **Python**: `3.11` (primary), with matrix testing on 3.10-3.12
+- **Tool versions**: Pinned to match pre-commit (ruff 0.1.9, mypy 1.8.0)
+
+### Running Tests Locally Before Push
+
+```bash
+# Run the same checks as CI
+ruff check src/
+ruff format --check src/
+mypy src/ --ignore-missing-imports
+pytest tests/ -m "not e2e" --ignore=tests/gui
+
+# Run GUI tests (requires display or offscreen mode)
+QT_QPA_PLATFORM=offscreen pytest tests/gui -m "not e2e"
+```
 
 CI must pass before merging. Check the [Actions tab](https://github.com/kcenon/video_converter/actions) for build status.
 

@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+#### CI/CD Configuration Improvements (#219)
+- **Unified release workflow** - Consolidated `release.yml` and `release-macos.yml` into single workflow
+  - Prevents race conditions from duplicate v* tag triggers
+  - Includes code signing and notarization from macOS workflow
+  - Adds Homebrew Cask update automation
+- **Pre-release test gate** - Tests run before building release artifacts
+  - Linting, type checking, and unit tests must pass before build
+  - Prevents releasing buggy code to production
+- **Standardized macOS versions** - All workflows now use `macos-14`
+  - Consistent behavior across CI, E2E, build, and release workflows
+  - Improved reproducibility and debugging
+- **Type checking configuration** - mypy runs with gradual adoption mode
+  - Type errors are reported but don't fail build (gradual adoption)
+  - Separate issue (#226) tracks fixing existing type errors
+- **Pinned tool versions** - ruff (>=0.1.9,<0.2.0) and mypy (>=1.8.0,<2.0.0)
+  - Matches pre-commit hook versions for consistency
+  - Prevents version drift between local and CI environments
+
+### Added
+
+#### CI/CD Enhancements (#219)
+- **GUI tests in CI** - Headless GUI tests with `QT_QPA_PLATFORM=offscreen`
+  - Dedicated `gui-test` job in CI workflow
+  - Tests run without requiring display server
+- **Homebrew package caching** - Faster CI builds with cached dependencies
+  - Caches ffmpeg, exiftool, and create-dmg installations
+  - Reduces macOS job runtime significantly
+- **CodeQL security scanning** - Static code analysis for vulnerabilities
+  - Weekly security scans plus on every PR
+  - Extended security and quality queries enabled
+- **Compatibility test workflow** - macOS version matrix testing
+  - Tests on macos-13, macos-14, and macos-15
+  - Runs weekly and on demand with `[compat]` commits
+  - Verifies CLI commands and app bundle builds
+
 ## [0.3.0.0] - 2025-12-24
 
 ### Changed

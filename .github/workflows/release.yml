@@ -1,5 +1,23 @@
-# Release Workflow for Video Converter
-# Creates GitHub releases when a version tag is pushed
+# Unified Release Workflow for Video Converter
+# Creates GitHub releases with signed macOS app and Python package when a version tag is pushed
+#
+# This workflow handles:
+# 1. Running tests before build (quality gate)
+# 2. Building signed and notarized macOS app bundle with DMG
+# 3. Building Python package
+# 4. Creating GitHub Release with all artifacts
+# 5. Publishing to PyPI
+# 6. Updating Homebrew Cask
+#
+# Required Secrets:
+#   MACOS_SIGNING_IDENTITY  - Developer ID Application certificate identity
+#   MACOS_CERTIFICATE       - Base64-encoded .p12 certificate
+#   MACOS_CERTIFICATE_PWD   - Certificate password
+#   APPLE_ID                - Apple ID email for notarization
+#   APPLE_PASSWORD          - App-specific password for notarization
+#   TEAM_ID                 - Apple Developer Team ID
+#   PYPI_API_TOKEN          - PyPI API token for publishing
+#   CODECOV_TOKEN           - Codecov token for coverage reports
 
 name: Release
 
@@ -7,17 +25,85 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      skip_signing:
+        description: "Skip code signing (for testing)"
+        required: false
+        default: false
+        type: boolean
+      skip_notarization:
+        description: "Skip notarization (for testing)"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
 
+env:
+  PYTHON_VERSION: "3.11"
+  MACOS_VERSION: "macos-14"
+
 jobs:
+  # Quality gate: Run tests before building release artifacts
+  test:
+    name: Run Tests
+    runs-on: macos-14
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Cache Homebrew packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/Homebrew
+            /opt/homebrew/Cellar/ffmpeg
+            /opt/homebrew/Cellar/exiftool
+          key: ${{ runner.os }}-brew-${{ hashFiles('.github/workflows/*.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-brew-
+
+      - name: Install system dependencies
+        run: |
+          brew install ffmpeg exiftool
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,gui]"
+
+      - name: Run linter
+        run: ruff check src/
+
+      - name: Run formatter check
+        run: ruff format --check src/
+
+      - name: Run type checker
+        run: mypy src/ --ignore-missing-imports
+
+      - name: Run tests
+        run: |
+          pytest tests/ -m "not e2e" --ignore=tests/gui --cov=video_converter --cov-report=xml
+        env:
+          QT_QPA_PLATFORM: offscreen
+
   build-macos:
     name: Build macOS App
+    needs: test
     runs-on: macos-14
     outputs:
-      version: ${{ steps.version.outputs.VERSION }}
-      dmg_sha256: ${{ steps.checksum.outputs.SHA256 }}
+      version: ${{ steps.version.outputs.version }}
+      dmg_name: ${{ steps.version.outputs.dmg_name }}
+      dmg_sha256: ${{ steps.checksum.outputs.sha256 }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -27,14 +113,20 @@ jobs:
       - name: Get version from tag
         id: version
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF_NAME#v}
+          else
+            VERSION=$(grep -m1 'version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "dmg_name=VideoConverter-${VERSION}.dmg" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
       - name: Verify version matches pyproject.toml
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           PYPROJECT_VERSION=$(grep -m1 'version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
-          TAG_VERSION=${{ steps.version.outputs.VERSION }}
+          TAG_VERSION=${{ steps.version.outputs.version }}
           if [ "$PYPROJECT_VERSION" != "$TAG_VERSION" ]; then
             echo "Error: Tag version ($TAG_VERSION) does not match pyproject.toml version ($PYPROJECT_VERSION)"
             exit 1
@@ -44,24 +136,84 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: "pip"
 
-      - name: Install dependencies
+      - name: Cache Homebrew packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/Homebrew
+            /opt/homebrew/Cellar/ffmpeg
+            /opt/homebrew/Cellar/exiftool
+            /opt/homebrew/Cellar/create-dmg
+          key: ${{ runner.os }}-brew-release-${{ hashFiles('.github/workflows/*.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-brew-release-
+            ${{ runner.os }}-brew-
+
+      - name: Install system dependencies
+        run: |
+          brew install ffmpeg exiftool create-dmg
+
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[gui,packaging]"
 
+      - name: Import signing certificate
+        if: ${{ !inputs.skip_signing && secrets.MACOS_CERTIFICATE != '' }}
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+        run: |
+          # Create temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          # Create keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import certificate
+          CERT_PATH=$RUNNER_TEMP/certificate.p12
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$CERT_PATH"
+          security import "$CERT_PATH" -P "$MACOS_CERTIFICATE_PWD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Clean up certificate file
+          rm -f "$CERT_PATH"
+
       - name: Build macOS app bundle
+        env:
+          SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
         run: |
           cd packaging/macos
-          chmod +x build_app.sh
-          ./build_app.sh --clean
 
-      - name: Install create-dmg
-        run: brew install create-dmg
+          # Determine build options
+          BUILD_OPTS="--clean"
+          if [[ "${{ inputs.skip_signing }}" != "true" && -n "$SIGNING_IDENTITY" ]]; then
+            BUILD_OPTS="$BUILD_OPTS --sign"
+            if [[ "${{ inputs.skip_notarization }}" != "true" && -n "$APPLE_ID" ]]; then
+              BUILD_OPTS="$BUILD_OPTS --notarize"
+            fi
+          fi
+
+          # Build the app
+          chmod +x build_app.sh
+          ./build_app.sh $BUILD_OPTS
 
       - name: Create DMG
+        env:
+          SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
         run: |
           cd packaging/macos
           chmod +x create_dmg.sh
@@ -70,21 +222,35 @@ jobs:
       - name: Calculate DMG checksum
         id: checksum
         run: |
-          VERSION=${{ steps.version.outputs.VERSION }}
+          VERSION=${{ steps.version.outputs.version }}
           DMG_FILE="dist/VideoConverter-${VERSION}.dmg"
           SHA256=$(shasum -a 256 "$DMG_FILE" | awk '{print $1}')
-          echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
           echo "DMG SHA256: $SHA256"
+          # Also save to file for artifact
+          echo "$SHA256  VideoConverter-${VERSION}.dmg" > dist/checksums-macos.txt
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-dmg
-          path: dist/*.dmg
+          path: |
+            dist/*.dmg
+            dist/checksums-macos.txt
           if-no-files-found: error
+          retention-days: 5
+
+      - name: Clean up keychain
+        if: always()
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/signing.keychain-db
+          if [ -f "$KEYCHAIN_PATH" ]; then
+            security delete-keychain "$KEYCHAIN_PATH" || true
+          fi
 
   build-python:
     name: Build Python Package
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -93,7 +259,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: "pip"
 
       - name: Install build tools
@@ -118,6 +284,7 @@ jobs:
     name: Create Release
     needs: [build-macos, build-python]
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -155,6 +322,7 @@ jobs:
         with:
           files: |
             artifacts/macos-dmg/*.dmg
+            artifacts/macos-dmg/checksums-macos.txt
             artifacts/python-dist/*.whl
             artifacts/python-dist/*.tar.gz
           body_path: release_notes.md
@@ -167,9 +335,9 @@ jobs:
             ### macOS App (GUI)
             Download `VideoConverter-${{ needs.build-macos.outputs.version }}.dmg` and drag to Applications.
 
-            **Homebrew Cask (after tap is updated):**
+            **Homebrew Cask:**
             ```bash
-            brew install --cask video-converter
+            brew install --cask kcenon/tap/video-converter
             ```
 
             ### CLI (Python)
@@ -188,7 +356,7 @@ jobs:
     name: Publish to PyPI
     needs: [build-python, release]
     runs-on: ubuntu-latest
-    if: github.repository == 'kcenon/video_converter'
+    if: github.repository == 'kcenon/video_converter' && startsWith(github.ref, 'refs/tags/')
     environment:
       name: pypi
       url: https://pypi.org/project/video-converter/
@@ -204,3 +372,39 @@ jobs:
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
           skip-existing: true
+
+  update-homebrew:
+    name: Update Homebrew Cask
+    needs: [build-macos, release]
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.ref_name, '-') && startsWith(github.ref, 'refs/tags/') }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-dmg
+          path: dist/
+
+      - name: Update Homebrew Cask formula
+        run: |
+          VERSION=${{ needs.build-macos.outputs.version }}
+          SHA256=${{ needs.build-macos.outputs.dmg_sha256 }}
+
+          # Update version and SHA256 in the formula
+          cd packaging/macos/homebrew
+          if [ -f update_cask.sh ]; then
+            chmod +x update_cask.sh
+            ./update_cask.sh "$VERSION" "$SHA256"
+          fi
+
+      - name: Commit and push Homebrew formula
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add packaging/macos/homebrew/video-converter.rb || true
+          git diff --staged --quiet || git commit -m "chore: update Homebrew Cask to v${{ needs.build-macos.outputs.version }}"
+          git push origin HEAD:main || echo "Could not push to main, may need manual update"
