@@ -72,22 +72,9 @@ video-converter run --source photos --from-date 2024-01-01 --to-date 2024-06-30
 
 ## iCloud Handling
 
-### Check iCloud Status
-
-```bash
-video-converter scan --mode photos --show-icloud
-```
-
-### Download and Convert
-
-```bash
-# Download iCloud videos before conversion
-video-converter run --mode photos --download-icloud
-```
-
-!!! warning "iCloud Downloads"
-    Downloading iCloud videos requires internet connection and may take time.
-    Ensure sufficient local storage.
+!!! note "iCloud Videos"
+    Videos stored only in iCloud are automatically skipped during conversion.
+    To convert iCloud videos, first download them to your Mac through Photos app.
 
 ## Metadata Preservation
 
@@ -116,43 +103,28 @@ exiftool -GPS* -CreateDate converted_video.mp4
 ### Custom Output Directory
 
 ```bash
-video-converter run --mode photos --output ~/Movies/Converted
-```
-
-### Organize by Date
-
-```bash
-video-converter run --mode photos --organize-by-date
-```
-
-Creates structure:
-```
-output/
-├── 2024/
-│   ├── 01/
-│   ├── 02/
-│   └── ...
-└── 2023/
-    └── ...
+video-converter run --source photos --output-dir ~/Movies/Converted
 ```
 
 ## Re-import to Photos
 
 !!! note "Experimental Feature"
-    Re-importing to Photos is experimental. Original videos are preserved.
+    Re-importing to Photos is experimental. Original videos are preserved by default.
 
 ```bash
 # Convert and re-import
-video-converter run --mode photos --reimport
+video-converter run --source photos --reimport
 
-# Re-import with duplicate handling
-video-converter run --mode photos --reimport --skip-duplicates
+# Re-import and archive originals to a specific album
+video-converter run --source photos --reimport --archive-album "Converted Originals"
+
+# Re-import and keep both versions
+video-converter run --source photos --reimport --keep-originals
 ```
 
 ## Best Practices
 
-1. **Start with a scan**: Always scan first to understand the scope
-2. **Dry run first**: Use `--dry-run` to preview actions
-3. **Backup important videos**: Keep originals until verified
-4. **Convert during idle time**: Use automation for overnight processing
-5. **Monitor disk space**: Ensure 2-3x the source video size is available
+1. **Preview first**: Use `--dry-run` to understand the scope before converting
+2. **Backup important videos**: Keep originals until verified
+3. **Convert during idle time**: Use automation for overnight processing
+4. **Monitor disk space**: Ensure 2-3x the source video size is available
