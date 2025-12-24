@@ -106,30 +106,30 @@ video-converter stats [options]
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--days` | `30` | Number of days to show |
-| `--format` | `table` | Output format: `table` or `json` |
+| `--period` | `all` | Time period: `today`, `week`, `month`, `all` |
+| `--json` | `false` | Output statistics in JSON format |
+| `--detailed` | `false` | Show detailed statistics with recent conversions |
 
-### install
+### install-service
 
-Install automation service.
+Install launchd automation service.
 
 ```bash
-video-converter install [options]
+video-converter install-service [options]
 ```
 
 **Options:**
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--time` | `03:00` | Run time (HH:MM) |
-| `--days` | `daily` | Schedule: `daily`, `weekdays`, `weekends` |
+| `--time` | `03:00` | Run time in HH:MM format |
 
-### uninstall
+### uninstall-service
 
-Remove automation service.
+Remove launchd automation service.
 
 ```bash
-video-converter uninstall
+video-converter uninstall-service
 ```
 
 ## Global Options
