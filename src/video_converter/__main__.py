@@ -682,9 +682,7 @@ def run(
     # Handle check-permissions mode for Photos
     if check_permissions:
         if source != "photos":
-            console_err.print(
-                "[yellow]--check-permissions is only valid for Photos mode[/yellow]"
-            )
+            console_err.print("[yellow]--check-permissions is only valid for Photos mode[/yellow]")
             sys.exit(1)
         _check_photos_permissions(cli_ctx)
         return
