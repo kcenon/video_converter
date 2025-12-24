@@ -66,18 +66,27 @@ git push origin vX.Y.Z
 
 ### 3. Monitor Workflows
 
-After pushing the tag, the following workflows will run:
+After pushing the tag, the unified release workflow (`.github/workflows/release.yml`) runs:
 
-1. **Release** (`.github/workflows/release.yml`)
-   - Builds Python package
-   - Creates GitHub release with package
-
-2. **Release macOS** (`.github/workflows/release-macos.yml`)
-   - Builds macOS .app bundle
-   - Signs and notarizes (if secrets configured)
+1. **build-macos** job
+   - Builds macOS .app bundle with PyInstaller
    - Creates DMG installer
-   - Uploads to GitHub release
-   - Updates Homebrew Cask formula
+   - Signs and notarizes (if secrets configured)
+   - Uploads DMG as artifact
+
+2. **build-python** job (runs in parallel)
+   - Builds Python wheel and source distribution
+   - Verifies package with twine
+
+3. **release** job (after both build jobs complete)
+   - Downloads all build artifacts
+   - Creates GitHub release with DMG, wheel, and source tarball
+   - Includes installation instructions and checksums
+
+4. **publish-pypi** job (optional, after release)
+   - Publishes to PyPI if `PYPI_API_TOKEN` is configured
+
+For development and PR builds, see `.github/workflows/build-macos.yml`.
 
 ### 4. Verify Release
 
