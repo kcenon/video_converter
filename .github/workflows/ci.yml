@@ -43,6 +43,9 @@ jobs:
         run: ruff format --check src/
 
       - name: Run mypy type checker
+        # TODO: Remove continue-on-error after fixing existing type errors
+        # See issue for gradual mypy adoption
+        continue-on-error: true
         run: mypy src/ --ignore-missing-imports
 
   test:

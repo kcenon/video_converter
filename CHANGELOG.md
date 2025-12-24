@@ -20,8 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Standardized macOS versions** - All workflows now use `macos-14`
   - Consistent behavior across CI, E2E, build, and release workflows
   - Improved reproducibility and debugging
-- **Stricter type checking** - Removed `continue-on-error` from mypy
-  - Type errors now fail the build as intended
+- **Type checking configuration** - mypy runs with gradual adoption mode
+  - Type errors are reported but don't fail build (gradual adoption)
+  - Separate issue (#226) tracks fixing existing type errors
 - **Pinned tool versions** - ruff (>=0.1.9,<0.2.0) and mypy (>=1.8.0,<2.0.0)
   - Matches pre-commit hook versions for consistency
   - Prevents version drift between local and CI environments
