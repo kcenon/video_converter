@@ -58,6 +58,7 @@ docs = [
     "mkdocs-material>=9.0.0",
     "mkdocstrings[python]>=0.24.0",
     "pymdown-extensions>=10.0.0",
+    "pydeps>=1.12.0",
 ]
 gui = [
     "PySide6>=6.6.0",
