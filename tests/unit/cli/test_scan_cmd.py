@@ -241,7 +241,8 @@ class TestScanFiltering:
         result = cli_runner.invoke(main, ["scan", "--path", str(custom_dir)])
 
         assert result.exit_code == 0
-        assert str(custom_dir) in result.output
+        # Console may wrap long paths with newlines, so check for the directory name
+        assert custom_dir.name in result.output
 
 
 class TestScanKeyboardInterrupt:
