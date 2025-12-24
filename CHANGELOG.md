@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+#### CI Build Fixes (#181)
+- **Make osxphotos dependency macOS-only** with platform marker `sys_platform == 'darwin'`
+  - Fixes CI build failure on ubuntu-latest runners for documentation builds
+  - osxphotos is only needed on macOS for Photos library integration
+- **Fix mkdocstrings cross-reference warnings** in `command_runner.py`
+  - Convert docstring examples to fenced code blocks
+  - Prevents bracket notation from being interpreted as cross-references
+
 ### Changed
 
 #### Extended Config Schema for VMAF, HDR, and Processing Settings (#173)
