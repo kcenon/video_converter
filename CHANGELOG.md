@@ -20,9 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Standardized macOS versions** - All workflows now use `macos-14`
   - Consistent behavior across CI, E2E, build, and release workflows
   - Improved reproducibility and debugging
-- **Type checking configuration** - mypy runs with gradual adoption mode
-  - Type errors are reported but don't fail build (gradual adoption)
-  - Separate issue (#226) tracks fixing existing type errors
+- **Type checking now enforced** - mypy type errors fail the build (#226)
+  - Fixed all 45 mypy type errors across 17 files
+  - Added proper type annotations to functions missing return types
+  - Corrected variable type declarations to match actual usage patterns
+  - Replaced `callable` with `Callable` from typing module
 - **Pinned tool versions** - ruff (>=0.1.9,<0.2.0) and mypy (>=1.8.0,<2.0.0)
   - Matches pre-commit hook versions for consistency
   - Prevents version drift between local and CI environments
