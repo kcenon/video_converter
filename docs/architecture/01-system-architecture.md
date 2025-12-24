@@ -346,3 +346,36 @@ flowchart LR
 | FFmpeg | 5.0+ | `brew install ffmpeg` |
 | ExifTool | 12.0+ | `brew install exiftool` |
 | osxphotos | 0.70+ | `pip install osxphotos` |
+
+## 7. Auto-Generated Diagrams
+
+The following diagrams are automatically generated from the codebase using pyreverse and pydeps.
+These can be regenerated at any time by running:
+
+```bash
+python scripts/generate_diagrams.py
+```
+
+### 7.1 Package Structure
+
+Full package dependency diagram showing all modules and their relationships:
+
+![Package Structure](generated/packages_video_converter.svg)
+
+### 7.2 Module Dependencies
+
+Clustered dependency graph showing module relationships:
+
+![Module Dependencies](generated/dependencies.svg)
+
+### 7.3 Core Module Dependencies
+
+Focused view of core module dependencies:
+
+![Core Dependencies](generated/core_dependencies.svg)
+
+### 7.4 Class Diagram
+
+Complete UML class diagram (note: this is a large diagram):
+
+![Class Diagram](generated/classes_video_converter.svg)
