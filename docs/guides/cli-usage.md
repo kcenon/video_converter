@@ -15,17 +15,18 @@ video-converter <command> [options] [arguments]
 Convert a single video file.
 
 ```bash
-video-converter convert <input> <output> [options]
+video-converter convert <input> [output] [options]
 ```
 
 **Options:**
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--encoder` | `hardware` | Encoder type: `hardware` or `software` |
-| `--quality` | `45` | Hardware encoder quality (1-100, lower = better) |
-| `--crf` | `22` | Software encoder CRF (0-51, lower = better) |
-| `--preset` | `medium` | Software encoder preset |
+| `--mode` | `hardware` | Encoding mode: `hardware` or `software` |
+| `--quality` | config default | Quality setting (1-100, higher = better) |
+| `--preset` | `medium` | Encoder preset: `fast`, `medium`, `slow` |
+| `-f, --force` | `false` | Overwrite output file if exists |
+| `--vmaf` | config default | Measure VMAF quality score after conversion |
 
 **Examples:**
 
@@ -34,10 +35,10 @@ video-converter convert <input> <output> [options]
 video-converter convert vacation.mp4 vacation_hevc.mp4
 
 # High quality software encoding
-video-converter convert input.mp4 output.mp4 --encoder software --crf 18
+video-converter convert input.mp4 output.mp4 --mode software --quality 90
 
-# Faster hardware encoding with lower quality
-video-converter convert input.mp4 output.mp4 --quality 60
+# Hardware encoding with custom quality
+video-converter convert input.mp4 output.mp4 --quality 70
 ```
 
 ### run

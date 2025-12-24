@@ -68,43 +68,40 @@ video-converter run --source photos
 
 | Mode | Command | Speed | Quality | Use Case |
 |------|---------|-------|---------|----------|
-| Hardware | `--encoder hardware` | 6-20x realtime | Good | Daily use, batch conversion |
-| Software | `--encoder software` | 0.5-2x realtime | Excellent | Archival, maximum quality |
+| Hardware | `--mode hardware` | 6-20x realtime | Good | Daily use, batch conversion |
+| Software | `--mode software` | 0.5-2x realtime | Excellent | Archival, maximum quality |
 
 ```bash
 # Hardware encoding (default)
-video-converter convert input.mp4 output.mp4 --encoder hardware
+video-converter convert input.mp4 output.mp4 --mode hardware
 
 # Software encoding (higher quality)
-video-converter convert input.mp4 output.mp4 --encoder software --crf 20
+video-converter convert input.mp4 output.mp4 --mode software --quality 85
 ```
 
 ## Quality Settings
 
-### Hardware Encoder Quality
+The `--quality` option works for both hardware and software encoding (1-100, higher = better quality):
 
 ```bash
-# Default quality (45)
+# Default quality
 video-converter convert input.mp4 output.mp4
 
-# Higher quality (lower number = better quality, more space)
-video-converter convert input.mp4 output.mp4 --quality 30
+# Higher quality (larger file)
+video-converter convert input.mp4 output.mp4 --quality 85
 
-# Lower quality (higher number = smaller file)
-video-converter convert input.mp4 output.mp4 --quality 60
+# Lower quality (smaller file)
+video-converter convert input.mp4 output.mp4 --quality 50
 ```
 
-### Software Encoder CRF
+### Software Encoding with Quality
 
 ```bash
-# Default CRF (22)
-video-converter convert input.mp4 output.mp4 --encoder software
+# Software encoding with high quality
+video-converter convert input.mp4 output.mp4 --mode software --quality 90
 
-# Higher quality (lower CRF)
-video-converter convert input.mp4 output.mp4 --encoder software --crf 18
-
-# Smaller file (higher CRF)
-video-converter convert input.mp4 output.mp4 --encoder software --crf 26
+# Software encoding with medium quality
+video-converter convert input.mp4 output.mp4 --mode software --quality 70
 ```
 
 ## Next Steps

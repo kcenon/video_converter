@@ -37,7 +37,7 @@ video-converter convert input.mp4 output.mp4 --quality 60
 
 ```bash
 # High quality with software encoder
-video-converter convert input.mp4 output.mp4 --encoder software --crf 20
+video-converter convert input.mp4 output.mp4 --mode software --quality 90
 ```
 
 ## Multiple Files
