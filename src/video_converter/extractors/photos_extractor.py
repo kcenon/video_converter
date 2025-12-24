@@ -498,7 +498,7 @@ class PhotosLibrary:
             path=path,
             date=photo.date,
             date_modified=photo.date_modified,
-            duration=photo.duration or 0.0,
+            duration=0.0,  # Duration is obtained later via FFprobe in _enrich_with_codec
             favorite=photo.favorite,
             hidden=photo.hidden,
             in_cloud=photo.iscloudasset,
@@ -713,19 +713,31 @@ class PhotosVideoFilter:
             return None
 
     def _enrich_with_codec(self, video: PhotosVideoInfo) -> PhotosVideoInfo:
-        """Enrich video info with codec and size data.
+        """Enrich video info with codec, duration, and size data.
 
         Args:
             video: Video to enrich.
 
         Returns:
-            Video with codec and size information.
+            Video with codec, duration, and size information.
         """
         if not video.is_available_locally or video.path is None:
             return video
 
-        # Get codec
-        codec = self._detect_codec(video)
+        # Get codec and duration from FFprobe
+        codec: str | None = None
+        duration: float = video.duration
+        try:
+            from video_converter.processors.codec_detector import (
+                CorruptedVideoError,
+                InvalidVideoError,
+            )
+
+            codec_info = self.codec_detector.analyze(video.path)
+            codec = codec_info.codec
+            duration = codec_info.duration
+        except (InvalidVideoError, CorruptedVideoError, FileNotFoundError) as e:
+            logger.warning(f"Failed to analyze video {video.filename}: {e}")
 
         # Get file size
         try:
@@ -739,7 +751,7 @@ class PhotosVideoFilter:
             path=video.path,
             date=video.date,
             date_modified=video.date_modified,
-            duration=video.duration,
+            duration=duration,
             favorite=video.favorite,
             hidden=video.hidden,
             in_cloud=video.in_cloud,
@@ -778,13 +790,37 @@ class PhotosVideoFilter:
             to_date=to_date,
         )
 
+        # Progress tracking
+        total_videos = len(videos)
+        processed = 0
+        skipped_icloud = 0
+        skipped_album = 0
+        skipped_hevc = 0
+        log_interval = max(100, total_videos // 20)  # Log every 5% or 100 videos
+
+        logger.info(f"Analyzing {total_videos} videos for H.264 codec...")
+
         for video in videos:
+            processed += 1
+
+            # Log progress periodically
+            if processed % log_interval == 0 or processed == total_videos:
+                progress_pct = (processed / total_videos) * 100
+                logger.info(
+                    f"Progress: {processed}/{total_videos} ({progress_pct:.1f}%) - "
+                    f"Found {len(candidates)} H.264, "
+                    f"Skipped: {skipped_icloud} iCloud, {skipped_album} album filter, "
+                    f"{skipped_hevc} already HEVC"
+                )
+
             # Skip if doesn't pass album filter
             if not self._passes_album_filter(video):
+                skipped_album += 1
                 continue
 
             # Skip if not available locally
             if not video.is_available_locally:
+                skipped_icloud += 1
                 logger.debug(f"Skipping iCloud-only video: {video.filename}")
                 continue
 
@@ -797,9 +833,16 @@ class PhotosVideoFilter:
                 logger.debug(f"Found candidate: {enriched.filename} ({enriched.codec})")
 
                 if limit and len(candidates) >= limit:
+                    logger.info(f"Reached limit of {limit} candidates")
                     break
+            elif enriched.is_hevc:
+                skipped_hevc += 1
 
-        logger.info(f"Found {len(candidates)} H.264 videos for conversion")
+        logger.info(
+            f"Scan complete: {len(candidates)} H.264 videos found for conversion "
+            f"(Skipped: {skipped_icloud} iCloud, {skipped_album} album filter, "
+            f"{skipped_hevc} already HEVC)"
+        )
         return candidates
 
     def get_stats(self) -> LibraryStats:

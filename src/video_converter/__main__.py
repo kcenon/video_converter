@@ -203,12 +203,13 @@ def _display_conversion_summary(
     console.print("├──────────────────────────────────────────────┤")
     console.print(f"│  Original:   {bytes_to_human(original_size):<31} │")
     console.print(f"│  Converted:  {bytes_to_human(converted_size):<31} │")
-    console.print(
-        f"│  [green]Saved:      {bytes_to_human(saved_bytes)} ({saved_pct:.1f}%)[/green]{' ' * (20 - len(f'{saved_pct:.1f}'))}│"
-    )
+    # Pad text before applying Rich markup (markup breaks width calculation)
+    saved_text = f"Saved:      {bytes_to_human(saved_bytes)} ({saved_pct:.1f}%)"
+    console.print(f"│  [green]{saved_text:<42}[/green] │")
     console.print("├──────────────────────────────────────────────┤")
     console.print(f"│  Duration:   {format_duration(duration_seconds):<31} │")
-    console.print(f"│  Speed:      {speed_ratio:.1f}x realtime{' ' * 20}│")
+    speed_text = f"{speed_ratio:.1f}x realtime"
+    console.print(f"│  Speed:      {speed_text:<31} │")
 
     # Display VMAF score if available
     if vmaf_score is not None:
@@ -1167,17 +1168,20 @@ def _display_photos_dry_run(
         size_mb = video.size / BYTES_PER_MB if video.size else 0
         total_size += size_mb
 
-        date_str = video.date.strftime("%Y-%m-%d") if video.date else "Unknown"
-        album_str = video.albums[0] if video.albums else "-"
-        if len(video.albums) > 1:
-            album_str += f" (+{len(video.albums) - 1})"
+        # Ensure all values are strings for Rich table rendering
+        filename = str(video.filename) if video.filename else "Unknown"
+        if len(filename) > 40:
+            filename = filename[:40] + "..."
 
-        table.add_row(
-            video.filename[:40] + "..." if len(video.filename) > 40 else video.filename,
-            f"{size_mb:.1f} MB",
-            date_str,
-            album_str,
-        )
+        date_str = video.date.strftime("%Y-%m-%d") if video.date else "Unknown"
+
+        album_str = "-"
+        if video.albums:
+            album_str = str(video.albums[0])
+            if len(video.albums) > 1:
+                album_str += f" (+{len(video.albums) - 1})"
+
+        table.add_row(filename, f"{size_mb:.1f} MB", date_str, album_str)
 
     console.print(table)
     console.print()
@@ -1632,7 +1636,9 @@ def status() -> None:
         status_text = "✓ Installed, Idle"
         status_style = "yellow"
 
-    click.echo(f"│  Status:       {click.style(status_text, fg=status_style):<31}│")
+    # Pad text first, then apply style (ANSI codes break width calculation)
+    padded_status = f"{status_text:<31}"
+    click.echo(f"│  Status:       {click.style(padded_status, fg=status_style)}│")
 
     # Schedule line
     if service_status.schedule:
@@ -1665,6 +1671,347 @@ def status() -> None:
 
     click.echo("╰" + "─" * 46 + "╯")
     click.echo()
+
+
+@main.command()
+@click.option(
+    "--output-dir",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Output directory to clean (default: config output path).",
+)
+@click.option(
+    "--confirm",
+    is_flag=True,
+    help="Skip confirmation prompt.",
+)
+@click.pass_context
+def clean(ctx: click.Context, output_dir: Path | None, confirm: bool) -> None:
+    """Clean the output directory.
+
+    Removes all converted video files from the output directory to free up
+    disk space. By default, uses the configured output path.
+
+    Examples:
+
+        # Show what would be deleted (dry run)
+        video-converter clean
+
+        # Delete with confirmation prompt
+        video-converter clean --confirm
+
+        # Clean a specific directory
+        video-converter clean --output-dir ~/Desktop/Converted --confirm
+    """
+    import shutil
+
+    # Get config
+    cli_ctx: CLIContext = ctx.obj
+    config = cli_ctx.config
+
+    # Determine output directory
+    target_dir = output_dir if output_dir else config.paths.output.expanduser()
+
+    console.print()
+    console.print(f"[bold]Output Directory:[/bold] {target_dir}")
+
+    # Check if directory exists
+    if not target_dir.exists():
+        console.print("[yellow]Directory does not exist. Nothing to clean.[/yellow]")
+        return
+
+    # Calculate size and count files
+    total_size = 0
+    file_count = 0
+    video_extensions = {".mp4", ".mov", ".mkv", ".m4v", ".avi", ".webm"}
+
+    for file_path in target_dir.rglob("*"):
+        if file_path.is_file():
+            if file_path.suffix.lower() in video_extensions:
+                file_count += 1
+                total_size += file_path.stat().st_size
+
+    size_mb = total_size / BYTES_PER_MB
+    size_gb = total_size / BYTES_PER_GB
+
+    if file_count == 0:
+        console.print("[yellow]No video files found. Directory is already clean.[/yellow]")
+        return
+
+    # Display summary
+    console.print()
+    console.print(f"[bold]Files to delete:[/bold] {file_count} video(s)")
+    if size_gb >= 1:
+        console.print(f"[bold]Space to free:[/bold] {size_gb:.2f} GB")
+    else:
+        console.print(f"[bold]Space to free:[/bold] {size_mb:.1f} MB")
+
+    if not confirm:
+        console.print()
+        console.print("[dim]Run with --confirm to delete these files.[/dim]")
+        return
+
+    # Confirm deletion
+    console.print()
+    if not click.confirm("Are you sure you want to delete all converted videos?"):
+        console.print("[yellow]Cancelled.[/yellow]")
+        return
+
+    # Delete files
+    deleted_count = 0
+    deleted_size = 0
+
+    for file_path in target_dir.rglob("*"):
+        if file_path.is_file() and file_path.suffix.lower() in video_extensions:
+            try:
+                file_size = file_path.stat().st_size
+                file_path.unlink()
+                deleted_count += 1
+                deleted_size += file_size
+            except OSError as e:
+                console.print(f"[red]Failed to delete {file_path.name}: {e}[/red]")
+
+    # Clean up empty directories
+    for dir_path in sorted(target_dir.rglob("*"), reverse=True):
+        if dir_path.is_dir() and not any(dir_path.iterdir()):
+            try:
+                dir_path.rmdir()
+            except OSError:
+                pass
+
+    deleted_mb = deleted_size / BYTES_PER_MB
+    deleted_gb = deleted_size / BYTES_PER_GB
+
+    console.print()
+    console.print(f"[green]✓ Deleted {deleted_count} file(s)[/green]")
+    if deleted_gb >= 1:
+        console.print(f"[green]✓ Freed {deleted_gb:.2f} GB[/green]")
+    else:
+        console.print(f"[green]✓ Freed {deleted_mb:.1f} MB[/green]")
+
+
+@main.command()
+@click.option(
+    "--path",
+    type=click.Path(exists=True, path_type=Path),
+    default=None,
+    help="Directory to scan (default: home directory).",
+)
+@click.option(
+    "--min-size",
+    type=int,
+    default=1,
+    help="Minimum file size in MB (default: 1).",
+)
+@click.option(
+    "--limit",
+    type=int,
+    default=None,
+    help="Maximum number of results to show.",
+)
+@click.pass_context
+def scan(ctx: click.Context, path: Path | None, min_size: int, limit: int | None) -> None:
+    """Scan for videos not in Photos library.
+
+    Searches for video files on your system that are not registered in the
+    Photos library. Useful for finding videos that could be imported or
+    converted.
+
+    Examples:
+
+        # Scan home directory
+        video-converter scan
+
+        # Scan specific directory
+        video-converter scan --path ~/Downloads
+
+        # Only show videos larger than 100MB
+        video-converter scan --min-size 100
+
+        # Limit results
+        video-converter scan --limit 50
+    """
+    from collections import defaultdict
+
+    from video_converter.extractors.photos_extractor import (
+        PhotosAccessDeniedError,
+        PhotosLibrary,
+    )
+
+    # Determine search path
+    search_path = path if path else Path.home()
+    min_size_bytes = min_size * BYTES_PER_MB
+
+    console.print()
+    console.print(f"[bold]Scanning for videos not in Photos library...[/bold]")
+    console.print(f"[dim]Search path: {search_path}[/dim]")
+    console.print()
+
+    # Directories to exclude from search
+    exclude_dirs = {
+        ".Trash",
+        "Library",
+        ".git",
+        "node_modules",
+        "__pycache__",
+        ".venv",
+        "venv",
+        ".cache",
+        "Photos Library.photoslibrary",
+        "iPhoto Library.photolibrary",
+    }
+
+    video_extensions = {".mp4", ".mov", ".mkv", ".m4v", ".avi", ".webm", ".mts", ".m2ts"}
+
+    # Step 1: Get Photos library video paths
+    console.print("[cyan]Step 1/2: Loading Photos library...[/cyan]")
+    photos_paths: set[str] = set()
+
+    try:
+        library = PhotosLibrary()
+        if library.check_permissions():
+            videos = library.get_videos()
+            for video in videos:
+                if video.path:
+                    # Normalize path for comparison
+                    photos_paths.add(str(video.path.resolve()))
+            console.print(f"[green]✓ Found {len(photos_paths)} videos in Photos library[/green]")
+        else:
+            console.print("[yellow]⚠ Cannot access Photos library. Showing all videos.[/yellow]")
+    except PhotosAccessDeniedError:
+        console.print("[yellow]⚠ Photos library access denied. Showing all videos.[/yellow]")
+    except Exception as e:
+        console.print(f"[yellow]⚠ Could not load Photos library: {e}[/yellow]")
+
+    # Step 2: Scan filesystem for videos
+    console.print()
+    console.print("[cyan]Step 2/2: Scanning filesystem...[/cyan]")
+
+    found_videos: list[tuple[Path, int]] = []
+    scanned_dirs = 0
+    skipped_dirs = 0
+
+    def should_exclude(dir_path: Path) -> bool:
+        """Check if directory should be excluded."""
+        return dir_path.name in exclude_dirs or dir_path.name.startswith(".")
+
+    try:
+        for item in search_path.rglob("*"):
+            # Skip excluded directories
+            if item.is_dir():
+                if should_exclude(item):
+                    skipped_dirs += 1
+                    continue
+                scanned_dirs += 1
+                continue
+
+            # Check if it's a video file
+            if not item.is_file():
+                continue
+
+            if item.suffix.lower() not in video_extensions:
+                continue
+
+            # Check if any parent is excluded
+            if any(should_exclude(p) for p in item.parents):
+                continue
+
+            try:
+                file_size = item.stat().st_size
+            except OSError:
+                continue
+
+            # Skip small files
+            if file_size < min_size_bytes:
+                continue
+
+            # Check if already in Photos
+            resolved_path = str(item.resolve())
+            if resolved_path in photos_paths:
+                continue
+
+            found_videos.append((item, file_size))
+
+            # Progress indicator every 100 videos
+            if len(found_videos) % 100 == 0:
+                console.print(f"[dim]Found {len(found_videos)} videos so far...[/dim]")
+
+    except PermissionError:
+        console.print("[yellow]⚠ Some directories could not be accessed (permission denied)[/yellow]")
+    except KeyboardInterrupt:
+        console.print("[yellow]Scan interrupted by user[/yellow]")
+
+    if not found_videos:
+        console.print()
+        console.print("[green]No unregistered videos found.[/green]")
+        return
+
+    # Sort by size (largest first)
+    found_videos.sort(key=lambda x: x[1], reverse=True)
+
+    # Apply limit
+    if limit:
+        found_videos = found_videos[:limit]
+
+    # Group by directory
+    videos_by_dir: dict[Path, list[tuple[Path, int]]] = defaultdict(list)
+    for video_path, size in found_videos:
+        videos_by_dir[video_path.parent].append((video_path, size))
+
+    # Calculate totals
+    total_count = len(found_videos)
+    total_size = sum(size for _, size in found_videos)
+    total_gb = total_size / BYTES_PER_GB
+
+    # Display results
+    console.print()
+    console.print(f"[bold green]Found {total_count} video(s) not in Photos library[/bold green]")
+    console.print(f"[bold]Total size: {total_gb:.2f} GB[/bold]")
+    console.print()
+
+    # Create table grouped by directory
+    table = Table(title="Videos by Location")
+    table.add_column("Location", style="cyan", no_wrap=False)
+    table.add_column("Files", style="green", justify="right")
+    table.add_column("Size", style="yellow", justify="right")
+
+    # Sort directories by total size
+    sorted_dirs = sorted(
+        videos_by_dir.items(),
+        key=lambda x: sum(size for _, size in x[1]),
+        reverse=True,
+    )
+
+    for dir_path, videos in sorted_dirs[:20]:  # Show top 20 directories
+        dir_count = len(videos)
+        dir_size = sum(size for _, size in videos)
+        dir_size_str = f"{dir_size / BYTES_PER_GB:.2f} GB" if dir_size >= BYTES_PER_GB else f"{dir_size / BYTES_PER_MB:.1f} MB"
+
+        # Truncate long paths
+        dir_str = str(dir_path)
+        if len(dir_str) > 60:
+            dir_str = "..." + dir_str[-57:]
+
+        table.add_row(dir_str, str(dir_count), dir_size_str)
+
+    if len(sorted_dirs) > 20:
+        remaining = len(sorted_dirs) - 20
+        table.add_row(f"[dim]... and {remaining} more locations[/dim]", "", "")
+
+    console.print(table)
+
+    # Show top 10 largest files
+    console.print()
+    console.print("[bold]Largest files:[/bold]")
+    for video_path, size in found_videos[:10]:
+        size_str = f"{size / BYTES_PER_GB:.2f} GB" if size >= BYTES_PER_GB else f"{size / BYTES_PER_MB:.1f} MB"
+        name = video_path.name
+        if len(name) > 50:
+            name = name[:47] + "..."
+        console.print(f"  {size_str:>10}  {name}")
+
+    console.print()
+    console.print("[dim]Tip: Use 'video-converter run --source folder --input-dir <path>' to convert these videos.[/dim]")
 
 
 @main.command()

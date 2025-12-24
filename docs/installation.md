@@ -26,27 +26,46 @@ Complete installation guide for Video Converter.
 ### From Source (Recommended)
 
 ```bash
+# Clone repository
 git clone https://github.com/kcenon/video_converter.git
 cd video_converter
-pip install -e .
+
+# Create and activate virtual environment (Python 3.12 recommended)
+python3.12 -m venv .venv
+source .venv/bin/activate
+
+# Install
+pip3 install -e .
 ```
+
+!!! warning "Python Version"
+    Use **Python 3.10-3.12**. Python 3.13+ is not yet fully supported due to
+    `pyobjc` compatibility. Check with: `python3.12 --version`
+
+!!! note "Virtual Environment Required"
+    Modern macOS requires using a virtual environment for Python packages.
+    Always activate the virtual environment before using video-converter:
+    `source .venv/bin/activate`
 
 ### With Development Dependencies
 
 ```bash
-pip install -e ".[dev]"
+source .venv/bin/activate
+pip3 install -e ".[dev]"
 ```
 
 ### With GUI Support
 
 ```bash
-pip install -e ".[gui]"
+source .venv/bin/activate
+pip3 install -e ".[gui]"
 ```
 
 ### With Documentation Dependencies
 
 ```bash
-pip install -e ".[docs]"
+source .venv/bin/activate
+pip3 install -e ".[docs]"
 ```
 
 ## Verify Installation
@@ -113,5 +132,5 @@ source .venv/bin/activate
 # Install video-converter from source
 git clone https://github.com/kcenon/video_converter.git
 cd video_converter
-pip install -e .
+pip3 install -e .
 ```
