@@ -238,7 +238,7 @@ class TestPhotosLibrary:
         count = library.get_video_count()
 
         assert count == 3
-        mock_db.photos.assert_called_once_with(media_type=["video"])
+        mock_db.photos.assert_called_once_with(movies=True, images=False)
 
     def test_get_library_info(self, mock_osxphotos: MagicMock) -> None:
         """Test get_library_info returns expected structure."""
@@ -257,6 +257,31 @@ class TestPhotosLibrary:
         assert info["photo_count"] == 10
         assert info["video_count"] == 5
 
+    def test_get_library_info_uses_correct_api_params(self, mock_osxphotos: MagicMock) -> None:
+        """Test get_library_info uses correct osxphotos API parameters.
+
+        Verifies that photos() is called with images/movies parameters
+        instead of the unsupported media_type parameter (osxphotos >= 0.74).
+        """
+        mock_db = MagicMock()
+        mock_db.library_path = "/path/to/library"
+        mock_db.photos.side_effect = [
+            [MagicMock()] * 10,  # photos call
+            [MagicMock()] * 5,  # videos call
+        ]
+        mock_osxphotos.PhotosDB.return_value = mock_db
+
+        library = PhotosLibrary()
+        library.get_library_info()
+
+        # Verify correct API parameters are used
+        calls = mock_db.photos.call_args_list
+        assert len(calls) == 2
+        # First call: photos (images=True, movies=False)
+        assert calls[0] == ((),({"images": True, "movies": False}))
+        # Second call: videos (movies=True, images=False)
+        assert calls[1] == ((),({"movies": True, "images": False}))
+
     def test_get_videos_empty_library(self, mock_osxphotos: MagicMock) -> None:
         """Test get_videos with empty library."""
         mock_db = MagicMock()
@@ -267,6 +292,43 @@ class TestPhotosLibrary:
         videos = library.get_videos()
 
         assert videos == []
+
+    def test_get_videos_uses_correct_api_params(self, mock_osxphotos: MagicMock) -> None:
+        """Test get_videos uses correct osxphotos API parameters.
+
+        Verifies that photos() is called with movies=True, images=False
+        instead of the unsupported media_type parameter (osxphotos >= 0.74).
+        This is the test case from issue #195.
+        """
+        mock_db = MagicMock()
+        mock_db.photos.return_value = []
+        mock_osxphotos.PhotosDB.return_value = mock_db
+
+        library = PhotosLibrary()
+        library.get_videos()
+
+        # Verify correct API parameters are used
+        mock_db.photos.assert_called_once_with(movies=True, images=False)
+
+    def test_get_videos_with_date_filters_uses_correct_api(self, mock_osxphotos: MagicMock) -> None:
+        """Test get_videos with date filters still uses correct API parameters."""
+        mock_db = MagicMock()
+        mock_db.photos.return_value = []
+        mock_osxphotos.PhotosDB.return_value = mock_db
+
+        from_date = datetime(2024, 1, 1)
+        to_date = datetime(2024, 12, 31)
+
+        library = PhotosLibrary()
+        library.get_videos(from_date=from_date, to_date=to_date)
+
+        # Verify movies/images params are used along with date filters
+        mock_db.photos.assert_called_once_with(
+            movies=True,
+            images=False,
+            from_date=from_date,
+            to_date=to_date,
+        )
 
     def test_get_videos_with_filters(self, mock_osxphotos: MagicMock) -> None:
         """Test get_videos with favorites_only filter."""
