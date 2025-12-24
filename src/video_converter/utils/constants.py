@@ -101,9 +101,7 @@ DEFAULT_BIT_DEPTH = 8
 # =============================================================================
 # File System
 # =============================================================================
-VIDEO_EXTENSIONS = frozenset(
-    {".mov", ".mp4", ".m4v", ".avi", ".mkv", ".wmv", ".flv", ".webm"}
-)
+VIDEO_EXTENSIONS = frozenset({".mov", ".mp4", ".m4v", ".avi", ".mkv", ".wmv", ".flv", ".webm"})
 HEVC_EXTENSIONS = frozenset({".mp4", ".m4v", ".mov", ".mkv"})
 
 # Default paths (unexpanded - use Path.expanduser() when accessing)
