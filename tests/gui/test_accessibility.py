@@ -209,30 +209,52 @@ class TestKeyboardNavigation:
         window.close()
 
     def test_keyboard_shortcuts_work(self, qtbot: QtBot, mock_services) -> None:
-        """Test that keyboard shortcuts switch tabs correctly."""
+        """Test that keyboard shortcuts are properly configured for tab switching.
+
+        Note: In offscreen/headless Qt environments, QTest.keyClick does not
+        reliably trigger menu bar shortcuts. Instead, we verify that the menu
+        actions exist with correct shortcuts and trigger them directly.
+        """
         window = MainWindow()
         qtbot.addWidget(window)
         window.show()
 
-        # Test Ctrl+1 for Home
+        # Find View menu and its actions
+        menu_bar = window.menuBar()
+        view_menu = None
+        for action in menu_bar.actions():
+            if action.text() == "View":
+                view_menu = action.menu()
+                break
+
+        assert view_menu is not None, "View menu not found"
+
+        # Get all view menu actions
+        actions = {action.text(): action for action in view_menu.actions()}
+
+        # Verify shortcuts are configured correctly
+        assert actions["Home"].shortcut().toString() == "Ctrl+1"
+        assert actions["Convert"].shortcut().toString() == "Ctrl+2"
+        assert actions["Photos"].shortcut().toString() == "Ctrl+3"
+        assert actions["Queue"].shortcut().toString() == "Ctrl+4"
+        assert actions["Settings"].shortcut().toString() == "Ctrl+5"
+
+        # Test that triggering actions switches tabs correctly
         window._set_current_tab(MainWindow.TAB_SETTINGS)  # Start from different tab
-        QTest.keyClick(window, Qt.Key.Key_1, Qt.KeyboardModifier.ControlModifier)
+
+        actions["Home"].trigger()
         assert window.tab_bar.currentIndex() == MainWindow.TAB_HOME
 
-        # Test Ctrl+2 for Convert
-        QTest.keyClick(window, Qt.Key.Key_2, Qt.KeyboardModifier.ControlModifier)
+        actions["Convert"].trigger()
         assert window.tab_bar.currentIndex() == MainWindow.TAB_CONVERT
 
-        # Test Ctrl+3 for Photos
-        QTest.keyClick(window, Qt.Key.Key_3, Qt.KeyboardModifier.ControlModifier)
+        actions["Photos"].trigger()
         assert window.tab_bar.currentIndex() == MainWindow.TAB_PHOTOS
 
-        # Test Ctrl+4 for Queue
-        QTest.keyClick(window, Qt.Key.Key_4, Qt.KeyboardModifier.ControlModifier)
+        actions["Queue"].trigger()
         assert window.tab_bar.currentIndex() == MainWindow.TAB_QUEUE
 
-        # Test Ctrl+5 for Settings
-        QTest.keyClick(window, Qt.Key.Key_5, Qt.KeyboardModifier.ControlModifier)
+        actions["Settings"].trigger()
         assert window.tab_bar.currentIndex() == MainWindow.TAB_SETTINGS
 
         window.close()
