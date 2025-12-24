@@ -368,8 +368,8 @@ class PhotosLibrary:
         """
         return {
             "path": str(self.db.library_path),
-            "photo_count": len(self.db.photos(media_type=["photo"])),
-            "video_count": len(self.db.photos(media_type=["video"])),
+            "photo_count": len(self.db.photos(images=True, movies=False)),
+            "video_count": len(self.db.photos(movies=True, images=False)),
         }
 
     def get_video_count(self) -> int:
@@ -381,7 +381,7 @@ class PhotosLibrary:
         Raises:
             PhotosAccessDeniedError: If access is denied.
         """
-        return len(self.db.photos(media_type=["video"]))
+        return len(self.db.photos(movies=True, images=False))
 
     def get_videos(
         self,
@@ -413,8 +413,11 @@ class PhotosLibrary:
         )
 
         # Build query parameters
-        query_params: dict[str, list[str] | datetime | bool] = {
-            "media_type": ["video"],
+        # Use movies=True, images=False per osxphotos API
+        # Ref: https://github.com/RhetTbull/osxphotos
+        query_params: dict[str, datetime | bool] = {
+            "movies": True,
+            "images": False,
         }
 
         if from_date is not None:

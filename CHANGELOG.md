@@ -28,6 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+#### osxphotos API Compatibility (#195)
+- **Fix TypeError with osxphotos** when running `video-converter run --source photos`
+  - Replace unsupported `media_type` parameter with `movies`/`images` parameters
+  - Affects `get_library_info()`, `get_video_count()`, and `get_videos()` methods
+  - osxphotos has never supported `media_type` parameter; correct API uses:
+    - `movies=True, images=False` for video queries
+    - `images=True, movies=False` for photo queries
+  - Compatible with osxphotos 0.70.0+ (all supported versions)
+
 #### CI Build Fixes (#181)
 - **Make osxphotos dependency macOS-only** with platform marker `sys_platform == 'darwin'`
   - Fixes CI build failure on ubuntu-latest runners for documentation builds
