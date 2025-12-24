@@ -20,6 +20,10 @@ concurrency:
   group: e2e-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  PYTHON_VERSION: "3.11"
+  MACOS_VERSION: "macos-14"
+
 jobs:
   check-trigger:
     name: Check if E2E should run
@@ -47,17 +51,28 @@ jobs:
     name: E2E Tests
     needs: check-trigger
     if: needs.check-trigger.outputs.should_run == 'true'
-    runs-on: macos-latest
+    runs-on: macos-14
     timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: "pip"
+
+      - name: Cache Homebrew packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/Homebrew
+            /opt/homebrew/Cellar/ffmpeg
+            /opt/homebrew/Cellar/exiftool
+          key: ${{ runner.os }}-brew-${{ hashFiles('.github/workflows/*.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-brew-
 
       - name: Install system dependencies
         run: |
