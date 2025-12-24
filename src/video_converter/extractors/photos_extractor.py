@@ -790,13 +790,37 @@ class PhotosVideoFilter:
             to_date=to_date,
         )
 
+        # Progress tracking
+        total_videos = len(videos)
+        processed = 0
+        skipped_icloud = 0
+        skipped_album = 0
+        skipped_hevc = 0
+        log_interval = max(100, total_videos // 20)  # Log every 5% or 100 videos
+
+        logger.info(f"Analyzing {total_videos} videos for H.264 codec...")
+
         for video in videos:
+            processed += 1
+
+            # Log progress periodically
+            if processed % log_interval == 0 or processed == total_videos:
+                progress_pct = (processed / total_videos) * 100
+                logger.info(
+                    f"Progress: {processed}/{total_videos} ({progress_pct:.1f}%) - "
+                    f"Found {len(candidates)} H.264, "
+                    f"Skipped: {skipped_icloud} iCloud, {skipped_album} album filter, "
+                    f"{skipped_hevc} already HEVC"
+                )
+
             # Skip if doesn't pass album filter
             if not self._passes_album_filter(video):
+                skipped_album += 1
                 continue
 
             # Skip if not available locally
             if not video.is_available_locally:
+                skipped_icloud += 1
                 logger.debug(f"Skipping iCloud-only video: {video.filename}")
                 continue
 
@@ -809,9 +833,16 @@ class PhotosVideoFilter:
                 logger.debug(f"Found candidate: {enriched.filename} ({enriched.codec})")
 
                 if limit and len(candidates) >= limit:
+                    logger.info(f"Reached limit of {limit} candidates")
                     break
+            elif enriched.is_hevc:
+                skipped_hevc += 1
 
-        logger.info(f"Found {len(candidates)} H.264 videos for conversion")
+        logger.info(
+            f"Scan complete: {len(candidates)} H.264 videos found for conversion "
+            f"(Skipped: {skipped_icloud} iCloud, {skipped_album} album filter, "
+            f"{skipped_hevc} already HEVC)"
+        )
         return candidates
 
     def get_stats(self) -> LibraryStats:
