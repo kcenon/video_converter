@@ -174,5 +174,5 @@ tests/fixtures/*.mp4
 tests/fixtures/*.mov
 tests/fixtures/*.m4v
 
-# Generated documentation artifacts
-docs/architecture/generated/
+# Generated documentation artifacts (keep SVG diagrams for MkDocs)
+# docs/architecture/generated/  # Commented out - SVG files needed for documentation
