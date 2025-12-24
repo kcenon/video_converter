@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+#### Scan Command Permission Error Handling (#220, #221)
+- **Scan command continues after PermissionError** - Previously stopped on first protected directory
+  - Scans all accessible directories even when some are protected
+  - Reports count of inaccessible items after scan completes
+- **OSError handling** - Gracefully handles broken symlinks and I/O errors
+  - Counts and reports broken symlinks separately from permission errors
+  - Prevents scan from crashing on filesystem edge cases
+- **Comprehensive test coverage** - 9 tests covering error handling scenarios
+  - Permission error continuation, count reporting, and mixed errors
+  - Broken symlink handling and OS error count reporting
+  - Path filtering, size filtering, and keyboard interrupt handling
+
 ### Changed
 
 #### CI/CD Configuration Improvements (#219)

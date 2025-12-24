@@ -1891,6 +1891,8 @@ def scan(ctx: click.Context, path: Path | None, min_size: int, limit: int | None
     found_videos: list[tuple[Path, int]] = []
     scanned_dirs = 0
     skipped_dirs = 0
+    permission_errors = 0
+    os_errors = 0
 
     def should_exclude(dir_path: Path) -> bool:
         """Check if directory should be excluded."""
@@ -1898,51 +1900,62 @@ def scan(ctx: click.Context, path: Path | None, min_size: int, limit: int | None
 
     try:
         for item in search_path.rglob("*"):
-            # Skip excluded directories
-            if item.is_dir():
-                if should_exclude(item):
-                    skipped_dirs += 1
-                    continue
-                scanned_dirs += 1
-                continue
-
-            # Check if it's a video file
-            if not item.is_file():
-                continue
-
-            if item.suffix.lower() not in video_extensions:
-                continue
-
-            # Check if any parent is excluded
-            if any(should_exclude(p) for p in item.parents):
-                continue
-
             try:
+                # Skip excluded directories
+                if item.is_dir():
+                    if should_exclude(item):
+                        skipped_dirs += 1
+                        continue
+                    scanned_dirs += 1
+                    continue
+
+                # Check if it's a video file
+                if not item.is_file():
+                    continue
+
+                if item.suffix.lower() not in video_extensions:
+                    continue
+
+                # Check if any parent is excluded
+                if any(should_exclude(p) for p in item.parents):
+                    continue
+
                 file_size = item.stat().st_size
+
+                # Skip small files
+                if file_size < min_size_bytes:
+                    continue
+
+                # Check if already in Photos
+                resolved_path = str(item.resolve())
+                if resolved_path in photos_paths:
+                    continue
+
+                found_videos.append((item, file_size))
+
+                # Progress indicator every 100 videos
+                if len(found_videos) % 100 == 0:
+                    console.print(f"[dim]Found {len(found_videos)} videos so far...[/dim]")
+
+            except PermissionError:
+                permission_errors += 1
+                continue
             except OSError:
+                # Handle other OS errors (e.g., broken symlinks, I/O errors)
+                os_errors += 1
                 continue
 
-            # Skip small files
-            if file_size < min_size_bytes:
-                continue
-
-            # Check if already in Photos
-            resolved_path = str(item.resolve())
-            if resolved_path in photos_paths:
-                continue
-
-            found_videos.append((item, file_size))
-
-            # Progress indicator every 100 videos
-            if len(found_videos) % 100 == 0:
-                console.print(f"[dim]Found {len(found_videos)} videos so far...[/dim]")
-
-    except PermissionError:
-        console.print(
-            "[yellow]⚠ Some directories could not be accessed (permission denied)[/yellow]"
-        )
     except KeyboardInterrupt:
         console.print("[yellow]Scan interrupted by user[/yellow]")
+
+    if permission_errors > 0:
+        console.print(
+            f"[yellow]⚠ {permission_errors} items could not be accessed (permission denied)[/yellow]"
+        )
+    if os_errors > 0:
+        console.print(
+            f"[yellow]⚠ {os_errors} items could not be read (broken symlinks or I/O errors)[/yellow]"
+        )
 
     if not found_videos:
         console.print()
