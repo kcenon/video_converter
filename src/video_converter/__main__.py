@@ -203,12 +203,13 @@ def _display_conversion_summary(
     console.print("├──────────────────────────────────────────────┤")
     console.print(f"│  Original:   {bytes_to_human(original_size):<31} │")
     console.print(f"│  Converted:  {bytes_to_human(converted_size):<31} │")
-    console.print(
-        f"│  [green]Saved:      {bytes_to_human(saved_bytes)} ({saved_pct:.1f}%)[/green]{' ' * (20 - len(f'{saved_pct:.1f}'))}│"
-    )
+    # Pad text before applying Rich markup (markup breaks width calculation)
+    saved_text = f"Saved:      {bytes_to_human(saved_bytes)} ({saved_pct:.1f}%)"
+    console.print(f"│  [green]{saved_text:<42}[/green] │")
     console.print("├──────────────────────────────────────────────┤")
     console.print(f"│  Duration:   {format_duration(duration_seconds):<31} │")
-    console.print(f"│  Speed:      {speed_ratio:.1f}x realtime{' ' * 20}│")
+    speed_text = f"{speed_ratio:.1f}x realtime"
+    console.print(f"│  Speed:      {speed_text:<31} │")
 
     # Display VMAF score if available
     if vmaf_score is not None:
