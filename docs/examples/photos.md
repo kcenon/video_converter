@@ -2,61 +2,43 @@
 
 Examples for working with macOS Photos library.
 
-## Scanning the Library
+## Preview the Library
 
-### Basic Scan
+### Dry Run (Preview)
+
+Use `--dry-run` to preview what would be converted without making changes:
 
 ```bash
-video-converter scan --mode photos
+video-converter run --source photos --dry-run
 ```
 
 **Output:**
 ```
 Scanning Photos library...
 
-╭─────────────────────────────────────────────╮
-│         Photos Library Summary              │
-├─────────────────────────────────────────────┤
-│  Total videos:     156                      │
-│  H.264 videos:     89 (57%)                 │
-│  Already HEVC:     67 (43%)                 │
-│  In iCloud only:   12                       │
-├─────────────────────────────────────────────┤
-│  Total H.264 size: 45.2 GB                  │
-│  Estimated savings: ~22.6 GB (50%)          │
-╰─────────────────────────────────────────────╯
+Found 89 H.264 videos to convert.
+Total size: 45.2 GB
+Estimated savings: ~22.6 GB (50%)
+
+Dry run complete. Use 'video-converter run --source photos' to start conversion.
 ```
 
-### Detailed Scan
+### Detailed Preview with Limit
 
 ```bash
-video-converter scan --mode photos --verbose
+video-converter run --source photos --dry-run --limit 10
 ```
 
 **Output:**
 ```
 Scanning Photos library...
 
-Albums:
-  • All Videos (156)
-  • Vacation 2024 (45) - 23 H.264
-  • Family Events (32) - 18 H.264
-  • Work (12) - 8 H.264
+Preview (first 10 of 89 videos):
+  1. vacation_2024.mp4 (1.2 GB) - H.264
+  2. family_dinner.mp4 (890 MB) - H.264
   ...
 
-By Year:
-  • 2024: 89 videos (52 H.264)
-  • 2023: 45 videos (28 H.264)
-  • 2022: 22 videos (9 H.264)
-
-By Resolution:
-  • 4K: 45 videos
-  • 1080p: 78 videos
-  • 720p: 33 videos
-
-iCloud Status:
-  • Local: 144 videos
-  • iCloud only: 12 videos
+Use 'video-converter run --source photos' to convert all 89 videos.
 ```
 
 ## Album-Based Conversion

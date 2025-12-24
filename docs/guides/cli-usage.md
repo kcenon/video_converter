@@ -71,32 +71,6 @@ video-converter run --mode folder --path ~/Videos
 video-converter run --mode photos --dry-run
 ```
 
-### scan
-
-Scan for videos without converting.
-
-```bash
-video-converter scan [options]
-```
-
-**Options:**
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--mode` | `photos` | Source mode |
-| `--path` | - | Folder path (for folder mode) |
-| `--verbose` | `false` | Show detailed information |
-
-**Examples:**
-
-```bash
-# Scan Photos library
-video-converter scan --mode photos
-
-# Scan with details
-video-converter scan --mode photos --verbose
-```
-
 ### status
 
 Show service status.

@@ -58,83 +58,43 @@ find . -name "*.mp4" -print0 | xargs -0 -I {} video-converter convert {} {}_hevc
 
 ## Check Video Properties
 
-### Before Conversion
+Use `ffprobe` to check video properties:
 
 ```bash
-video-converter info input.mp4
+# Check codec and format
+ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,width,height,duration -of csv=p=0 input.mp4
+
+# Check metadata including GPS
+exiftool -GPS* -CreateDate -Model input.mp4
 ```
 
-**Output:**
+**Example output:**
 ```
-╭─────────────────────────────────────────────╮
-│           Video Information                 │
-├─────────────────────────────────────────────┤
-│  File:       input.mp4                      │
-│  Codec:      H.264 (AVC)                    │
-│  Resolution: 3840x2160 (4K)                 │
-│  FPS:        30.0                           │
-│  Duration:   10:25                          │
-│  Size:       4.2 GB                         │
-│  Bitrate:    56 Mbps                        │
-│  Audio:      AAC 48kHz stereo               │
-│  Container:  MP4                            │
-├─────────────────────────────────────────────┤
-│  GPS:        37.7749°N, 122.4194°W          │
-│  Created:    2024-12-20 14:30:22            │
-│  Device:     iPhone 15 Pro                  │
-╰─────────────────────────────────────────────╯
+h264,3840,2160,625.000000
+Create Date: 2024-12-20 14:30:22
+GPS Latitude: 37.7749 N
+GPS Longitude: 122.4194 W
+Model: iPhone 15 Pro
 ```
 
-### Compare Before and After
+## Verify Conversion with VMAF
+
+Use the `--vmaf` option during conversion to automatically measure quality:
 
 ```bash
-# Check both files
-video-converter info input.mp4 output.mp4 --compare
+video-converter convert input.mp4 output.mp4 --vmaf
 ```
 
-**Output:**
+**Output includes VMAF score:**
 ```
-╭──────────────────────────────────────────────────────────────╮
-│                   Comparison                                  │
-├──────────────────────────────────────────────────────────────┤
-│                    │ Original        │ Converted              │
-├──────────────────────────────────────────────────────────────┤
-│  Codec             │ H.264           │ HEVC                   │
-│  Size              │ 4.2 GB          │ 1.8 GB                 │
-│  Bitrate           │ 56 Mbps         │ 24 Mbps                │
-│  Resolution        │ 3840x2160       │ 3840x2160 ✓            │
-│  Duration          │ 10:25           │ 10:25 ✓                │
-│  GPS               │ Present         │ Present ✓              │
-├──────────────────────────────────────────────────────────────┤
-│  Space Saved: 2.4 GB (57%)                                    │
-╰──────────────────────────────────────────────────────────────╯
-```
-
-## Verify Conversion
-
-### Check Integrity
-
-```bash
-video-converter verify output.mp4
-```
-
-### With VMAF
-
-```bash
-video-converter verify input.mp4 output.mp4 --vmaf
-```
-
-**Output:**
-```
-╭─────────────────────────────────────────────╮
-│           Verification Result               │
-├─────────────────────────────────────────────┤
-│  Integrity:   ✅ Valid                      │
-│  Playable:    ✅ Yes                        │
-│  Duration:    ✅ Matches (10:25)            │
-│  Resolution:  ✅ Matches (3840x2160)        │
-│  VMAF Score:  94.2 (Excellent)              │
-╰─────────────────────────────────────────────╯
+╭──────────────────────────────────────────────╮
+│            Conversion Complete               │
+├──────────────────────────────────────────────┤
+│  Input:      input.mp4                       │
+│  Output:     output.mp4                      │
+│  Size:       4.2 GB → 1.8 GB (57% saved)     │
+│  VMAF Score: 94.2 (Excellent)                │
+╰──────────────────────────────────────────────╯
 ```
 
 ## Error Handling

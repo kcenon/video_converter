@@ -28,31 +28,29 @@ flowchart LR
 
 ## Basic Usage
 
-### Scan Library
+### Preview Library (Dry Run)
+
+Use `--dry-run` to scan and preview what would be converted:
 
 ```bash
-video-converter scan --mode photos
+video-converter run --source photos --dry-run
 ```
 
 **Output:**
 ```
-╭─────────────────────────────────────────────╮
-│         Photos Library Summary              │
-├─────────────────────────────────────────────┤
-│  Total videos:     156                      │
-│  H.264 videos:     89 (57%)                 │
-│  Already HEVC:     67 (43%)                 │
-│  In iCloud only:   12                       │
-├─────────────────────────────────────────────┤
-│  Total H.264 size: 45.2 GB                  │
-│  Estimated savings: ~22.6 GB (50%)          │
-╰─────────────────────────────────────────────╯
+Scanning Photos library...
+
+Found 89 H.264 videos to convert.
+Total size: 45.2 GB
+Estimated savings: ~22.6 GB (50%)
+
+Dry run complete.
 ```
 
 ### Convert All H.264 Videos
 
 ```bash
-video-converter run --mode photos
+video-converter run --source photos
 ```
 
 ### Filter by Album

@@ -41,31 +41,27 @@ Converting: input.mp4
 ✅ Complete: Saved 820MB (54%)
 ```
 
-### Scan Photos Library
+### Preview Photos Library (Dry Run)
 
 ```bash
-video-converter scan --mode photos
+video-converter run --source photos --dry-run
 ```
 
 **Output:**
 ```
 Scanning Photos library...
 
-╭─────────────────────────────────────────────╮
-│         Photos Library Summary              │
-├─────────────────────────────────────────────┤
-│  Total videos:     156                      │
-│  H.264 videos:     89                       │
-│  Already HEVC:     67                       │
-│  Total size:       45.2 GB                  │
-│  Estimated savings: ~22.6 GB                │
-╰─────────────────────────────────────────────╯
+Found 89 H.264 videos to convert.
+Total size: 45.2 GB
+Estimated savings: ~22.6 GB (50%)
+
+Dry run complete. Use 'video-converter run --source photos' to start conversion.
 ```
 
 ### Batch Convert Photos Library
 
 ```bash
-video-converter run --mode photos
+video-converter run --source photos
 ```
 
 ## Hardware vs Software Encoding
