@@ -29,6 +29,15 @@ import subprocess
 
 from video_converter.converters.base import BaseConverter
 from video_converter.core.types import ConversionMode, ConversionRequest
+from video_converter.utils.constants import (
+    DEFAULT_BIT_DEPTH,
+    DEFAULT_CRF,
+    DEFAULT_PRESET,
+    ENCODING_PRESETS,
+    SOFTWARE_MAX_CRF,
+    SOFTWARE_MIN_CRF,
+    SUPPORTED_BIT_DEPTHS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,28 +56,17 @@ class SoftwareConverter(BaseConverter):
     """
 
     # CRF range for libx265: 0-51 (lower = better quality, 18-28 typical)
-    MIN_CRF = 0
-    MAX_CRF = 51
-    DEFAULT_CRF = 22
+    MIN_CRF = SOFTWARE_MIN_CRF
+    MAX_CRF = SOFTWARE_MAX_CRF
+    DEFAULT_CRF = DEFAULT_CRF
 
     # Valid presets from fastest to slowest
-    VALID_PRESETS = [
-        "ultrafast",
-        "superfast",
-        "veryfast",
-        "faster",
-        "fast",
-        "medium",
-        "slow",
-        "slower",
-        "veryslow",
-        "placebo",
-    ]
-    DEFAULT_PRESET = "medium"
+    VALID_PRESETS = list(ENCODING_PRESETS)
+    DEFAULT_PRESET = DEFAULT_PRESET
 
     # Valid bit depths
-    VALID_BIT_DEPTHS = [8, 10]
-    DEFAULT_BIT_DEPTH = 8
+    VALID_BIT_DEPTHS = list(SUPPORTED_BIT_DEPTHS)
+    DEFAULT_BIT_DEPTH = DEFAULT_BIT_DEPTH
 
     # HDR x265 parameters for BT.2020 PQ (HDR10)
     HDR_X265_PARAMS = (

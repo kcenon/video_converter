@@ -36,6 +36,19 @@ from pydantic_settings import (
 from pydantic_settings.sources import JsonConfigSettingsSource
 
 from video_converter import __version__
+from video_converter.utils.constants import (
+    CLI_MAX_CRF,
+    CLI_MIN_CRF,
+    DEFAULT_CONCURRENT_CONVERSIONS,
+    DEFAULT_CRF,
+    DEFAULT_MIN_FREE_SPACE_GB,
+    DEFAULT_QUALITY,
+    ICLOUD_DOWNLOAD_TIMEOUT,
+    MAX_CONCURRENT_CONVERSIONS,
+    MIN_CONCURRENT_CONVERSIONS,
+    VMAF_DEFAULT_SAMPLE_INTERVAL,
+    VMAF_THRESHOLD_VISUALLY_LOSSLESS,
+)
 
 # Default paths
 DEFAULT_CONFIG_DIR = Path.home() / ".config" / "video_converter"
@@ -73,8 +86,8 @@ class EncodingConfig(BaseModel):
     """
 
     mode: Literal["hardware", "software"] = "hardware"
-    quality: int = Field(default=45, ge=1, le=100)
-    crf: int = Field(default=22, ge=18, le=28)
+    quality: int = Field(default=DEFAULT_QUALITY, ge=1, le=100)
+    crf: int = Field(default=DEFAULT_CRF, ge=CLI_MIN_CRF, le=CLI_MAX_CRF)
     preset: Literal["fast", "medium", "slow"] = "medium"
     bit_depth: Literal[8, 10] = 8
     hdr: bool = False
@@ -137,7 +150,7 @@ class PhotosConfig(BaseModel):
     include_albums: list[str] = Field(default_factory=list)
     exclude_albums: list[str] = Field(default_factory=lambda: ["Screenshots"])
     download_from_icloud: bool = True
-    icloud_timeout: int = Field(default=3600, ge=60, le=86400)
+    icloud_timeout: int = Field(default=ICLOUD_DOWNLOAD_TIMEOUT, ge=60, le=86400)
     skip_cloud_only: bool = False
 
 
@@ -160,7 +173,7 @@ class FolderConfig(BaseModel):
 
     recursive: bool = True
     auto_download_icloud: bool = True
-    icloud_timeout: int = Field(default=3600, ge=60, le=86400)
+    icloud_timeout: int = Field(default=ICLOUD_DOWNLOAD_TIMEOUT, ge=60, le=86400)
     skip_icloud_on_timeout: bool = True
     include_patterns: list[str] = Field(default_factory=list)
     exclude_patterns: list[str] = Field(
@@ -185,8 +198,8 @@ class VmafConfig(BaseModel):
     """
 
     enabled: bool = False
-    threshold: float = Field(default=93.0, ge=0.0, le=100.0)
-    sample_interval: int = Field(default=30, ge=1)
+    threshold: float = Field(default=VMAF_THRESHOLD_VISUALLY_LOSSLESS, ge=0.0, le=100.0)
+    sample_interval: int = Field(default=VMAF_DEFAULT_SAMPLE_INTERVAL, ge=1)
     fail_action: Literal["warn", "retry", "fail"] = "warn"
 
 
@@ -203,13 +216,17 @@ class ProcessingConfig(BaseModel):
         min_free_space_gb: Minimum free disk space in gigabytes.
     """
 
-    max_concurrent: int = Field(default=2, ge=1, le=8)
+    max_concurrent: int = Field(
+        default=DEFAULT_CONCURRENT_CONVERSIONS,
+        ge=MIN_CONCURRENT_CONVERSIONS,
+        le=MAX_CONCURRENT_CONVERSIONS,
+    )
     validate_quality: bool = True
     preserve_original: bool = True
     move_processed: bool = False
     move_failed: bool = False
     check_disk_space: bool = True
-    min_free_space_gb: float = Field(default=1.0, ge=0.1)
+    min_free_space_gb: float = Field(default=DEFAULT_MIN_FREE_SPACE_GB, ge=0.1)
 
 
 class NotificationConfig(BaseModel):

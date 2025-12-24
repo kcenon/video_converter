@@ -9,11 +9,8 @@ from __future__ import annotations
 import pytest
 from click import BadParameter
 
-from video_converter.__main__ import (
-    _format_duration,
-    _format_size,
-    parse_time,
-)
+from video_converter.__main__ import parse_time
+from video_converter.utils.constants import bytes_to_human, format_duration
 
 
 class TestParseTime:
@@ -66,55 +63,55 @@ class TestParseTime:
 
 
 class TestFormatDuration:
-    """Tests for _format_duration function."""
+    """Tests for format_duration function from constants."""
 
     def test_seconds_only(self) -> None:
         """Test formatting durations under 60 seconds."""
-        assert _format_duration(0) == "0 sec"
-        assert _format_duration(30) == "30 sec"
-        assert _format_duration(59) == "59 sec"
+        assert format_duration(0) == "0 sec"
+        assert format_duration(30) == "30 sec"
+        assert format_duration(59) == "59 sec"
 
     def test_minutes_and_seconds(self) -> None:
         """Test formatting durations in minutes."""
-        assert _format_duration(60) == "1 min 0 sec"
-        assert _format_duration(90) == "1 min 30 sec"
-        assert _format_duration(3599) == "59 min 59 sec"
+        assert format_duration(60) == "1 min 0 sec"
+        assert format_duration(90) == "1 min 30 sec"
+        assert format_duration(3599) == "59 min 59 sec"
 
     def test_hours_and_minutes(self) -> None:
         """Test formatting durations in hours."""
-        assert _format_duration(3600) == "1 hr 0 min"
-        assert _format_duration(5400) == "1 hr 30 min"
-        assert _format_duration(7200) == "2 hr 0 min"
+        assert format_duration(3600) == "1 hr 0 min"
+        assert format_duration(5400) == "1 hr 30 min"
+        assert format_duration(7200) == "2 hr 0 min"
 
     def test_decimal_seconds(self) -> None:
         """Test formatting with decimal seconds."""
-        assert _format_duration(30.7) == "30 sec"
-        assert _format_duration(90.5) == "1 min 30 sec"
+        assert format_duration(30.7) == "30 sec"
+        assert format_duration(90.5) == "1 min 30 sec"
 
 
-class TestFormatSize:
-    """Tests for _format_size function."""
+class TestBytesToHuman:
+    """Tests for bytes_to_human function from constants."""
 
     def test_bytes(self) -> None:
         """Test formatting sizes in bytes."""
-        assert _format_size(0) == "0 B"
-        assert _format_size(500) == "500 B"
-        assert _format_size(1023) == "1023 B"
+        assert bytes_to_human(0) == "0 B"
+        assert bytes_to_human(500) == "500 B"
+        assert bytes_to_human(1023) == "1023 B"
 
     def test_kilobytes(self) -> None:
         """Test formatting sizes in kilobytes."""
-        assert _format_size(1024) == "1 KB"
-        assert _format_size(1536) == "2 KB"  # 1.5 KB rounds to 2
-        assert _format_size(1024 * 500) == "500 KB"
+        assert bytes_to_human(1024) == "1.00 KB"
+        assert bytes_to_human(1536) == "1.50 KB"
+        assert bytes_to_human(1024 * 500) == "500.00 KB"
 
     def test_megabytes(self) -> None:
         """Test formatting sizes in megabytes."""
-        assert _format_size(1024 * 1024) == "1 MB"
-        assert _format_size(1024 * 1024 * 100) == "100 MB"
-        assert _format_size(1024 * 1024 * 680) == "680 MB"
+        assert bytes_to_human(1024 * 1024) == "1.00 MB"
+        assert bytes_to_human(1024 * 1024 * 100) == "100.00 MB"
+        assert bytes_to_human(1024 * 1024 * 680) == "680.00 MB"
 
     def test_gigabytes(self) -> None:
         """Test formatting sizes in gigabytes."""
-        assert _format_size(1024 * 1024 * 1024) == "1.00 GB"
-        assert _format_size(int(1024 * 1024 * 1024 * 1.5)) == "1.50 GB"
-        assert _format_size(1024 * 1024 * 1024 * 10) == "10.00 GB"
+        assert bytes_to_human(1024 * 1024 * 1024) == "1.00 GB"
+        assert bytes_to_human(int(1024 * 1024 * 1024 * 1.5)) == "1.50 GB"
+        assert bytes_to_human(1024 * 1024 * 1024 * 10) == "10.00 GB"

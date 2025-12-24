@@ -26,6 +26,13 @@ from video_converter.core.orchestrator import Orchestrator, OrchestratorConfig
 from video_converter.core.types import ConversionMode, ConversionProgress
 from video_converter.processors.codec_detector import CodecDetector
 from video_converter.ui.progress import ProgressDisplayManager
+from video_converter.utils.constants import (
+    BYTES_PER_GB,
+    BYTES_PER_MB,
+    VIDEO_EXTENSIONS,
+    bytes_to_human,
+    format_duration,
+)
 
 # Rich console for formatted output
 console = Console()
@@ -154,43 +161,8 @@ def _create_progress_callback(quiet: bool) -> Any:
     return callback
 
 
-def _format_duration(seconds: float) -> str:
-    """Format duration in human-readable format.
-
-    Args:
-        seconds: Duration in seconds.
-
-    Returns:
-        Formatted duration string like "3 min 45 sec" or "1 hr 30 min".
-    """
-    if seconds < 60:
-        return f"{int(seconds)} sec"
-    elif seconds < 3600:
-        mins = int(seconds // 60)
-        secs = int(seconds % 60)
-        return f"{mins} min {secs} sec"
-    else:
-        hrs = int(seconds // 3600)
-        mins = int((seconds % 3600) // 60)
-        return f"{hrs} hr {mins} min"
-
-
-def _format_size(size_bytes: int) -> str:
-    """Format file size in human-readable format.
-
-    Args:
-        size_bytes: Size in bytes.
-
-    Returns:
-        Formatted size string like "1.50 GB" or "680 MB".
-    """
-    if size_bytes >= 1024 * 1024 * 1024:
-        return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
-    elif size_bytes >= 1024 * 1024:
-        return f"{size_bytes / (1024 * 1024):.0f} MB"
-    elif size_bytes >= 1024:
-        return f"{size_bytes / 1024:.0f} KB"
-    return f"{size_bytes} B"
+# Use format_duration and bytes_to_human from constants module
+# (imported above)
 
 
 def _display_conversion_summary(
@@ -229,13 +201,13 @@ def _display_conversion_summary(
     console.print(f"│  Output:     {output_file.name[:31]:<31} │")
     console.print(f"│  Codec:      {codec_change:<31} │")
     console.print("├──────────────────────────────────────────────┤")
-    console.print(f"│  Original:   {_format_size(original_size):<31} │")
-    console.print(f"│  Converted:  {_format_size(converted_size):<31} │")
+    console.print(f"│  Original:   {bytes_to_human(original_size):<31} │")
+    console.print(f"│  Converted:  {bytes_to_human(converted_size):<31} │")
     console.print(
-        f"│  [green]Saved:      {_format_size(saved_bytes)} ({saved_pct:.1f}%)[/green]{' ' * (20 - len(f'{saved_pct:.1f}'))}│"
+        f"│  [green]Saved:      {bytes_to_human(saved_bytes)} ({saved_pct:.1f}%)[/green]{' ' * (20 - len(f'{saved_pct:.1f}'))}│"
     )
     console.print("├──────────────────────────────────────────────┤")
-    console.print(f"│  Duration:   {_format_duration(duration_seconds):<31} │")
+    console.print(f"│  Duration:   {format_duration(duration_seconds):<31} │")
     console.print(f"│  Speed:      {speed_ratio:.1f}x realtime{' ' * 20}│")
 
     # Display VMAF score if available
@@ -428,9 +400,9 @@ def convert(
         console.print(f"[bold]Converting:[/bold] {input_file.name}")
         console.print(f"[bold]Mode:[/bold] {conv_mode.value} ({encoder_name})")
         console.print(
-            f"[bold]Input:[/bold] {_format_size(codec_info.size)} "
+            f"[bold]Input:[/bold] {bytes_to_human(codec_info.size)} "
             f"({codec_info.codec.upper()}, {codec_info.resolution_label}@{codec_info.fps:.0f}fps, "
-            f"{_format_duration(codec_info.duration)})"
+            f"{format_duration(codec_info.duration)})"
         )
         console.print()
 
@@ -802,14 +774,13 @@ def _scan_for_videos(input_dir: Path, recursive: bool) -> list[Path]:
     Returns:
         List of video file paths.
     """
-    video_extensions = {".mov", ".mp4", ".m4v", ".avi", ".mkv", ".wmv", ".flv", ".webm"}
     video_files: list[Path] = []
 
     if recursive:
-        for ext in video_extensions:
+        for ext in VIDEO_EXTENSIONS:
             video_files.extend(input_dir.rglob(f"*{ext}"))
     else:
-        for ext in video_extensions:
+        for ext in VIDEO_EXTENSIONS:
             video_files.extend(input_dir.glob(f"*{ext}"))
 
     return sorted(video_files)
@@ -829,7 +800,7 @@ def _display_dry_run(video_files: list[Path], output_dir: Path | None) -> None:
 
     total_size = 0
     for video_path in video_files:
-        size_mb = video_path.stat().st_size / (1024 * 1024)
+        size_mb = video_path.stat().st_size / BYTES_PER_MB
         total_size += size_mb
 
         if output_dir:
@@ -885,7 +856,7 @@ def _run_batch_conversion(
         move_to_processed=config.paths.processed if config.processing.move_processed else None,
         move_to_failed=config.paths.failed if config.processing.move_failed else None,
         check_disk_space=config.processing.check_disk_space,
-        min_free_space=int(config.processing.min_free_space_gb * 1024 * 1024 * 1024),
+        min_free_space=int(config.processing.min_free_space_gb * BYTES_PER_GB),
         enable_vmaf=config.vmaf.enabled,
         vmaf_threshold=config.vmaf.threshold,
         vmaf_sample_interval=config.vmaf.sample_interval,
@@ -955,8 +926,8 @@ def _run_batch_conversion(
     console.print(f"  [yellow]Skipped:[/yellow]      {report.skipped}")
 
     if report.total_original_size > 0:
-        original_mb = report.total_original_size / (1024 * 1024)
-        converted_mb = report.total_converted_size / (1024 * 1024)
+        original_mb = report.total_original_size / BYTES_PER_MB
+        converted_mb = report.total_converted_size / BYTES_PER_MB
         saved_mb = original_mb - converted_mb
         saved_pct = (saved_mb / original_mb) * 100
 
@@ -1004,7 +975,7 @@ def _check_photos_permissions(cli_ctx: CLIContext) -> None:
                     stats = handler.get_stats()
                     library_info = handler.get_library_info()
                     library_path = library_info.get("path", "")
-                    total_size_gb = stats.total_size_h264 / (1024 * 1024 * 1024)
+                    total_size_gb = stats.total_size_h264 / (BYTES_PER_GB)
 
                     display_photos_library_info(
                         console=console,
@@ -1193,7 +1164,7 @@ def _display_photos_dry_run(
 
     total_size = 0
     for video in candidates:
-        size_mb = video.size / (1024 * 1024) if video.size else 0
+        size_mb = video.size / BYTES_PER_MB if video.size else 0
         total_size += size_mb
 
         date_str = video.date.strftime("%Y-%m-%d") if video.date else "Unknown"
@@ -1295,7 +1266,7 @@ def _run_photos_batch_conversion(
         move_to_processed=config.paths.processed if config.processing.move_processed else None,
         move_to_failed=config.paths.failed if config.processing.move_failed else None,
         check_disk_space=config.processing.check_disk_space,
-        min_free_space=int(config.processing.min_free_space_gb * 1024 * 1024 * 1024),
+        min_free_space=int(config.processing.min_free_space_gb * BYTES_PER_GB),
         pause_on_disk_full=True,
         enable_vmaf=config.vmaf.enabled,
         vmaf_threshold=config.vmaf.threshold,
@@ -1546,7 +1517,7 @@ def _run_photos_batch_conversion(
     console.print(f"  Failed:           {report.failed + len(export_errors)}")
     if reimport:
         console.print(f"  Re-imported:      {reimport_count}")
-    console.print(f"  Space saved:      {total_saved / (1024 * 1024):.1f} MB")
+    console.print(f"  Space saved:      {total_saved / BYTES_PER_MB:.1f} MB")
     console.print(f"  Time elapsed:     {elapsed_time:.1f}s")
 
     # Show errors
@@ -1593,7 +1564,7 @@ def _run_resume_session(cli_ctx: CLIContext) -> None:
         move_to_processed=config.paths.processed if config.processing.move_processed else None,
         move_to_failed=config.paths.failed if config.processing.move_failed else None,
         check_disk_space=config.processing.check_disk_space,
-        min_free_space=int(config.processing.min_free_space_gb * 1024 * 1024 * 1024),
+        min_free_space=int(config.processing.min_free_space_gb * BYTES_PER_GB),
         enable_vmaf=config.vmaf.enabled,
         vmaf_threshold=config.vmaf.threshold,
         vmaf_sample_interval=config.vmaf.sample_interval,

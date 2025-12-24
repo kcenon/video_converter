@@ -96,15 +96,22 @@ from video_converter.processors.vmaf_analyzer import (
     VmafAnalyzer,
     VmafNotAvailableError,
 )
+from video_converter.utils.constants import (
+    DEFAULT_CONCURRENT_CONVERSIONS,
+    DEFAULT_CRF,
+    DEFAULT_QUALITY,
+    ICLOUD_DOWNLOAD_TIMEOUT,
+    ICLOUD_POLL_INTERVAL,
+    MIN_FREE_DISK_SPACE,
+    VIDEO_EXTENSIONS,
+    VMAF_DEFAULT_SAMPLE_INTERVAL,
+    VMAF_THRESHOLD_VISUALLY_LOSSLESS,
+)
 
 if TYPE_CHECKING:
     from video_converter.extractors.folder_extractor import FolderVideoInfo
 
 logger = logging.getLogger(__name__)
-
-
-# Common video extensions
-VIDEO_EXTENSIONS = {".mov", ".mp4", ".m4v", ".avi", ".mkv", ".wmv", ".flv", ".webm"}
 
 
 @dataclass
@@ -143,15 +150,15 @@ class OrchestratorConfig:
     """
 
     mode: ConversionMode = ConversionMode.HARDWARE
-    quality: int = 45
-    crf: int = 22
+    quality: int = DEFAULT_QUALITY
+    crf: int = DEFAULT_CRF
     preset: str = "medium"
     output_suffix: str = "_h265"
     preserve_metadata: bool = True
     preserve_timestamps: bool = True
     validate_output: bool = True
     validation_strictness: ValidationStrictness = ValidationStrictness.STANDARD
-    max_concurrent: int = 2
+    max_concurrent: int = DEFAULT_CONCURRENT_CONVERSIONS
     delete_original: bool = False
     move_to_processed: Path | None = None
     move_to_failed: Path | None = None
@@ -159,16 +166,16 @@ class OrchestratorConfig:
     enable_retry: bool = True
     retry_config: RetryConfig | None = None
     check_disk_space: bool = True
-    min_free_space: int = 1024 * 1024 * 1024  # 1GB
+    min_free_space: int = MIN_FREE_DISK_SPACE
     pause_on_disk_full: bool = True
     enable_notifications: bool = True
     notification_config: NotificationConfig | None = None
     auto_download_icloud: bool = True
-    icloud_timeout: int = 3600  # 1 hour
+    icloud_timeout: int = ICLOUD_DOWNLOAD_TIMEOUT
     skip_icloud_on_timeout: bool = True
     enable_vmaf: bool = False
-    vmaf_threshold: float = 93.0
-    vmaf_sample_interval: int = 30
+    vmaf_threshold: float = VMAF_THRESHOLD_VISUALLY_LOSSLESS
+    vmaf_sample_interval: int = VMAF_DEFAULT_SAMPLE_INTERVAL
     vmaf_fail_action: str = "warn"
 
 
@@ -373,7 +380,7 @@ class Orchestrator:
         # Create iCloud handler
         handler = iCloudHandler(
             timeout=self.config.icloud_timeout,
-            poll_interval=1.0,
+            poll_interval=ICLOUD_POLL_INTERVAL,
         )
 
         # Create a minimal video info object for iCloudHandler
