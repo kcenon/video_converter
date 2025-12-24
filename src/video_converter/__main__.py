@@ -1944,7 +1944,9 @@ def scan(ctx: click.Context, path: Path | None, min_size: int, limit: int | None
         console.print("[yellow]Scan interrupted by user[/yellow]")
 
     if permission_errors > 0:
-        console.print(f"[yellow]⚠ {permission_errors} items could not be accessed (permission denied)[/yellow]")
+        console.print(
+            f"[yellow]⚠ {permission_errors} items could not be accessed (permission denied)[/yellow]"
+        )
 
     if not found_videos:
         console.print()
@@ -1990,7 +1992,11 @@ def scan(ctx: click.Context, path: Path | None, min_size: int, limit: int | None
     for dir_path, videos in sorted_dirs[:20]:  # Show top 20 directories
         dir_count = len(videos)
         dir_size = sum(size for _, size in videos)
-        dir_size_str = f"{dir_size / BYTES_PER_GB:.2f} GB" if dir_size >= BYTES_PER_GB else f"{dir_size / BYTES_PER_MB:.1f} MB"
+        dir_size_str = (
+            f"{dir_size / BYTES_PER_GB:.2f} GB"
+            if dir_size >= BYTES_PER_GB
+            else f"{dir_size / BYTES_PER_MB:.1f} MB"
+        )
 
         # Truncate long paths
         dir_str = str(dir_path)
@@ -2009,14 +2015,20 @@ def scan(ctx: click.Context, path: Path | None, min_size: int, limit: int | None
     console.print()
     console.print("[bold]Largest files:[/bold]")
     for video_path, size in found_videos[:10]:
-        size_str = f"{size / BYTES_PER_GB:.2f} GB" if size >= BYTES_PER_GB else f"{size / BYTES_PER_MB:.1f} MB"
+        size_str = (
+            f"{size / BYTES_PER_GB:.2f} GB"
+            if size >= BYTES_PER_GB
+            else f"{size / BYTES_PER_MB:.1f} MB"
+        )
         name = video_path.name
         if len(name) > 50:
             name = name[:47] + "..."
         console.print(f"  {size_str:>10}  {name}")
 
     console.print()
-    console.print("[dim]Tip: Use 'video-converter run --source folder --input-dir <path>' to convert these videos.[/dim]")
+    console.print(
+        "[dim]Tip: Use 'video-converter run --source folder --input-dir <path>' to convert these videos.[/dim]"
+    )
 
 
 @main.command()

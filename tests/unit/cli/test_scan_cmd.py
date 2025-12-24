@@ -45,7 +45,7 @@ class TestScanCommandHelp:
 class TestScanPermissionErrorHandling:
     """Tests for permission error handling during filesystem scan."""
 
-    @patch("video_converter.__main__.PhotosLibrary")
+    @patch("video_converter.extractors.photos_extractor.PhotosLibrary")
     def test_scan_continues_after_permission_error(
         self,
         mock_photos_library: MagicMock,
@@ -78,7 +78,7 @@ class TestScanPermissionErrorHandling:
         # Should complete without error
         assert result.exit_code == 0
 
-    @patch("video_converter.__main__.PhotosLibrary")
+    @patch("video_converter.extractors.photos_extractor.PhotosLibrary")
     def test_scan_reports_permission_error_count(
         self,
         mock_photos_library: MagicMock,
@@ -103,7 +103,7 @@ class TestScanPermissionErrorHandling:
         # Should complete without crashing
         assert result.exit_code == 0
 
-    @patch("video_converter.__main__.PhotosLibrary")
+    @patch("video_converter.extractors.photos_extractor.PhotosLibrary")
     @patch("pathlib.Path.rglob")
     def test_scan_handles_mixed_permission_errors(
         self,
@@ -144,13 +144,16 @@ class TestScanPermissionErrorHandling:
 
         # Should complete and report permission errors
         assert result.exit_code == 0
-        assert "permission denied" in result.output.lower() or "could not be accessed" in result.output.lower()
+        assert (
+            "permission denied" in result.output.lower()
+            or "could not be accessed" in result.output.lower()
+        )
 
 
 class TestScanOSErrorHandling:
     """Tests for general OS error handling during filesystem scan."""
 
-    @patch("video_converter.__main__.PhotosLibrary")
+    @patch("video_converter.extractors.photos_extractor.PhotosLibrary")
     @patch("pathlib.Path.rglob")
     def test_scan_handles_broken_symlinks(
         self,
@@ -188,7 +191,7 @@ class TestScanOSErrorHandling:
 class TestScanFiltering:
     """Tests for scan filtering options."""
 
-    @patch("video_converter.__main__.PhotosLibrary")
+    @patch("video_converter.extractors.photos_extractor.PhotosLibrary")
     def test_scan_with_min_size_filter(
         self,
         mock_photos_library: MagicMock,
@@ -216,7 +219,7 @@ class TestScanFiltering:
         # Small file should be filtered out
         assert "No unregistered videos found" in result.output
 
-    @patch("video_converter.__main__.PhotosLibrary")
+    @patch("video_converter.extractors.photos_extractor.PhotosLibrary")
     def test_scan_with_custom_path(
         self,
         mock_photos_library: MagicMock,
@@ -244,7 +247,7 @@ class TestScanFiltering:
 class TestScanKeyboardInterrupt:
     """Tests for keyboard interrupt handling."""
 
-    @patch("video_converter.__main__.PhotosLibrary")
+    @patch("video_converter.extractors.photos_extractor.PhotosLibrary")
     @patch("pathlib.Path.rglob")
     def test_scan_handles_keyboard_interrupt(
         self,
