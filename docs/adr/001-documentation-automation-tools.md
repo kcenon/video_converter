@@ -151,6 +151,28 @@ python scripts/generate_diagrams.py --output-dir docs/diagrams
 
 **Deferred**: Could add `mkdocs build --strict` to CI to catch documentation issues early.
 
+## Automated Evaluation Script
+
+A reproducible evaluation script has been created to test all three API documentation tools:
+
+```bash
+# Run evaluation
+python scripts/evaluate_api_doc_tools.py
+
+# Keep generated documentation for inspection
+python scripts/evaluate_api_doc_tools.py --keep-output
+```
+
+### Evaluation Results (2024-12-24)
+
+| Tool | Status | Build Time | Output Size | HTML Files |
+|------|--------|------------|-------------|------------|
+| mkdocstrings | OK | 4.38s | 13.95 MB | 57 |
+| pdoc | OK | 2.75s | 12.12 MB | 13 |
+| Sphinx | OK | 1.01s | 1.51 MB | 4 |
+
+**Note**: Sphinx generates fewer files in the test because it only includes explicitly configured modules, while mkdocstrings and pdoc automatically document all modules.
+
 ## Verification Results
 
 The following tests were performed on 2024-12-24 with Python 3.12:
