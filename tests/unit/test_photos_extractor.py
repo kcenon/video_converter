@@ -21,6 +21,7 @@ from video_converter.extractors.photos_extractor import (
     VideoNotAvailableError,
     get_permission_instructions,
 )
+from video_converter.processors.codec_detector import CodecInfo
 
 
 class TestPhotosVideoInfo:
@@ -831,9 +832,35 @@ class TestPhotosVideoFilter:
         filter = PhotosVideoFilter(mock_library, exclude_albums=[])
 
         # Mock codec detector to return h264 for first, hevc for second
-        with patch.object(filter, "_detect_codec") as mock_detect:
-            mock_detect.side_effect = ["h264", "hevc"]
-            candidates = filter.get_conversion_candidates()
+        mock_codec_detector = MagicMock()
+        h264_info = CodecInfo(
+            path=video_file,
+            codec="h264",
+            width=1920,
+            height=1080,
+            fps=30.0,
+            duration=60.0,
+            bitrate=10_000_000,
+            size=75_000_000,
+            audio_codec="aac",
+            container="mov",
+        )
+        hevc_info = CodecInfo(
+            path=video_file,
+            codec="hevc",
+            width=1920,
+            height=1080,
+            fps=30.0,
+            duration=60.0,
+            bitrate=5_000_000,
+            size=37_500_000,
+            audio_codec="aac",
+            container="mov",
+        )
+        mock_codec_detector.analyze.side_effect = [h264_info, hevc_info]
+        filter._codec_detector = mock_codec_detector
+
+        candidates = filter.get_conversion_candidates()
 
         assert len(candidates) == 1
         assert candidates[0].codec == "h264"
