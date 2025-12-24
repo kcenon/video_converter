@@ -579,12 +579,12 @@ class MetadataPreserver:
         """Set favorite status via AppleScript."""
         escaped_uuid = escape_applescript_string(uuid)
         favorite_str = "true" if favorite else "false"
-        script = f'''
+        script = f"""
 tell application "Photos"
     set targetItem to media item id "{escaped_uuid}"
     set favorite of targetItem to {favorite_str}
 end tell
-'''
+"""
         try:
             self._script_runner.run(script, check=True)
         except (AppleScriptTimeoutError, AppleScriptExecutionError) as e:
@@ -594,12 +594,12 @@ end tell
         """Set hidden status via AppleScript."""
         escaped_uuid = escape_applescript_string(uuid)
         hidden_str = "true" if hidden else "false"
-        script = f'''
+        script = f"""
 tell application "Photos"
     set targetItem to media item id "{escaped_uuid}"
     set hidden of targetItem to {hidden_str}
 end tell
-'''
+"""
         try:
             self._script_runner.run(script, check=True)
         except (AppleScriptTimeoutError, AppleScriptExecutionError) as e:
@@ -609,7 +609,7 @@ end tell
         """Add video to album via AppleScript."""
         escaped_uuid = escape_applescript_string(uuid)
         escaped_album = escape_applescript_string(album_name)
-        script = f'''
+        script = f"""
 tell application "Photos"
     set targetItem to media item id "{escaped_uuid}"
     try
@@ -619,7 +619,7 @@ tell application "Photos"
         error "Album not found or cannot add: " & errMsg
     end try
 end tell
-'''
+"""
         try:
             self._script_runner.run(script, check=True)
         except (AppleScriptTimeoutError, AppleScriptExecutionError) as e:
@@ -631,12 +631,12 @@ end tell
         """Set description via AppleScript."""
         escaped_uuid = escape_applescript_string(uuid)
         escaped_desc = escape_applescript_string(description)
-        script = f'''
+        script = f"""
 tell application "Photos"
     set targetItem to media item id "{escaped_uuid}"
     set description of targetItem to "{escaped_desc}"
 end tell
-'''
+"""
         try:
             self._script_runner.run(script, check=True)
         except (AppleScriptTimeoutError, AppleScriptExecutionError) as e:
@@ -646,12 +646,12 @@ end tell
         """Set keywords via AppleScript."""
         escaped_uuid = escape_applescript_string(uuid)
         keywords_list = ", ".join(f'"{escape_applescript_string(k)}"' for k in keywords)
-        script = f'''
+        script = f"""
 tell application "Photos"
     set targetItem to media item id "{escaped_uuid}"
     set keywords of targetItem to {{{keywords_list}}}
 end tell
-'''
+"""
         try:
             self._script_runner.run(script, check=True)
         except (AppleScriptTimeoutError, AppleScriptExecutionError) as e:
@@ -660,7 +660,7 @@ end tell
     def _get_photos_metadata(self, uuid: str) -> dict | None:
         """Get metadata from Photos library via AppleScript."""
         escaped_uuid = escape_applescript_string(uuid)
-        script = f'''
+        script = f"""
 tell application "Photos"
     try
         set targetItem to media item id "{escaped_uuid}"
@@ -692,7 +692,7 @@ tell application "Photos"
         return "ERROR:" & errMsg
     end try
 end tell
-'''
+"""
         try:
             result = self._script_runner.run(script, timeout=60.0)
             if not result.success or result.result.startswith("ERROR:"):

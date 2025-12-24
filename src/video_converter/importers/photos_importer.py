@@ -358,7 +358,7 @@ class PhotosImporter:
         Returns:
             AppleScript code for import operation.
         """
-        return f'''
+        return f"""
 tell application "Photos"
     activate
     delay 1
@@ -373,7 +373,7 @@ tell application "Photos"
         error "Import returned no items"
     end if
 end tell
-'''
+"""
 
     def _build_verify_script(self, uuid: str) -> str:
         """Build AppleScript for verifying import.
@@ -385,7 +385,7 @@ end tell
             AppleScript code for verification.
         """
         escaped_uuid = escape_applescript_string(uuid)
-        return f'''
+        return f"""
 tell application "Photos"
     try
         set targetItem to media item id "{escaped_uuid}"
@@ -394,7 +394,7 @@ tell application "Photos"
         return "false"
     end try
 end tell
-'''
+"""
 
     def _build_info_script(self, uuid: str) -> str:
         """Build AppleScript for getting video info.
@@ -406,7 +406,7 @@ end tell
             AppleScript code for getting info.
         """
         escaped_uuid = escape_applescript_string(uuid)
-        return f'''
+        return f"""
 tell application "Photos"
     try
         set targetItem to media item id "{escaped_uuid}"
@@ -418,7 +418,7 @@ tell application "Photos"
         return ""
     end try
 end tell
-'''
+"""
 
     def handle_original(
         self,
@@ -578,7 +578,7 @@ end tell
             AppleScript code for deletion.
         """
         escaped_uuid = escape_applescript_string(uuid)
-        return f'''
+        return f"""
 tell application "Photos"
     try
         set targetItem to media item id "{escaped_uuid}"
@@ -588,7 +588,7 @@ tell application "Photos"
         return "false: " & errMsg
     end try
 end tell
-'''
+"""
 
     def _build_add_to_album_script(self, uuid: str, album_name: str) -> str:
         """Build AppleScript for adding a video to an album.
@@ -602,7 +602,7 @@ end tell
         """
         escaped_uuid = escape_applescript_string(uuid)
         escaped_album = escape_applescript_string(album_name)
-        return f'''
+        return f"""
 tell application "Photos"
     try
         set targetItem to media item id "{escaped_uuid}"
@@ -613,7 +613,7 @@ tell application "Photos"
         return "false: " & errMsg
     end try
 end tell
-'''
+"""
 
     def _build_create_album_script(self, album_name: str) -> str:
         """Build AppleScript for creating an album if it doesn't exist.
@@ -625,11 +625,11 @@ end tell
             AppleScript code for album creation.
         """
         escaped_album = escape_applescript_string(album_name)
-        return f'''
+        return f"""
 tell application "Photos"
     if not (exists album "{escaped_album}") then
         make new album named "{escaped_album}"
     end if
     return "true"
 end tell
-'''
+"""
