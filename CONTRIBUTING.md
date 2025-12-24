@@ -160,6 +160,65 @@ Types:
 - `test`: Adding or updating tests
 - `chore`: Maintenance tasks
 
+## Documentation
+
+### Building Documentation
+
+Documentation is built using MkDocs with the Material theme.
+
+```bash
+# Install documentation dependencies
+pip install -e ".[docs]"
+
+# Build documentation
+mkdocs build
+
+# Serve documentation locally
+mkdocs serve
+# Then open http://localhost:8000
+```
+
+### Generating Architecture Diagrams
+
+Architecture diagrams are auto-generated from the codebase using pyreverse and pydeps:
+
+```bash
+# Generate all architecture diagrams
+python scripts/generate_diagrams.py
+
+# Output to custom directory
+python scripts/generate_diagrams.py --output-dir path/to/output
+```
+
+This generates:
+- `classes_video_converter.svg` - UML class diagram
+- `packages_video_converter.svg` - Package structure diagram
+- `dependencies.svg` - Full dependency graph
+- `core_dependencies.svg` - Core module dependencies
+
+**Prerequisites:**
+- Graphviz must be installed for SVG output: `brew install graphviz`
+
+### API Documentation
+
+API documentation is automatically generated from docstrings using mkdocstrings.
+Use Google-style docstrings in your code:
+
+```python
+def convert(self, request: ConversionRequest) -> ConversionResult:
+    """Convert a video from H.264 to H.265.
+
+    Args:
+        request: The conversion request containing input/output paths and options.
+
+    Returns:
+        ConversionResult with status and output path.
+
+    Raises:
+        ConversionError: If FFmpeg fails to convert the video.
+    """
+```
+
 ## Reporting Issues
 
 When reporting issues, please include:
