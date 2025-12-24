@@ -35,7 +35,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 
 # Install
-pip install -e .
+pip3 install -e .
 ```
 
 !!! note "Virtual Environment Required"
@@ -47,21 +47,21 @@ pip install -e .
 
 ```bash
 source .venv/bin/activate
-pip install -e ".[dev]"
+pip3 install -e ".[dev]"
 ```
 
 ### With GUI Support
 
 ```bash
 source .venv/bin/activate
-pip install -e ".[gui]"
+pip3 install -e ".[gui]"
 ```
 
 ### With Documentation Dependencies
 
 ```bash
 source .venv/bin/activate
-pip install -e ".[docs]"
+pip3 install -e ".[docs]"
 ```
 
 ## Verify Installation
@@ -128,5 +128,5 @@ source .venv/bin/activate
 # Install video-converter from source
 git clone https://github.com/kcenon/video_converter.git
 cd video_converter
-pip install -e .
+pip3 install -e .
 ```

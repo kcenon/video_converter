@@ -29,7 +29,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 
 # Install
-pip install -e .
+pip3 install -e .
 ```
 
 ## Basic Usage
