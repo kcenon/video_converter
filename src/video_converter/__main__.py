@@ -1632,7 +1632,9 @@ def status() -> None:
         status_text = "✓ Installed, Idle"
         status_style = "yellow"
 
-    click.echo(f"│  Status:       {click.style(status_text, fg=status_style):<31}│")
+    # Pad text first, then apply style (ANSI codes break width calculation)
+    padded_status = f"{status_text:<31}"
+    click.echo(f"│  Status:       {click.style(padded_status, fg=status_style)}│")
 
     # Schedule line
     if service_status.schedule:
