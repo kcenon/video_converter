@@ -218,7 +218,7 @@ class MetadataProcessor:
             if not result.success:
                 raise MetadataExtractionError(path, result.stderr)
 
-            data = json.loads(result.stdout)
+            data: list[dict[str, Any]] = json.loads(result.stdout)
             return data[0] if data else {}
 
         except json.JSONDecodeError as e:
@@ -568,7 +568,7 @@ class MetadataProcessor:
             True if values are considered equal.
         """
         if val1 is None or val2 is None:
-            return val1 == val2
+            return bool(val1 == val2)
 
         # Both numeric
         if isinstance(val1, (int, float)) and isinstance(val2, (int, float)):

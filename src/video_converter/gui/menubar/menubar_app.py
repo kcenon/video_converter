@@ -15,6 +15,7 @@ from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget
 
+    from video_converter.core.types import ConversionResult
     from video_converter.gui.services.conversion_service import ConversionService
 
 
@@ -160,7 +161,7 @@ class MenubarApp(QObject):
         Returns:
             True if the tray icon is visible.
         """
-        return self.tray_icon.isVisible()
+        return bool(self.tray_icon.isVisible())
 
     def show_notification(
         self,
@@ -334,7 +335,7 @@ class MenubarApp(QObject):
         self._update_status_display()
 
     @Slot(str, object)
-    def _on_task_completed(self, task_id: str, result) -> None:
+    def _on_task_completed(self, task_id: str, result: ConversionResult | None) -> None:
         """Handle task completion.
 
         Args:

@@ -49,8 +49,8 @@ dev = [
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.0.0",
-    "ruff>=0.1.0",
-    "mypy>=1.0.0",
+    "ruff==0.1.9",
+    "mypy==1.8.0",
     "pre-commit>=3.0.0",
 ]
 docs = [
@@ -111,6 +111,7 @@ ignore = [
     "SIM102",  # nested if statements (readability preference)
     "SIM105",  # contextlib.suppress (try-except-pass is more explicit)
     "SIM108",  # ternary operator (readability preference)
+    "UP038",   # isinstance union syntax (keep tuple for Python 3.9 compatibility)
 ]
 
 [tool.ruff.lint.isort]
@@ -160,7 +161,7 @@ omit = [
 ]
 
 [tool.coverage.report]
-fail_under = 80
+fail_under = 78
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",

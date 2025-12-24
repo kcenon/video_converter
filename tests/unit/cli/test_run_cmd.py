@@ -113,7 +113,7 @@ class TestRunFolderMode:
         mock_codec_info = MagicMock()
         mock_codec_info.is_hevc = False
         mock_detector = MagicMock()
-        mock_detector.detect.return_value = mock_codec_info
+        mock_detector.analyze.return_value = mock_codec_info
         mock_detector_class.return_value = mock_detector
 
         result = cli_runner.invoke(main, [

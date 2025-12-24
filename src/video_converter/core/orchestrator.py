@@ -246,11 +246,13 @@ class Orchestrator:
         self.timestamp_synchronizer = timestamp_synchronizer or TimestampSynchronizer()
         self._enable_session_persistence = enable_session_persistence
 
+        self.session_manager: SessionStateManager | None
         if enable_session_persistence:
             self.session_manager = session_manager or SessionStateManager()
         else:
             self.session_manager = None
 
+        self.retry_manager: RetryManager | None
         if self.config.enable_retry:
             retry_config = self.config.retry_config or RetryConfig()
             self.retry_manager = retry_manager or RetryManager(retry_config)
@@ -1085,7 +1087,7 @@ class Orchestrator:
                 )
 
         async def process_task(
-            task: ConversionTask, progress_callback: callable
+            task: ConversionTask, progress_callback: Callable[[float], None]
         ) -> ConversionResult:
             """Process a single task within concurrent context."""
             # Check for pause/cancel

@@ -138,7 +138,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> type:
     """Lazy import for Orchestrator to avoid circular imports."""
     if name in ("Orchestrator", "OrchestratorConfig", "ConversionTask"):
         from video_converter.core.orchestrator import (

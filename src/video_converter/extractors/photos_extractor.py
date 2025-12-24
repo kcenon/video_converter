@@ -427,7 +427,7 @@ class PhotosLibrary:
             query_params["to_date"] = to_date
 
         # Query videos
-        photos = self.db.photos(**query_params)  # type: ignore[arg-type]
+        photos = self.db.photos(**query_params)
 
         # Apply additional filters
         videos: list[PhotosVideoInfo] = []

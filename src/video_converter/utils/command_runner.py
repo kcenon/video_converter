@@ -443,7 +443,8 @@ class FFprobeRunner:
         )
 
         result = self._runner.run(args, timeout=timeout, check=True)
-        return json.loads(result.stdout)
+        parsed: dict[str, Any] = json.loads(result.stdout)
+        return parsed
 
     async def probe_async(
         self,
@@ -474,7 +475,8 @@ class FFprobeRunner:
         )
 
         result = await self._runner.run_async(args, timeout=timeout, check=True)
-        return json.loads(result.stdout)
+        parsed: dict[str, Any] = json.loads(result.stdout)
+        return parsed
 
     def quick_check(self, path: Path, timeout: float = 10.0) -> bool:
         """Quickly check if a video file is valid.
@@ -562,7 +564,7 @@ class ExifToolRunner:
         args.append(str(path))
 
         result = self._runner.run(args, timeout=timeout, check=True)
-        data = json.loads(result.stdout)
+        data: list[dict[str, Any]] = json.loads(result.stdout)
 
         # ExifTool returns a list with one dict per file
         return data[0] if data else {}
@@ -595,7 +597,7 @@ class ExifToolRunner:
         args.append(str(path))
 
         result = await self._runner.run_async(args, timeout=timeout, check=True)
-        data = json.loads(result.stdout)
+        data: list[dict[str, Any]] = json.loads(result.stdout)
 
         return data[0] if data else {}
 

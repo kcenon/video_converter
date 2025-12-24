@@ -338,7 +338,7 @@ class ConcurrentProcessor:
         items: list[T],
         processor: Callable[[T, Callable[[float], None]], Awaitable[R]],
         on_progress: Callable[[AggregatedProgress], None] | None = None,
-    ) -> list[R]:
+    ) -> list[R | None]:
         """Process a batch of items concurrently.
 
         Args:
@@ -381,11 +381,11 @@ class ConcurrentProcessor:
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Handle exceptions
-        final_results: list[R] = []
+        final_results: list[R | None] = []
         for i, result in enumerate(results):
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 logger.error(f"Job {i} failed with exception: {result}")
-                final_results.append(None)  # type: ignore
+                final_results.append(None)
             else:
                 final_results.append(result)
 
@@ -438,6 +438,7 @@ class ConcurrentProcessor:
         Returns:
             The processing result.
         """
+        assert self._semaphore is not None, "Semaphore not initialized"
         async with self._semaphore:
             if self._cancelled:
                 raise asyncio.CancelledError("Batch processing cancelled")

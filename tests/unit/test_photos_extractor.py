@@ -21,7 +21,6 @@ from video_converter.extractors.photos_extractor import (
     VideoNotAvailableError,
     get_permission_instructions,
 )
-from video_converter.processors.codec_detector import CodecInfo
 
 
 class TestPhotosVideoInfo:
@@ -831,36 +830,30 @@ class TestPhotosVideoFilter:
 
         filter = PhotosVideoFilter(mock_library, exclude_albums=[])
 
-        # Mock codec detector to return h264 for first, hevc for second
-        mock_codec_detector = MagicMock()
-        h264_info = CodecInfo(
+        # Create enriched video info with codec set
+        h264_enriched = PhotosVideoInfo(
+            uuid="uuid1",
+            filename="h264_video.mov",
             path=video_file,
+            date=datetime(2024, 1, 1),
+            date_modified=None,
+            duration=60.0,
             codec="h264",
-            width=1920,
-            height=1080,
-            fps=30.0,
-            duration=60.0,
-            bitrate=10_000_000,
-            size=75_000_000,
-            audio_codec="aac",
-            container="mov",
         )
-        hevc_info = CodecInfo(
+        hevc_enriched = PhotosVideoInfo(
+            uuid="uuid2",
+            filename="hevc_video.mov",
             path=video_file,
-            codec="hevc",
-            width=1920,
-            height=1080,
-            fps=30.0,
+            date=datetime(2024, 1, 1),
+            date_modified=None,
             duration=60.0,
-            bitrate=5_000_000,
-            size=37_500_000,
-            audio_codec="aac",
-            container="mov",
+            codec="hevc",
         )
-        mock_codec_detector.analyze.side_effect = [h264_info, hevc_info]
-        filter._codec_detector = mock_codec_detector
 
-        candidates = filter.get_conversion_candidates()
+        # Mock _enrich_with_codec to return enriched videos with codec info
+        with patch.object(filter, "_enrich_with_codec") as mock_enrich:
+            mock_enrich.side_effect = [h264_enriched, hevc_enriched]
+            candidates = filter.get_conversion_candidates()
 
         assert len(candidates) == 1
         assert candidates[0].codec == "h264"
@@ -892,6 +885,7 @@ class TestPhotosVideoFilter:
         mock_library = MagicMock(spec=PhotosLibrary)
 
         videos = []
+        enriched_videos = []
         for i in range(5):
             video_file = tmp_path / f"video{i}.mov"
             video_file.write_bytes(b"fake")
@@ -905,12 +899,24 @@ class TestPhotosVideoFilter:
                     duration=60.0,
                 )
             )
+            enriched_videos.append(
+                PhotosVideoInfo(
+                    uuid=f"uuid{i}",
+                    filename=f"video{i}.mov",
+                    path=video_file,
+                    date=datetime(2024, 1, 1),
+                    date_modified=None,
+                    duration=60.0,
+                    codec="h264",
+                )
+            )
 
         mock_library.get_videos.return_value = videos
 
         filter = PhotosVideoFilter(mock_library, exclude_albums=[])
 
-        with patch.object(filter, "_detect_codec", return_value="h264"):
+        with patch.object(filter, "_enrich_with_codec") as mock_enrich:
+            mock_enrich.side_effect = enriched_videos
             candidates = filter.get_conversion_candidates(limit=2)
 
         assert len(candidates) == 2
