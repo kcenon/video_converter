@@ -26,6 +26,13 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from video_converter.utils.constants import (
+    ICLOUD_DOWNLOAD_TIMEOUT,
+    ICLOUD_POLL_INTERVAL,
+    ICLOUD_STUB_PREFIX,
+    ICLOUD_STUB_SUFFIX,
+)
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -163,19 +170,15 @@ class iCloudHandler:
     """
 
     # Default timeout: 1 hour for large videos
-    DEFAULT_TIMEOUT = 3600
+    DEFAULT_TIMEOUT = ICLOUD_DOWNLOAD_TIMEOUT
 
     # Default polling interval: 1 second
-    DEFAULT_POLL_INTERVAL = 1.0
-
-    # iCloud stub file prefix
-    ICLOUD_STUB_PREFIX = "."
-    ICLOUD_STUB_SUFFIX = ".icloud"
+    DEFAULT_POLL_INTERVAL = ICLOUD_POLL_INTERVAL
 
     def __init__(
         self,
-        timeout: int = DEFAULT_TIMEOUT,
-        poll_interval: float = DEFAULT_POLL_INTERVAL,
+        timeout: int = ICLOUD_DOWNLOAD_TIMEOUT,
+        poll_interval: float = ICLOUD_POLL_INTERVAL,
     ) -> None:
         """Initialize iCloud handler.
 
@@ -468,7 +471,7 @@ class iCloudHandler:
         Returns:
             Path to the iCloud stub file.
         """
-        return path.parent / f"{self.ICLOUD_STUB_PREFIX}{path.name}{self.ICLOUD_STUB_SUFFIX}"
+        return path.parent / f"{ICLOUD_STUB_PREFIX}{path.name}{ICLOUD_STUB_SUFFIX}"
 
     def _is_stub_file(self, path: Path) -> bool:
         """Check if a path is an iCloud stub file.
@@ -480,7 +483,7 @@ class iCloudHandler:
             True if the path is an iCloud stub file.
         """
         name = path.name
-        return name.startswith(self.ICLOUD_STUB_PREFIX) and name.endswith(self.ICLOUD_STUB_SUFFIX)
+        return name.startswith(ICLOUD_STUB_PREFIX) and name.endswith(ICLOUD_STUB_SUFFIX)
 
     def _is_downloading(self, path: Path) -> bool:
         """Check if a file is currently downloading.

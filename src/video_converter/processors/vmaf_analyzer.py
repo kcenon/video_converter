@@ -43,6 +43,16 @@ from video_converter.utils.command_runner import (
     CommandNotFoundError,
     CommandRunner,
 )
+from video_converter.utils.constants import (
+    VMAF_ANALYSIS_TIMEOUT,
+    VMAF_DEFAULT_RESOLUTION,
+    VMAF_DEFAULT_SAMPLE_INTERVAL,
+    VMAF_DEFAULT_THREADS,
+    VMAF_QUICK_TIMEOUT,
+    VMAF_THRESHOLD_GOOD_QUALITY,
+    VMAF_THRESHOLD_HIGH_QUALITY,
+    VMAF_THRESHOLD_VISUALLY_LOSSLESS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -113,11 +123,11 @@ class VmafQualityLevel(Enum):
         Returns:
             Corresponding VmafQualityLevel.
         """
-        if score >= 93:
+        if score >= VMAF_THRESHOLD_VISUALLY_LOSSLESS:
             return cls.VISUALLY_LOSSLESS
-        elif score >= 80:
+        elif score >= VMAF_THRESHOLD_HIGH_QUALITY:
             return cls.HIGH_QUALITY
-        elif score >= 60:
+        elif score >= VMAF_THRESHOLD_GOOD_QUALITY:
             return cls.GOOD_QUALITY
         else:
             return cls.NOTICEABLE_DEGRADATION
@@ -255,18 +265,18 @@ class VmafAnalyzer:
     """
 
     FFMPEG_CMD = "ffmpeg"
-    DEFAULT_TIMEOUT = 3600.0  # 1 hour for long videos
+    DEFAULT_TIMEOUT = VMAF_ANALYSIS_TIMEOUT
 
     # Quality thresholds
-    VISUALLY_LOSSLESS_THRESHOLD = 93.0
-    HIGH_QUALITY_THRESHOLD = 80.0
-    GOOD_QUALITY_THRESHOLD = 60.0
+    VISUALLY_LOSSLESS_THRESHOLD = VMAF_THRESHOLD_VISUALLY_LOSSLESS
+    HIGH_QUALITY_THRESHOLD = VMAF_THRESHOLD_HIGH_QUALITY
+    GOOD_QUALITY_THRESHOLD = VMAF_THRESHOLD_GOOD_QUALITY
 
     def __init__(
         self,
         *,
         ffmpeg_path: str | None = None,
-        timeout: float = DEFAULT_TIMEOUT,
+        timeout: float = VMAF_ANALYSIS_TIMEOUT,
         model_path: str | None = None,
         command_runner: CommandRunner | None = None,
     ) -> None:
@@ -526,7 +536,7 @@ class VmafAnalyzer:
         """
         # Default resolution for VMAF (1080p recommended)
         if resolution is None:
-            resolution = (1920, 1080)
+            resolution = VMAF_DEFAULT_RESOLUTION
 
         width, height = resolution
 
@@ -538,7 +548,7 @@ class VmafAnalyzer:
         vmaf_opts = [
             "log_fmt=json",
             f"log_path={json_output}",
-            "n_threads=4",
+            f"n_threads={VMAF_DEFAULT_THREADS}",
         ]
 
         # Add model path if specified
@@ -735,8 +745,8 @@ class VmafAnalyzer:
             result = self.analyze(
                 original=original,
                 converted=converted,
-                sample_interval=30,  # Every 30th frame
-                timeout=timeout or 300.0,  # 5 minute timeout
+                sample_interval=VMAF_DEFAULT_SAMPLE_INTERVAL,  # Every 30th frame
+                timeout=timeout or VMAF_QUICK_TIMEOUT,  # 5 minute timeout
             )
             return result.scores.mean
         except (VmafNotAvailableError, VmafAnalysisError, FileNotFoundError):
