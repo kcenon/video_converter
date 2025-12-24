@@ -27,8 +27,22 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 # Configuration
 APP_NAME="Video Converter"
-APP_VERSION="0.3.0"
 VOLUME_NAME="Video Converter"
+
+# Get version dynamically from the package
+get_app_version() {
+    if python3 -c "from video_converter import __version__; print(__version__)" 2>/dev/null; then
+        return
+    fi
+    # Fallback: try to read from pyproject.toml
+    if [ -f "${PROJECT_ROOT}/pyproject.toml" ]; then
+        grep -m1 'version = ' "${PROJECT_ROOT}/pyproject.toml" | sed 's/version = "\(.*\)"/\1/'
+        return
+    fi
+    echo "0.0.0"
+}
+
+APP_VERSION=$(get_app_version)
 DMG_TEMP="${PROJECT_ROOT}/dist/dmg_temp"
 DMG_FINAL="${PROJECT_ROOT}/dist/VideoConverter-${APP_VERSION}.dmg"
 APP_PATH="${PROJECT_ROOT}/dist/${APP_NAME}.app"
