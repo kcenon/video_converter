@@ -265,6 +265,7 @@ class ConversionService(QObject):
     task_cancelled = Signal(str)  # task_id
     queue_updated = Signal()
     all_completed = Signal(int, int)  # successful, failed
+    _start_conversion = Signal(object)  # Internal signal to trigger worker
 
     def __init__(self, parent: QObject | None = None) -> None:
         """Initialize the conversion service.
@@ -288,6 +289,13 @@ class ConversionService(QObject):
         self._worker.progress_updated.connect(self._on_worker_progress)
         self._worker.conversion_complete.connect(self._on_worker_complete)
         self._worker.conversion_failed.connect(self._on_worker_failed)
+
+        # Connect service signal to worker slot (thread-safe via QueuedConnection)
+        from PySide6.QtCore import Qt
+
+        self._start_conversion.connect(
+            self._worker.run_conversion, Qt.ConnectionType.QueuedConnection
+        )
 
         self._worker_thread.start()
 
@@ -501,15 +509,8 @@ class ConversionService(QObject):
         # Start conversion
         self.task_started.emit(task_id)
 
-        # Use QMetaObject.invokeMethod for thread-safe call
-        from PySide6.QtCore import Q_ARG, QMetaObject, Qt
-
-        QMetaObject.invokeMethod(
-            self._worker,
-            "run_conversion",
-            Qt.ConnectionType.QueuedConnection,
-            Q_ARG(object, task),
-        )
+        # Emit signal to trigger worker (thread-safe via QueuedConnection)
+        self._start_conversion.emit(task)
 
     @Slot(str, float, object, object)
     def _on_worker_progress(

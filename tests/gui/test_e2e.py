@@ -107,7 +107,8 @@ class TestSingleFileE2E:
         from video_converter.gui.services.conversion_service import ConversionService
 
         service = ConversionService()
-        qtbot.addWidget(service)  # Ensure cleanup
+        # Note: ConversionService is a QObject, not QWidget, so we don't use addWidget.
+        # Cleanup is handled by service.shutdown() in the finally block.
 
         try:
             # Track completion
@@ -167,7 +168,6 @@ class TestSingleFileE2E:
         from video_converter.gui.services.conversion_service import ConversionService
 
         service = ConversionService()
-        qtbot.addWidget(service)
 
         try:
             completed_tasks = []
@@ -225,7 +225,6 @@ class TestSingleFileE2E:
         from video_converter.gui.services.conversion_service import ConversionService
 
         service = ConversionService()
-        qtbot.addWidget(service)
 
         try:
             completed_tasks = []
@@ -274,7 +273,6 @@ class TestBatchConversionE2E:
         from video_converter.gui.services.conversion_service import ConversionService
 
         service = ConversionService()
-        qtbot.addWidget(service)
 
         try:
             completed_tasks = []
@@ -347,7 +345,6 @@ class TestSettingsE2E:
         high_quality_dir.mkdir()
 
         service1 = ConversionService()
-        qtbot.addWidget(service1)
 
         try:
             completed1 = []
@@ -374,7 +371,6 @@ class TestSettingsE2E:
         low_quality_dir.mkdir()
 
         service2 = ConversionService()
-        qtbot.addWidget(service2)
 
         try:
             completed2 = []
@@ -425,7 +421,6 @@ class TestSettingsE2E:
         custom_dir.mkdir()
 
         service = ConversionService()
-        qtbot.addWidget(service)
 
         try:
             completed_tasks = []
@@ -467,7 +462,6 @@ class TestErrorHandlingE2E:
         from video_converter.gui.services.conversion_service import ConversionService
 
         service = ConversionService()
-        qtbot.addWidget(service)
 
         try:
             failed_tasks = []
@@ -512,7 +506,6 @@ class TestErrorHandlingE2E:
         from video_converter.gui.services.conversion_service import ConversionService
 
         service = ConversionService()
-        qtbot.addWidget(service)
 
         try:
             nonexistent = tmp_path / "does_not_exist.mp4"
@@ -557,7 +550,6 @@ class TestPauseResumeE2E:
         from video_converter.gui.services.conversion_service import ConversionService
 
         service = ConversionService()
-        qtbot.addWidget(service)
 
         try:
             completed_tasks = []
@@ -617,7 +609,6 @@ class TestConversionStatisticsE2E:
         from video_converter.gui.services.conversion_service import ConversionService
 
         service = ConversionService()
-        qtbot.addWidget(service)
 
         try:
             # Initial statistics should be zero
