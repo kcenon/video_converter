@@ -15,17 +15,18 @@ video-converter <command> [options] [arguments]
 Convert a single video file.
 
 ```bash
-video-converter convert <input> <output> [options]
+video-converter convert <input> [output] [options]
 ```
 
 **Options:**
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--encoder` | `hardware` | Encoder type: `hardware` or `software` |
-| `--quality` | `45` | Hardware encoder quality (1-100, lower = better) |
-| `--crf` | `22` | Software encoder CRF (0-51, lower = better) |
-| `--preset` | `medium` | Software encoder preset |
+| `--mode` | `hardware` | Encoding mode: `hardware` or `software` |
+| `--quality` | config default | Quality setting (1-100, higher = better) |
+| `--preset` | `medium` | Encoder preset: `fast`, `medium`, `slow` |
+| `-f, --force` | `false` | Overwrite output file if exists |
+| `--vmaf` | config default | Measure VMAF quality score after conversion |
 
 **Examples:**
 
@@ -34,10 +35,10 @@ video-converter convert <input> <output> [options]
 video-converter convert vacation.mp4 vacation_hevc.mp4
 
 # High quality software encoding
-video-converter convert input.mp4 output.mp4 --encoder software --crf 18
+video-converter convert input.mp4 output.mp4 --mode software --quality 90
 
-# Faster hardware encoding with lower quality
-video-converter convert input.mp4 output.mp4 --quality 60
+# Hardware encoding with custom quality
+video-converter convert input.mp4 output.mp4 --quality 70
 ```
 
 ### run
@@ -52,49 +53,28 @@ video-converter run [options]
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--mode` | `photos` | Source mode: `photos` or `folder` |
-| `--path` | - | Folder path (for folder mode) |
-| `--concurrent` | `2` | Number of concurrent conversions |
-| `--encoder` | `hardware` | Encoder type |
-| `--dry-run` | `false` | Simulate without converting |
+| `--source` | `folder` | Source mode: `photos` or `folder` |
+| `--input-dir` | - | Input directory for folder mode |
+| `--output-dir` | - | Output directory for converted files |
+| `-r, --recursive` | `false` | Recursively scan subdirectories |
+| `--max-concurrent` | config default | Number of concurrent conversions (1-8) |
+| `--dry-run` | `false` | Preview without converting |
+| `--resume` | `false` | Resume previously interrupted session |
 
 **Examples:**
 
 ```bash
 # Convert Photos library
-video-converter run --mode photos
+video-converter run --source photos
 
 # Convert folder
-video-converter run --mode folder --path ~/Videos
+video-converter run --source folder --input-dir ~/Videos
 
 # Dry run to see what would be converted
-video-converter run --mode photos --dry-run
-```
+video-converter run --source photos --dry-run
 
-### scan
-
-Scan for videos without converting.
-
-```bash
-video-converter scan [options]
-```
-
-**Options:**
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--mode` | `photos` | Source mode |
-| `--path` | - | Folder path (for folder mode) |
-| `--verbose` | `false` | Show detailed information |
-
-**Examples:**
-
-```bash
-# Scan Photos library
-video-converter scan --mode photos
-
-# Scan with details
-video-converter scan --mode photos --verbose
+# Resume interrupted session
+video-converter run --resume
 ```
 
 ### status
@@ -126,30 +106,30 @@ video-converter stats [options]
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--days` | `30` | Number of days to show |
-| `--format` | `table` | Output format: `table` or `json` |
+| `--period` | `all` | Time period: `today`, `week`, `month`, `all` |
+| `--json` | `false` | Output statistics in JSON format |
+| `--detailed` | `false` | Show detailed statistics with recent conversions |
 
-### install
+### install-service
 
-Install automation service.
+Install launchd automation service.
 
 ```bash
-video-converter install [options]
+video-converter install-service [options]
 ```
 
 **Options:**
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--time` | `03:00` | Run time (HH:MM) |
-| `--days` | `daily` | Schedule: `daily`, `weekdays`, `weekends` |
+| `--time` | `03:00` | Run time in HH:MM format |
 
-### uninstall
+### uninstall-service
 
-Remove automation service.
+Remove launchd automation service.
 
 ```bash
-video-converter uninstall
+video-converter uninstall-service
 ```
 
 ## Global Options

@@ -20,7 +20,10 @@ brew install exiftool
 ## Installation
 
 ```bash
-pip install video-converter
+# Clone and install from source
+git clone https://github.com/kcenon/video_converter.git
+cd video_converter
+pip install -e .
 ```
 
 ## Basic Usage
@@ -38,74 +41,67 @@ Converting: input.mp4
 ✅ Complete: Saved 820MB (54%)
 ```
 
-### Scan Photos Library
+### Preview Photos Library (Dry Run)
 
 ```bash
-video-converter scan --mode photos
+video-converter run --source photos --dry-run
 ```
 
 **Output:**
 ```
 Scanning Photos library...
 
-╭─────────────────────────────────────────────╮
-│         Photos Library Summary              │
-├─────────────────────────────────────────────┤
-│  Total videos:     156                      │
-│  H.264 videos:     89                       │
-│  Already HEVC:     67                       │
-│  Total size:       45.2 GB                  │
-│  Estimated savings: ~22.6 GB                │
-╰─────────────────────────────────────────────╯
+Found 89 H.264 videos to convert.
+Total size: 45.2 GB
+Estimated savings: ~22.6 GB (50%)
+
+Dry run complete. Use 'video-converter run --source photos' to start conversion.
 ```
 
 ### Batch Convert Photos Library
 
 ```bash
-video-converter run --mode photos
+video-converter run --source photos
 ```
 
 ## Hardware vs Software Encoding
 
 | Mode | Command | Speed | Quality | Use Case |
 |------|---------|-------|---------|----------|
-| Hardware | `--encoder hardware` | 6-20x realtime | Good | Daily use, batch conversion |
-| Software | `--encoder software` | 0.5-2x realtime | Excellent | Archival, maximum quality |
+| Hardware | `--mode hardware` | 6-20x realtime | Good | Daily use, batch conversion |
+| Software | `--mode software` | 0.5-2x realtime | Excellent | Archival, maximum quality |
 
 ```bash
 # Hardware encoding (default)
-video-converter convert input.mp4 output.mp4 --encoder hardware
+video-converter convert input.mp4 output.mp4 --mode hardware
 
 # Software encoding (higher quality)
-video-converter convert input.mp4 output.mp4 --encoder software --crf 20
+video-converter convert input.mp4 output.mp4 --mode software --quality 85
 ```
 
 ## Quality Settings
 
-### Hardware Encoder Quality
+The `--quality` option works for both hardware and software encoding (1-100, higher = better quality):
 
 ```bash
-# Default quality (45)
+# Default quality
 video-converter convert input.mp4 output.mp4
 
-# Higher quality (lower number = better quality, more space)
-video-converter convert input.mp4 output.mp4 --quality 30
+# Higher quality (larger file)
+video-converter convert input.mp4 output.mp4 --quality 85
 
-# Lower quality (higher number = smaller file)
-video-converter convert input.mp4 output.mp4 --quality 60
+# Lower quality (smaller file)
+video-converter convert input.mp4 output.mp4 --quality 50
 ```
 
-### Software Encoder CRF
+### Software Encoding with Quality
 
 ```bash
-# Default CRF (22)
-video-converter convert input.mp4 output.mp4 --encoder software
+# Software encoding with high quality
+video-converter convert input.mp4 output.mp4 --mode software --quality 90
 
-# Higher quality (lower CRF)
-video-converter convert input.mp4 output.mp4 --encoder software --crf 18
-
-# Smaller file (higher CRF)
-video-converter convert input.mp4 output.mp4 --encoder software --crf 26
+# Software encoding with medium quality
+video-converter convert input.mp4 output.mp4 --mode software --quality 70
 ```
 
 ## Next Steps

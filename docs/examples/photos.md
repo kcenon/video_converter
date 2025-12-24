@@ -2,61 +2,43 @@
 
 Examples for working with macOS Photos library.
 
-## Scanning the Library
+## Preview the Library
 
-### Basic Scan
+### Dry Run (Preview)
+
+Use `--dry-run` to preview what would be converted without making changes:
 
 ```bash
-video-converter scan --mode photos
+video-converter run --source photos --dry-run
 ```
 
 **Output:**
 ```
 Scanning Photos library...
 
-╭─────────────────────────────────────────────╮
-│         Photos Library Summary              │
-├─────────────────────────────────────────────┤
-│  Total videos:     156                      │
-│  H.264 videos:     89 (57%)                 │
-│  Already HEVC:     67 (43%)                 │
-│  In iCloud only:   12                       │
-├─────────────────────────────────────────────┤
-│  Total H.264 size: 45.2 GB                  │
-│  Estimated savings: ~22.6 GB (50%)          │
-╰─────────────────────────────────────────────╯
+Found 89 H.264 videos to convert.
+Total size: 45.2 GB
+Estimated savings: ~22.6 GB (50%)
+
+Dry run complete. Use 'video-converter run --source photos' to start conversion.
 ```
 
-### Detailed Scan
+### Detailed Preview with Limit
 
 ```bash
-video-converter scan --mode photos --verbose
+video-converter run --source photos --dry-run --limit 10
 ```
 
 **Output:**
 ```
 Scanning Photos library...
 
-Albums:
-  • All Videos (156)
-  • Vacation 2024 (45) - 23 H.264
-  • Family Events (32) - 18 H.264
-  • Work (12) - 8 H.264
+Preview (first 10 of 89 videos):
+  1. vacation_2024.mp4 (1.2 GB) - H.264
+  2. family_dinner.mp4 (890 MB) - H.264
   ...
 
-By Year:
-  • 2024: 89 videos (52 H.264)
-  • 2023: 45 videos (28 H.264)
-  • 2022: 22 videos (9 H.264)
-
-By Resolution:
-  • 4K: 45 videos
-  • 1080p: 78 videos
-  • 720p: 33 videos
-
-iCloud Status:
-  • Local: 144 videos
-  • iCloud only: 12 videos
+Use 'video-converter run --source photos' to convert all 89 videos.
 ```
 
 ## Album-Based Conversion
@@ -64,90 +46,46 @@ iCloud Status:
 ### Single Album
 
 ```bash
-video-converter run --mode photos --album "Vacation 2024"
+video-converter run --source photos --albums "Vacation 2024"
 ```
 
 ### Multiple Albums
 
 ```bash
-video-converter run --mode photos \
-    --album "Vacation 2024" \
-    --album "Summer Trip" \
-    --album "Family Events"
+video-converter run --source photos --albums "Vacation 2024,Summer Trip,Family Events"
 ```
 
 ### Exclude Albums
 
 ```bash
 # Exclude system albums
-video-converter run --mode photos \
-    --exclude-album "Screenshots" \
-    --exclude-album "Bursts" \
-    --exclude-album "Slo-mo"
+video-converter run --source photos --exclude-albums "Screenshots,Bursts,Slo-mo"
 ```
 
 ## iCloud Video Handling
 
-### Check iCloud Status
-
-```bash
-video-converter scan --mode photos --show-icloud
-```
-
-**Output:**
-```
-iCloud Videos:
-  • vacation_day1.mp4 (1.2 GB) - In Cloud
-  • trip_highlight.mp4 (890 MB) - In Cloud
-  • family_2024.mp4 (2.1 GB) - Downloading...
-
-Total iCloud-only: 12 videos (8.5 GB)
-```
-
-### Download and Convert
-
-```bash
-# Download iCloud videos before converting
-video-converter run --mode photos --download-icloud
-```
-
-**Output:**
-```
-Downloading iCloud videos...
-  [████████░░░░░░░░░░░░] 40% | vacation_day1.mp4 (480 MB / 1.2 GB)
-
-Download complete: 12 videos (8.5 GB)
-Starting conversion...
-```
-
-### Skip iCloud Videos
-
-```bash
-video-converter run --mode photos --local-only
-```
+!!! note "iCloud Videos"
+    Videos stored only in iCloud are automatically skipped during conversion.
+    To convert iCloud videos, first download them to your Mac through Photos app.
 
 ## Metadata Preservation
 
+Video Converter automatically preserves all metadata during conversion.
+
 ### Verify GPS After Conversion
 
+Use `exiftool` to verify metadata preservation:
+
 ```bash
-# Check GPS preservation
-video-converter verify-metadata output.mp4 --check gps
+# Check GPS and date preservation
+exiftool -GPS* -CreateDate converted_video.mp4
 ```
 
 **Output:**
 ```
-Metadata Verification:
-  ✅ GPS Latitude: 37.7749
-  ✅ GPS Longitude: -122.4194
-  ✅ GPS Altitude: 15m
-  ✅ Creation Date: 2024-12-20 14:30:22
-```
-
-### Export Metadata Report
-
-```bash
-video-converter run --mode photos --metadata-report metadata.json
+GPS Latitude: 37.7749 N
+GPS Longitude: 122.4194 W
+Create Date: 2024-12-20 14:30:22
 ```
 
 ## Re-import to Photos
@@ -158,7 +96,7 @@ video-converter run --mode photos --metadata-report metadata.json
 ### Convert and Re-import
 
 ```bash
-video-converter run --mode photos --reimport
+video-converter run --source photos --reimport
 ```
 
 **Output:**
@@ -176,35 +114,27 @@ Converting and re-importing to Photos...
   ✅ Imported as: IMG_1235.mp4
 ```
 
-### Skip Duplicates
+### Archive Originals
 
 ```bash
-video-converter run --mode photos --reimport --skip-duplicates
+# Archive originals to a specific album
+video-converter run --source photos --reimport --archive-album "Old H.264 Videos"
 ```
 
-## Photos Library Statistics
-
-### View Statistics
+## View Statistics
 
 ```bash
-video-converter stats --mode photos
+video-converter stats --detailed
 ```
 
 **Output:**
 ```
 ╭─────────────────────────────────────────────╮
-│      Photos Library Conversion Stats         │
+│        Conversion Statistics                 │
 ├─────────────────────────────────────────────┤
 │  Total converted:    89 videos               │
 │  Space saved:        37.5 GB                 │
 │  Average savings:    52%                     │
-├─────────────────────────────────────────────┤
-│  Last 30 days:                               │
-│    Converted: 23 videos                      │
-│    Saved: 12.3 GB                            │
-├─────────────────────────────────────────────┤
-│  Pending conversion: 0 videos                │
-│  Remaining H.264:    0                       │
 ╰─────────────────────────────────────────────╯
 ```
 
@@ -214,25 +144,21 @@ video-converter stats --mode photos
 #!/bin/bash
 # Complete Photos library conversion workflow
 
-echo "Step 1: Scanning library..."
-video-converter scan --mode photos
-
-echo "Step 2: Dry run..."
-video-converter run --mode photos --dry-run
+echo "Step 1: Preview library..."
+video-converter run --source photos --dry-run
 
 read -p "Proceed with conversion? (y/n) " confirm
 if [ "$confirm" != "y" ]; then
     exit 0
 fi
 
-echo "Step 3: Converting..."
-video-converter run --mode photos \
-    --concurrent 2 \
-    --exclude-album "Screenshots" \
-    --exclude-album "Bursts"
+echo "Step 2: Converting..."
+video-converter run --source photos \
+    --max-concurrent 2 \
+    --exclude-albums "Screenshots,Bursts"
 
-echo "Step 4: Generating report..."
-video-converter stats --mode photos --format json > conversion_report.json
+echo "Step 3: Generating report..."
+video-converter stats --json > conversion_report.json
 
 echo "Complete!"
 ```
