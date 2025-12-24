@@ -151,9 +151,48 @@ python scripts/generate_diagrams.py --output-dir docs/diagrams
 
 **Deferred**: Could add `mkdocs build --strict` to CI to catch documentation issues early.
 
+## Verification Results
+
+The following tests were performed on 2024-12-24 with Python 3.12:
+
+### py2puml Test Result
+
+```bash
+$ py2puml src/video_converter video_converter
+ValueError: Could not resolve type Callable in module video_converter.converters.progress
+```
+
+**Conclusion**: Incompatible with Python 3.12 type annotations. Not suitable for this project.
+
+### pyreverse Test Result
+
+```bash
+$ pyreverse -o svg -p video_converter --output-directory docs/architecture/generated src/video_converter
+Format svg is not supported natively. Pyreverse will try to generate it using Graphviz...
+Analysed 77 modules with a total of 159 imports
+```
+
+**Generated Files**:
+- `classes_video_converter.svg` (426 KB)
+- `packages_video_converter.svg` (117 KB)
+
+**Conclusion**: Successfully generates high-quality diagrams.
+
+### pydeps Test Result
+
+```bash
+$ pydeps src/video_converter --max-bacon=3 --cluster --noshow -o docs/architecture/generated/dependencies.svg
+```
+
+**Generated Files**:
+- `dependencies.svg` (193 KB)
+
+**Conclusion**: Successfully generates dependency graphs with clustering.
+
 ## References
 
 - [mkdocstrings documentation](https://mkdocstrings.github.io/)
 - [pyreverse documentation](https://pylint.pycqa.org/en/latest/pyreverse.html)
 - [pydeps documentation](https://github.com/thebjorn/pydeps)
 - Issue #196: Evaluate documentation automation tools
+- Issue #202: Architecture diagram tools evaluation
