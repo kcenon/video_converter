@@ -1013,9 +1013,9 @@ def _check_photos_permissions(cli_ctx: CLIContext) -> None:
                         h264_count=stats.h264,
                         total_size_gb=total_size_gb,
                     )
-                except Exception:
-                    # Library info is optional, ignore errors
-                    pass
+                except Exception as e:
+                    # Library info is optional, log for debugging
+                    logging.debug("Failed to get library info: %s", e)
 
                 sys.exit(0)
             else:
@@ -1319,7 +1319,8 @@ def _run_photos_batch_conversion(
     try:
         library_info = handler.get_library_info()
         library_path = str(library_info.get("path", ""))
-    except Exception:
+    except Exception as e:
+        logging.debug("Failed to get library path: %s", e)
         library_path = "~/Pictures/Photos Library.photoslibrary"
 
     photos_progress.show_library_info(
@@ -1396,8 +1397,8 @@ def _run_photos_batch_conversion(
         for ev in exported_videos:
             try:
                 handler.cleanup_exported(ev.exported_path)
-            except Exception:
-                pass
+            except Exception as e:
+                logging.debug("Cleanup failed for %s: %s", ev.exported_path, e)
         photos_progress.finish()
         sys.exit(130)
 
@@ -1457,8 +1458,8 @@ def _run_photos_batch_conversion(
         for ev in exported_videos:
             try:
                 handler.cleanup_exported(ev.exported_path)
-            except Exception:
-                pass
+            except Exception as e:
+                logging.debug("Cleanup failed for %s: %s", ev.exported_path, e)
         sys.exit(130)
 
     console.print()  # Clear progress line
@@ -1525,8 +1526,8 @@ def _run_photos_batch_conversion(
     for ev in exported_videos:
         try:
             handler.cleanup_exported(ev.exported_path)
-        except Exception:
-            pass
+        except Exception as e:
+            logging.debug("Cleanup failed for %s: %s", ev.exported_path, e)
 
     # Calculate statistics
     elapsed_time = time.time() - start_time
