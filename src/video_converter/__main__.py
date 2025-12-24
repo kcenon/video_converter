@@ -1889,6 +1889,7 @@ def scan(ctx: click.Context, path: Path | None, min_size: int, limit: int | None
     console.print("[cyan]Step 2/2: Scanning filesystem...[/cyan]")
 
     found_videos: list[tuple[Path, int]] = []
+    seen_resolved_paths: set[str] = set()  # Track resolved paths to avoid duplicates
     scanned_dirs = 0
     skipped_dirs = 0
     permission_errors = 0
@@ -1897,6 +1898,18 @@ def scan(ctx: click.Context, path: Path | None, min_size: int, limit: int | None
     def should_exclude(dir_path: Path) -> bool:
         """Check if directory should be excluded."""
         return dir_path.name in exclude_dirs or dir_path.name.startswith(".")
+
+    def normalize_macos_path(path_str: str) -> str:
+        """Normalize macOS firmlink paths to canonical form.
+
+        macOS uses firmlinks where /System/Volumes/Data is the actual data volume
+        and paths like /Volumes are firmlinks to /System/Volumes/Data/Volumes.
+        This function normalizes these paths to avoid duplicates.
+        """
+        # Remove /System/Volumes/Data prefix if present
+        if path_str.startswith("/System/Volumes/Data/"):
+            return path_str[len("/System/Volumes/Data") :]
+        return path_str
 
     try:
         for item in search_path.rglob("*"):
@@ -1926,12 +1939,21 @@ def scan(ctx: click.Context, path: Path | None, min_size: int, limit: int | None
                 if file_size < min_size_bytes:
                     continue
 
-                # Check if already in Photos
+                # Resolve symlinks and normalize macOS firmlinks
                 resolved_path = str(item.resolve())
-                if resolved_path in photos_paths:
+                normalized_path = normalize_macos_path(resolved_path)
+
+                # Skip if already seen (handles symlink and firmlink duplicates)
+                if normalized_path in seen_resolved_paths:
+                    continue
+                seen_resolved_paths.add(normalized_path)
+
+                # Check if already in Photos (also normalize Photos paths)
+                if normalized_path in photos_paths or resolved_path in photos_paths:
                     continue
 
-                found_videos.append((item, file_size))
+                # Store normalized path to avoid duplicates in output
+                found_videos.append((Path(normalized_path), file_size))
 
                 # Progress indicator every 100 videos
                 if len(found_videos) % 100 == 0:
@@ -2007,12 +2029,7 @@ def scan(ctx: click.Context, path: Path | None, min_size: int, limit: int | None
             else f"{dir_size / BYTES_PER_MB:.1f} MB"
         )
 
-        # Truncate long paths
-        dir_str = str(dir_path)
-        if len(dir_str) > 60:
-            dir_str = "..." + dir_str[-57:]
-
-        table.add_row(dir_str, str(dir_count), dir_size_str)
+        table.add_row(str(dir_path), str(dir_count), dir_size_str)
 
     if len(sorted_dirs) > 20:
         remaining = len(sorted_dirs) - 20
