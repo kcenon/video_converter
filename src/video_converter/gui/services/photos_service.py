@@ -19,6 +19,7 @@ from PySide6.QtGui import QPixmap
 
 if TYPE_CHECKING:
     from video_converter.extractors.photos_extractor import PhotosVideoInfo
+    from video_converter.handlers.photos_handler import PhotosSourceHandler
 
 
 logger = logging.getLogger(__name__)
@@ -138,10 +139,10 @@ class PhotosWorker(QObject):
     def __init__(self) -> None:
         """Initialize the Photos worker."""
         super().__init__()
-        self._handler = None
+        self._handler: PhotosSourceHandler | None = None
         self._temp_dir = Path(tempfile.mkdtemp(prefix="video_converter_thumbs_"))
 
-    def _get_handler(self):
+    def _get_handler(self) -> PhotosSourceHandler:
         """Get or create PhotosSourceHandler.
 
         Returns:

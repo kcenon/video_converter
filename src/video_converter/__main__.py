@@ -11,9 +11,13 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import click
+
+if TYPE_CHECKING:
+    from video_converter.extractors.photos_extractor import PhotosVideoInfo
+    from video_converter.handlers.photos_handler import PhotosSourceHandler
 from rich.console import Console
 from rich.table import Table
 
@@ -36,6 +40,7 @@ from video_converter.utils.constants import (
 
 # Rich console for formatted output
 console = Console()
+console_err = Console(stderr=True)
 
 
 @dataclass
@@ -677,10 +682,7 @@ def run(
     # Handle check-permissions mode for Photos
     if check_permissions:
         if source != "photos":
-            console.print(
-                "[yellow]--check-permissions is only valid for Photos mode[/yellow]",
-                err=True,
-            )
+            console_err.print("[yellow]--check-permissions is only valid for Photos mode[/yellow]")
             sys.exit(1)
         _check_photos_permissions(cli_ctx)
         return
@@ -693,7 +695,7 @@ def run(
     # Validate input directory for folder mode
     if source == "folder":
         if input_dir is None:
-            console.print("[red]✗ --input-dir is required for folder mode[/red]", err=True)
+            console_err.print("[red]✗ --input-dir is required for folder mode[/red]")
             sys.exit(1)
 
         # Scan for videos
@@ -707,7 +709,7 @@ def run(
         detector = CodecDetector()
         h264_videos = []
         for video_path in video_files:
-            codec_info = detector.detect(video_path)
+            codec_info = detector.analyze(video_path)
             if codec_info and not codec_info.is_hevc:
                 h264_videos.append(video_path)
 
@@ -799,7 +801,7 @@ def _display_dry_run(video_files: list[Path], output_dir: Path | None) -> None:
     table.add_column("Size", style="green")
     table.add_column("Output", style="yellow")
 
-    total_size = 0
+    total_size: float = 0
     for video_path in video_files:
         size_mb = video_path.stat().st_size / BYTES_PER_MB
         total_size += size_mb
@@ -937,9 +939,9 @@ def _run_batch_conversion(
         console.print(f"  Converted:  {converted_mb:.1f} MB")
         console.print(f"  [green]Saved:      {saved_mb:.1f} MB ({saved_pct:.1f}%)[/green]")
 
-    if report.duration:
+    if report.total_duration_seconds:
         console.print()
-        console.print(f"  Duration:   {report.duration}")
+        console.print(f"  Duration:   {report.total_duration_seconds:.1f}s")
 
     if report.failed > 0:
         sys.exit(1)
@@ -1017,7 +1019,7 @@ def _check_photos_permissions(cli_ctx: CLIContext) -> None:
         )
         sys.exit(1)
     except Exception as e:
-        console.print(f"[red]Error checking permissions: {e}[/red]", err=True)
+        console_err.print(f"[red]Error checking permissions: {e}[/red]")
         sys.exit(1)
 
 
@@ -1194,8 +1196,8 @@ def _display_photos_dry_run(
 
 def _run_photos_batch_conversion(
     cli_ctx: CLIContext,
-    handler,
-    candidates: list,
+    handler: PhotosSourceHandler,
+    candidates: list[PhotosVideoInfo],
     output_dir: Path | None,
     reimport: bool = False,
     delete_originals: bool = False,
@@ -1466,8 +1468,8 @@ def _run_photos_batch_conversion(
                 continue
 
             # Find original video info
-            ev = path_to_video_map.get(result.request.input_path)
-            if not ev:
+            exported_video = path_to_video_map.get(result.request.input_path)
+            if not exported_video:
                 continue
 
             try:
@@ -1478,7 +1480,7 @@ def _run_photos_batch_conversion(
                 if importer.verify_import(new_uuid):
                     # Handle original video
                     importer.handle_original(
-                        original_uuid=ev.video.uuid,
+                        original_uuid=exported_video.video.uuid,
                         handling=handling_mode,
                         archive_album=archive_album,
                     )
@@ -1983,9 +1985,9 @@ def scan(ctx: click.Context, path: Path | None, min_size: int, limit: int | None
         reverse=True,
     )
 
-    for dir_path, videos in sorted_dirs[:20]:  # Show top 20 directories
-        dir_count = len(videos)
-        dir_size = sum(size for _, size in videos)
+    for dir_path, dir_videos in sorted_dirs[:20]:  # Show top 20 directories
+        dir_count = len(dir_videos)
+        dir_size = sum(size for _, size in dir_videos)
         dir_size_str = (
             f"{dir_size / BYTES_PER_GB:.2f} GB"
             if dir_size >= BYTES_PER_GB
@@ -2279,7 +2281,7 @@ def config_set(ctx: click.Context, key: str, value: str) -> None:
     # Parse the key path
     parts = key.split(".")
     if len(parts) != 2:
-        console.print(f"[red]✗ Invalid key format: {key}[/red]", err=True)
+        console_err.print(f"[red]✗ Invalid key format: {key}[/red]")
         console.print("[dim]Use format: section.key (e.g., encoding.mode)[/dim]")
         sys.exit(1)
 
@@ -2296,18 +2298,19 @@ def config_set(ctx: click.Context, key: str, value: str) -> None:
     }
 
     if section not in section_map:
-        console.print(f"[red]✗ Unknown section: {section}[/red]", err=True)
+        console_err.print(f"[red]✗ Unknown section: {section}[/red]")
         console.print(f"[dim]Available sections: {', '.join(section_map.keys())}[/dim]")
         sys.exit(1)
 
     section_obj = section_map[section]
 
     if not hasattr(section_obj, attr):
-        console.print(f"[red]✗ Unknown attribute: {attr} in section {section}[/red]", err=True)
+        console_err.print(f"[red]✗ Unknown attribute: {attr} in section {section}[/red]")
         sys.exit(1)
 
     # Convert value to appropriate type
     current_value = getattr(section_obj, attr)
+    new_value: bool | int | Path | str
     try:
         if isinstance(current_value, bool):
             new_value = value.lower() in ("true", "1", "yes", "on")
@@ -2324,7 +2327,7 @@ def config_set(ctx: click.Context, key: str, value: str) -> None:
         console.print(f"[green]✓ Set {key} = {new_value}[/green]")
 
     except (ValueError, TypeError) as e:
-        console.print(f"[red]✗ Invalid value: {e}[/red]", err=True)
+        console_err.print(f"[red]✗ Invalid value: {e}[/red]")
         sys.exit(1)
 
 

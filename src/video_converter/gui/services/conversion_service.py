@@ -13,12 +13,13 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import QObject, QThread, Signal, Slot
 
 if TYPE_CHECKING:
-    pass
+    from video_converter.core.orchestrator import Orchestrator
+    from video_converter.core.types import ConversionProgress, ConversionResult
 
 
 logger = logging.getLogger(__name__)
@@ -78,11 +79,11 @@ class ConversionWorker(QObject):
     def __init__(self) -> None:
         """Initialize the conversion worker."""
         super().__init__()
-        self._orchestrator = None
+        self._orchestrator: Orchestrator | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._current_task: ConversionTask | None = None
 
-    def _get_orchestrator(self):
+    def _get_orchestrator(self) -> Orchestrator:
         """Get or create the orchestrator instance.
 
         Returns:
@@ -124,7 +125,7 @@ class ConversionWorker(QObject):
             self._orchestrator = Orchestrator(config=config)
         return self._orchestrator
 
-    def _on_progress(self, progress) -> None:
+    def _on_progress(self, progress: ConversionProgress) -> None:
         """Handle progress updates from the orchestrator.
 
         Args:
@@ -208,7 +209,7 @@ class ConversionWorker(QObject):
         finally:
             self._current_task = None
 
-    def _apply_settings(self, orchestrator, settings: dict) -> None:
+    def _apply_settings(self, orchestrator: Orchestrator, settings: dict[str, Any]) -> None:
         """Apply conversion settings to the orchestrator.
 
         Args:
@@ -537,7 +538,7 @@ class ConversionService(QObject):
         self.progress_updated.emit(task_id, progress, eta_seconds, speed)
 
     @Slot(str, object)
-    def _on_worker_complete(self, task_id: str, result) -> None:
+    def _on_worker_complete(self, task_id: str, result: ConversionResult | None) -> None:
         """Handle conversion completion from worker.
 
         Args:
