@@ -355,9 +355,11 @@ class FFprobeRunner:
     JSON output parsing.
 
     Example:
-        >>> runner = FFprobeRunner()
-        >>> info = runner.get_format_info(Path("video.mp4"))
-        >>> print(info["format"]["duration"])
+        ```python
+        runner = FFprobeRunner()
+        info = runner.get_format_info(Path("video.mp4"))
+        print(info["format"]["duration"])
+        ```
     """
 
     FFPROBE_CMD = "ffprobe"
@@ -758,9 +760,11 @@ def run_ffprobe(
         Dictionary containing video information.
 
     Example:
-        >>> info = run_ffprobe("video.mp4")
-        >>> print(info["streams"][0]["codec_name"])
-        'h264'
+        ```python
+        info = run_ffprobe("video.mp4")
+        print(info["streams"][0]["codec_name"])
+        # Output: 'h264'
+        ```
     """
     runner = FFprobeRunner()
     return runner.probe(Path(path), timeout=timeout)
