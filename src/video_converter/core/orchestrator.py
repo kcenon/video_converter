@@ -719,7 +719,7 @@ class Orchestrator:
 
             validation = self.validator.validate(
                 output_path,
-                self.config.validation_strictness,
+                strictness=self.config.validation_strictness,
             )
 
             if not validation.valid:

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+#### CI Build Fixes (#181)
+- **Make osxphotos dependency macOS-only** with platform marker `sys_platform == 'darwin'`
+  - Fixes CI build failure on ubuntu-latest runners for documentation builds
+  - osxphotos is only needed on macOS for Photos library integration
+- **Fix mkdocstrings cross-reference warnings** in `command_runner.py`
+  - Convert docstring examples to fenced code blocks
+  - Prevents bracket notation from being interpreted as cross-references
+
 ### Changed
 
 #### Extended Config Schema for VMAF, HDR, and Processing Settings (#173)
@@ -184,6 +194,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Color contrast compliance (WCAG 2.1 relative luminance formula)
   - Comprehensive accessibility audit (focus traps, form labels, status bar)
   - 33 test cases covering accessibility requirements
+
+### Fixed
+
+#### PySide6 6.10 Compatibility and Test Fixes (#169)
+- **E2E test compatibility**: Removed `qtbot.addWidget()` calls for `ConversionService` (QObject, not QWidget)
+- **PySide6 6.10 compatibility**: Replaced `Q_ARG(object, ...)` with signal-based approach in `ConversionService` for thread-safe worker communication
+- **VideoValidator API fix**: Fixed `validate()` call in `Orchestrator` to use keyword argument `strictness=` instead of positional argument
 
 ## [0.2.0.0] - 2025-12-23
 
