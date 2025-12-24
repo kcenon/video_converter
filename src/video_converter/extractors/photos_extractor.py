@@ -498,7 +498,7 @@ class PhotosLibrary:
             path=path,
             date=photo.date,
             date_modified=photo.date_modified,
-            duration=photo.duration or 0.0,
+            duration=0.0,  # Duration is obtained later via FFprobe in _enrich_with_codec
             favorite=photo.favorite,
             hidden=photo.hidden,
             in_cloud=photo.iscloudasset,
@@ -713,19 +713,31 @@ class PhotosVideoFilter:
             return None
 
     def _enrich_with_codec(self, video: PhotosVideoInfo) -> PhotosVideoInfo:
-        """Enrich video info with codec and size data.
+        """Enrich video info with codec, duration, and size data.
 
         Args:
             video: Video to enrich.
 
         Returns:
-            Video with codec and size information.
+            Video with codec, duration, and size information.
         """
         if not video.is_available_locally or video.path is None:
             return video
 
-        # Get codec
-        codec = self._detect_codec(video)
+        # Get codec and duration from FFprobe
+        codec: str | None = None
+        duration: float = video.duration
+        try:
+            from video_converter.processors.codec_detector import (
+                CorruptedVideoError,
+                InvalidVideoError,
+            )
+
+            codec_info = self.codec_detector.analyze(video.path)
+            codec = codec_info.codec
+            duration = codec_info.duration
+        except (InvalidVideoError, CorruptedVideoError, FileNotFoundError) as e:
+            logger.warning(f"Failed to analyze video {video.filename}: {e}")
 
         # Get file size
         try:
@@ -739,7 +751,7 @@ class PhotosVideoFilter:
             path=video.path,
             date=video.date,
             date_modified=video.date_modified,
-            duration=video.duration,
+            duration=duration,
             favorite=video.favorite,
             hidden=video.hidden,
             in_cloud=video.in_cloud,
