@@ -20,9 +20,15 @@ brew install exiftool
 ## Installation
 
 ```bash
-# Clone and install from source
+# Clone repository
 git clone https://github.com/kcenon/video_converter.git
 cd video_converter
+
+# Create and activate virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install
 pip install -e .
 ```
 
