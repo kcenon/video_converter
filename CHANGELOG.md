@@ -21,6 +21,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Broken symlink handling and OS error count reporting
   - Path filtering, size filtering, and keyboard interrupt handling
 
+#### Scan Command Display Improvements (#228)
+- **Symlink and firmlink deduplication** - Prevents duplicate entries in scan output
+  - Same file accessed via different paths appears only once
+  - Handles macOS firmlinks (`/System/Volumes/Data` prefix normalization)
+  - Accurate file count and storage totals (no double-counting)
+- **Full path display** - Shows complete directory paths in scan output
+  - Removed 60-character path truncation
+  - Rich Table automatically wraps long paths for readability
+
 ### Changed
 
 #### CI/CD Configuration Improvements (#219)
