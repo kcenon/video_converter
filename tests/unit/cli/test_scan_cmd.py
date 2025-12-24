@@ -10,16 +10,12 @@ This module tests the video-converter scan command including:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
 
 from video_converter.__main__ import main
-
-if TYPE_CHECKING:
-    from collections.abc import Generator
 
 
 @pytest.fixture
@@ -186,6 +182,48 @@ class TestScanOSErrorHandling:
 
         # Should complete without crashing
         assert result.exit_code == 0
+
+    @patch("video_converter.extractors.photos_extractor.PhotosLibrary")
+    @patch("pathlib.Path.rglob")
+    def test_scan_reports_os_error_count(
+        self,
+        mock_rglob: MagicMock,
+        mock_photos_library: MagicMock,
+        cli_runner: CliRunner,
+        tmp_path: Path,
+    ) -> None:
+        """Test scan reports the number of OS errors encountered."""
+        # Setup mock Photos library
+        mock_library_instance = MagicMock()
+        mock_library_instance.get_video_paths.return_value = set()
+        mock_photos_library.return_value.__enter__ = MagicMock(
+            return_value=mock_library_instance
+        )
+        mock_photos_library.return_value.__exit__ = MagicMock(return_value=False)
+
+        # Create mock items that raise OSError
+        def os_error_is_file():
+            raise OSError("Broken symlink")
+
+        broken_symlinks = []
+        for i in range(3):
+            broken_symlink = MagicMock()
+            broken_symlink.is_dir.return_value = False
+            broken_symlink.is_file.side_effect = os_error_is_file
+            broken_symlink.name = f"broken_link_{i}"
+            broken_symlinks.append(broken_symlink)
+
+        mock_rglob.return_value = iter(broken_symlinks)
+
+        result = cli_runner.invoke(main, ["scan", "--path", str(tmp_path)])
+
+        # Should complete and report OS errors
+        assert result.exit_code == 0
+        assert (
+            "could not be read" in result.output.lower()
+            or "broken symlinks" in result.output.lower()
+            or "i/o errors" in result.output.lower()
+        )
 
 
 class TestScanFiltering:

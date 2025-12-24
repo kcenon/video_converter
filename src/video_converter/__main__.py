@@ -1892,6 +1892,7 @@ def scan(ctx: click.Context, path: Path | None, min_size: int, limit: int | None
     scanned_dirs = 0
     skipped_dirs = 0
     permission_errors = 0
+    os_errors = 0
 
     def should_exclude(dir_path: Path) -> bool:
         """Check if directory should be excluded."""
@@ -1941,6 +1942,7 @@ def scan(ctx: click.Context, path: Path | None, min_size: int, limit: int | None
                 continue
             except OSError:
                 # Handle other OS errors (e.g., broken symlinks, I/O errors)
+                os_errors += 1
                 continue
 
     except KeyboardInterrupt:
@@ -1949,6 +1951,10 @@ def scan(ctx: click.Context, path: Path | None, min_size: int, limit: int | None
     if permission_errors > 0:
         console.print(
             f"[yellow]⚠ {permission_errors} items could not be accessed (permission denied)[/yellow]"
+        )
+    if os_errors > 0:
+        console.print(
+            f"[yellow]⚠ {os_errors} items could not be read (broken symlinks or I/O errors)[/yellow]"
         )
 
     if not found_videos:
