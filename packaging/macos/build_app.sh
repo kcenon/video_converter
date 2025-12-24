@@ -164,6 +164,7 @@ create_app_icon() {
 
     ICON_DIR="${SCRIPT_DIR}/resources"
     ICON_FILE="${ICON_DIR}/AppIcon.icns"
+    mkdir -p "$ICON_DIR"
 
     if [ -f "$ICON_FILE" ]; then
         print_success "App icon already exists"
@@ -177,31 +178,89 @@ create_app_icon() {
     ICONSET_DIR="${ICON_DIR}/AppIcon.iconset"
     mkdir -p "$ICONSET_DIR"
 
-    # Create a simple placeholder icon using sips (macOS built-in)
-    # In production, replace this with actual icon files
-    for size in 16 32 64 128 256 512; do
-        double=$((size * 2))
+    # Try multiple methods to create placeholder icons
+    ICON_CREATED=false
 
-        # Create placeholder PNG (solid color)
-        # You should replace these with actual icon files
-        if command -v convert &> /dev/null; then
-            # ImageMagick is available
+    # Method 1: Use Python with Pillow (most reliable, installed as GUI dependency)
+    if ! $ICON_CREATED && python3 -c "from PIL import Image" &> /dev/null; then
+        echo "Using Python/Pillow to create placeholder icons..."
+        export ICONSET_DIR
+        python3 << 'PYTHON_SCRIPT'
+from PIL import Image, ImageDraw
+
+# Video converter theme color
+COLOR = (74, 144, 217)  # #4A90D9
+
+sizes = [
+    (16, "icon_16x16.png"),
+    (32, "icon_16x16@2x.png"),
+    (32, "icon_32x32.png"),
+    (64, "icon_32x32@2x.png"),
+    (128, "icon_128x128.png"),
+    (256, "icon_128x128@2x.png"),
+    (256, "icon_256x256.png"),
+    (512, "icon_256x256@2x.png"),
+    (512, "icon_512x512.png"),
+    (1024, "icon_512x512@2x.png"),
+]
+
+import os
+iconset_dir = os.environ.get("ICONSET_DIR", "AppIcon.iconset")
+
+for size, filename in sizes:
+    img = Image.new("RGB", (size, size), COLOR)
+    draw = ImageDraw.Draw(img)
+
+    # Draw a simple "V" shape for Video
+    margin = size // 4
+    points = [
+        (margin, margin),
+        (size // 2, size - margin),
+        (size - margin, margin),
+    ]
+    line_width = max(2, size // 16)
+    draw.line([points[0], points[1]], fill="white", width=line_width)
+    draw.line([points[1], points[2]], fill="white", width=line_width)
+
+    img.save(os.path.join(iconset_dir, filename))
+    print(f"  Created {filename}")
+
+print("All icon sizes created successfully")
+PYTHON_SCRIPT
+        ICON_CREATED=true
+        print_success "Icons created using Python/Pillow"
+
+    # Method 2: Use ImageMagick if available
+    elif ! $ICON_CREATED && command -v convert &> /dev/null; then
+        echo "Using ImageMagick to create placeholder icons..."
+        for size in 16 32 128 256 512; do
+            double=$((size * 2))
             convert -size ${size}x${size} xc:'#4A90D9' "${ICONSET_DIR}/icon_${size}x${size}.png"
             convert -size ${double}x${double} xc:'#4A90D9' "${ICONSET_DIR}/icon_${size}x${size}@2x.png"
-        else
-            print_warning "ImageMagick not found, skipping icon generation"
-            print_warning "Please provide AppIcon.icns manually"
-            return
-        fi
-    done
+        done
+        ICON_CREATED=true
+        print_success "Icons created using ImageMagick"
+    fi
+
+    if ! $ICON_CREATED; then
+        print_error "No icon generation method available"
+        print_warning "Please install Pillow (pip install pillow) or ImageMagick"
+        print_warning "Or provide AppIcon.icns manually in ${ICON_DIR}"
+        return 1
+    fi
 
     # Convert iconset to icns
+    echo "Converting iconset to .icns..."
     iconutil -c icns "$ICONSET_DIR" -o "$ICON_FILE"
 
-    # Clean up iconset
-    rm -rf "$ICONSET_DIR"
-
-    print_success "App icon created"
+    if [ -f "$ICON_FILE" ]; then
+        # Clean up iconset
+        rm -rf "$ICONSET_DIR"
+        print_success "App icon created: $ICON_FILE"
+    else
+        print_error "Failed to create .icns file"
+        return 1
+    fi
 }
 
 build_app() {
@@ -357,11 +416,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Main execution
+check_dependencies
+
 print_header "Video Converter macOS Build"
 echo "Version: ${APP_VERSION}"
 echo "Building: ${APP_NAME}.app"
-
-check_dependencies
 
 if $DO_CLEAN; then
     clean_build

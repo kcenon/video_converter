@@ -14,9 +14,30 @@ SPEC_DIR = Path(SPECPATH)
 PROJECT_ROOT = SPEC_DIR.parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
 
+
+def get_version_from_pyproject() -> str:
+    """Read version from pyproject.toml."""
+    pyproject_path = PROJECT_ROOT / "pyproject.toml"
+    if pyproject_path.exists():
+        try:
+            # Python 3.11+ has tomllib built-in
+            import tomllib
+            with open(pyproject_path, "rb") as f:
+                data = tomllib.load(f)
+                return data.get("project", {}).get("version", "0.0.0")
+        except ImportError:
+            # Fallback for Python < 3.11: parse manually
+            import re
+            content = pyproject_path.read_text()
+            match = re.search(r'^version\s*=\s*"([^"]+)"', content, re.MULTILINE)
+            if match:
+                return match.group(1)
+    return "0.0.0"
+
+
 # App metadata
 APP_NAME = "Video Converter"
-APP_VERSION = "0.3.0"
+APP_VERSION = get_version_from_pyproject()
 BUNDLE_ID = "com.github.kcenon.videoconverter"
 
 # Analysis configuration
