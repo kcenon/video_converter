@@ -18,12 +18,15 @@ Example:
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -253,9 +256,9 @@ class ProgressMonitor:
             self._last_callback_time = current_time
             try:
                 self.callback(info)
-            except Exception:
-                # Swallow callback exceptions to prevent conversion interruption
-                pass
+            except Exception as e:
+                # Log callback exceptions to aid debugging while preventing conversion interruption
+                logger.debug("Progress callback failed: %s", e)
 
     def get_current_progress(self) -> ProgressInfo | None:
         """Get the current progress without triggering a callback.
@@ -273,8 +276,8 @@ class ProgressMonitor:
         if info := self._parser.last_info:
             try:
                 self.callback(info)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Force callback failed: %s", e)
 
 
 def create_simple_callback(
