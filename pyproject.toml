@@ -111,6 +111,7 @@ ignore = [
     "SIM102",  # nested if statements (readability preference)
     "SIM105",  # contextlib.suppress (try-except-pass is more explicit)
     "SIM108",  # ternary operator (readability preference)
+    "UP038",   # isinstance union syntax (keep tuple for Python 3.9 compatibility)
 ]
 
 [tool.ruff.lint.isort]
