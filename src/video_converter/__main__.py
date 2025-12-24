@@ -1675,6 +1675,123 @@ def status() -> None:
 
 @main.command()
 @click.option(
+    "--output-dir",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Output directory to clean (default: config output path).",
+)
+@click.option(
+    "--confirm",
+    is_flag=True,
+    help="Skip confirmation prompt.",
+)
+@click.pass_context
+def clean(ctx: click.Context, output_dir: Path | None, confirm: bool) -> None:
+    """Clean the output directory.
+
+    Removes all converted video files from the output directory to free up
+    disk space. By default, uses the configured output path.
+
+    Examples:
+
+        # Show what would be deleted (dry run)
+        video-converter clean
+
+        # Delete with confirmation prompt
+        video-converter clean --confirm
+
+        # Clean a specific directory
+        video-converter clean --output-dir ~/Desktop/Converted --confirm
+    """
+    import shutil
+
+    # Get config
+    cli_ctx: CLIContext = ctx.obj
+    config = cli_ctx.config
+
+    # Determine output directory
+    target_dir = output_dir if output_dir else config.paths.output.expanduser()
+
+    console.print()
+    console.print(f"[bold]Output Directory:[/bold] {target_dir}")
+
+    # Check if directory exists
+    if not target_dir.exists():
+        console.print("[yellow]Directory does not exist. Nothing to clean.[/yellow]")
+        return
+
+    # Calculate size and count files
+    total_size = 0
+    file_count = 0
+    video_extensions = {".mp4", ".mov", ".mkv", ".m4v", ".avi", ".webm"}
+
+    for file_path in target_dir.rglob("*"):
+        if file_path.is_file():
+            if file_path.suffix.lower() in video_extensions:
+                file_count += 1
+                total_size += file_path.stat().st_size
+
+    size_mb = total_size / BYTES_PER_MB
+    size_gb = total_size / BYTES_PER_GB
+
+    if file_count == 0:
+        console.print("[yellow]No video files found. Directory is already clean.[/yellow]")
+        return
+
+    # Display summary
+    console.print()
+    console.print(f"[bold]Files to delete:[/bold] {file_count} video(s)")
+    if size_gb >= 1:
+        console.print(f"[bold]Space to free:[/bold] {size_gb:.2f} GB")
+    else:
+        console.print(f"[bold]Space to free:[/bold] {size_mb:.1f} MB")
+
+    if not confirm:
+        console.print()
+        console.print("[dim]Run with --confirm to delete these files.[/dim]")
+        return
+
+    # Confirm deletion
+    console.print()
+    if not click.confirm("Are you sure you want to delete all converted videos?"):
+        console.print("[yellow]Cancelled.[/yellow]")
+        return
+
+    # Delete files
+    deleted_count = 0
+    deleted_size = 0
+
+    for file_path in target_dir.rglob("*"):
+        if file_path.is_file() and file_path.suffix.lower() in video_extensions:
+            try:
+                file_size = file_path.stat().st_size
+                file_path.unlink()
+                deleted_count += 1
+                deleted_size += file_size
+            except OSError as e:
+                console.print(f"[red]Failed to delete {file_path.name}: {e}[/red]")
+
+    # Clean up empty directories
+    for dir_path in sorted(target_dir.rglob("*"), reverse=True):
+        if dir_path.is_dir() and not any(dir_path.iterdir()):
+            try:
+                dir_path.rmdir()
+            except OSError:
+                pass
+
+    deleted_mb = deleted_size / BYTES_PER_MB
+    deleted_gb = deleted_size / BYTES_PER_GB
+
+    console.print()
+    console.print(f"[green]✓ Deleted {deleted_count} file(s)[/green]")
+    if deleted_gb >= 1:
+        console.print(f"[green]✓ Freed {deleted_gb:.2f} GB[/green]")
+    else:
+        console.print(f"[green]✓ Freed {deleted_mb:.1f} MB[/green]")
+
+
+@main.command()
+@click.option(
     "--period",
     type=click.Choice(["today", "week", "month", "all"]),
     default="all",
