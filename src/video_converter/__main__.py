@@ -1168,17 +1168,20 @@ def _display_photos_dry_run(
         size_mb = video.size / BYTES_PER_MB if video.size else 0
         total_size += size_mb
 
-        date_str = video.date.strftime("%Y-%m-%d") if video.date else "Unknown"
-        album_str = video.albums[0] if video.albums else "-"
-        if len(video.albums) > 1:
-            album_str += f" (+{len(video.albums) - 1})"
+        # Ensure all values are strings for Rich table rendering
+        filename = str(video.filename) if video.filename else "Unknown"
+        if len(filename) > 40:
+            filename = filename[:40] + "..."
 
-        table.add_row(
-            video.filename[:40] + "..." if len(video.filename) > 40 else video.filename,
-            f"{size_mb:.1f} MB",
-            date_str,
-            album_str,
-        )
+        date_str = video.date.strftime("%Y-%m-%d") if video.date else "Unknown"
+
+        album_str = "-"
+        if video.albums:
+            album_str = str(video.albums[0])
+            if len(video.albums) > 1:
+                album_str += f" (+{len(video.albums) - 1})"
+
+        table.add_row(filename, f"{size_mb:.1f} MB", date_str, album_str)
 
     console.print(table)
     console.print()
