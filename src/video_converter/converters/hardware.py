@@ -27,6 +27,11 @@ import subprocess
 
 from video_converter.converters.base import BaseConverter
 from video_converter.core.types import ConversionMode, ConversionRequest
+from video_converter.utils.constants import (
+    DEFAULT_QUALITY,
+    HARDWARE_MAX_QUALITY,
+    HARDWARE_MIN_QUALITY,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +47,9 @@ class HardwareConverter(BaseConverter):
     """
 
     # VideoToolbox quality range: 1-100 (higher = better quality)
-    MIN_QUALITY = 1
-    MAX_QUALITY = 100
-    DEFAULT_QUALITY = 45
+    MIN_QUALITY = HARDWARE_MIN_QUALITY
+    MAX_QUALITY = HARDWARE_MAX_QUALITY
+    DEFAULT_QUALITY = DEFAULT_QUALITY
 
     def __init__(self) -> None:
         """Initialize the hardware converter."""
