@@ -58,6 +58,10 @@ SOFTWARE_MIN_CRF = 0
 SOFTWARE_MAX_CRF = 51
 DEFAULT_CRF = 22
 
+# CLI-recommended CRF range (narrower for user-friendly defaults)
+CLI_MIN_CRF = 18
+CLI_MAX_CRF = 28
+
 # =============================================================================
 # VMAF Thresholds
 # =============================================================================
@@ -202,6 +206,8 @@ __all__ = [
     "SOFTWARE_MIN_CRF",
     "SOFTWARE_MAX_CRF",
     "DEFAULT_CRF",
+    "CLI_MIN_CRF",
+    "CLI_MAX_CRF",
     # VMAF thresholds
     "VMAF_THRESHOLD_VISUALLY_LOSSLESS",
     "VMAF_THRESHOLD_HIGH_QUALITY",

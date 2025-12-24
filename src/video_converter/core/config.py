@@ -37,6 +37,8 @@ from pydantic_settings.sources import JsonConfigSettingsSource
 
 from video_converter import __version__
 from video_converter.utils.constants import (
+    CLI_MAX_CRF,
+    CLI_MIN_CRF,
     DEFAULT_CONCURRENT_CONVERSIONS,
     DEFAULT_CRF,
     DEFAULT_MIN_FREE_SPACE_GB,
@@ -44,7 +46,6 @@ from video_converter.utils.constants import (
     ICLOUD_DOWNLOAD_TIMEOUT,
     MAX_CONCURRENT_CONVERSIONS,
     MIN_CONCURRENT_CONVERSIONS,
-    SOFTWARE_MAX_CRF,
     VMAF_DEFAULT_SAMPLE_INTERVAL,
     VMAF_THRESHOLD_VISUALLY_LOSSLESS,
 )
@@ -86,7 +87,7 @@ class EncodingConfig(BaseModel):
 
     mode: Literal["hardware", "software"] = "hardware"
     quality: int = Field(default=DEFAULT_QUALITY, ge=1, le=100)
-    crf: int = Field(default=DEFAULT_CRF, ge=18, le=SOFTWARE_MAX_CRF)
+    crf: int = Field(default=DEFAULT_CRF, ge=CLI_MIN_CRF, le=CLI_MAX_CRF)
     preset: Literal["fast", "medium", "slow"] = "medium"
     bit_depth: Literal[8, 10] = 8
     hdr: bool = False
