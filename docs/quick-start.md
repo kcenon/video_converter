@@ -20,7 +20,10 @@ brew install exiftool
 ## Installation
 
 ```bash
-pip install video-converter
+# Clone and install from source
+git clone https://github.com/kcenon/video_converter.git
+cd video_converter
+pip install -e .
 ```
 
 ## Basic Usage

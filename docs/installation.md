@@ -23,13 +23,7 @@ Complete installation guide for Video Converter.
 
 ## Installation Methods
 
-### Using pip (Recommended)
-
-```bash
-pip install video-converter
-```
-
-### From Source
+### From Source (Recommended)
 
 ```bash
 git clone https://github.com/kcenon/video_converter.git
@@ -61,20 +55,19 @@ pip install -e ".[docs]"
 # Check CLI
 video-converter --version
 
-# Check dependencies
-video-converter check-deps
+# Check FFmpeg
+ffmpeg -version
+
+# Check ExifTool
+exiftool -ver
 ```
 
 **Expected output:**
 ```
-video-converter 0.2.0.0
+video-converter 0.2.0
 
-Checking dependencies...
-✅ Python 3.12.0
-✅ FFmpeg 6.1.1
-✅ ExifTool 12.76
-✅ osxphotos 0.70.1
-All dependencies satisfied!
+ffmpeg version 6.1.1 ...
+12.76
 ```
 
 ## Troubleshooting
@@ -117,6 +110,8 @@ brew install python@3.12
 python3.12 -m venv .venv
 source .venv/bin/activate
 
-# Install video-converter
-pip install video-converter
+# Install video-converter from source
+git clone https://github.com/kcenon/video_converter.git
+cd video_converter
+pip install -e .
 ```
