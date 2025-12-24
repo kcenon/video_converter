@@ -204,7 +204,7 @@ class ServiceManager:
 
     def install(
         self,
-        hour: int = 3,
+        hour: int | None = 3,
         minute: int = 0,
         weekday: int | None = None,
         watch_paths: list[Path] | None = None,

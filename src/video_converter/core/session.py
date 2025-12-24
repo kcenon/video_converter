@@ -586,7 +586,7 @@ class SessionStateManager:
         Returns:
             List of files that were cleaned up.
         """
-        cleaned = []
+        cleaned: list[Path] = []
 
         with self._lock:
             if self._current_session is None:

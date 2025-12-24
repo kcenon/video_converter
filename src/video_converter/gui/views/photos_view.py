@@ -62,7 +62,7 @@ class PhotosView(QWidget):
         """
         super().__init__(parent)
         self._selected_videos: list[VideoDisplayInfo] = []
-        self._current_videos: list[VideoDisplayInfo] = {}
+        self._current_videos: dict[str, VideoDisplayInfo] = {}
         self._current_album_id: str = "__all__"
         self._photos_service: PhotosService | None = None
         self._setup_ui()

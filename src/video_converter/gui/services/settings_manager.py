@@ -181,7 +181,8 @@ class SettingsManager(QObject):
         if category is None:
             return self._settings.copy()
 
-        return self._settings.get(category, {}).copy()
+        category_settings: dict[str, Any] = self._settings.get(category, {})
+        return category_settings.copy()
 
     def get_value(self, category: str, key: str, default: Any = None) -> Any:
         """Get a specific setting value.

@@ -568,7 +568,7 @@ class MetadataProcessor:
             True if values are considered equal.
         """
         if val1 is None or val2 is None:
-            return val1 == val2
+            return bool(val1 == val2)
 
         # Both numeric
         if isinstance(val1, (int, float)) and isinstance(val2, (int, float)):

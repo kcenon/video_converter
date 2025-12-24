@@ -7,7 +7,7 @@ and central widget management.
 from __future__ import annotations
 
 from PySide6.QtCore import Slot
-from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
 from PySide6.QtWidgets import (
     QMainWindow,
     QStackedWidget,
@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from video_converter.core.types import ConversionResult
 from video_converter.gui.dialogs.result_dialog import ConversionResultDialog
 from video_converter.gui.services.conversion_service import ConversionService
 from video_converter.gui.services.photos_service import PhotosService
@@ -410,7 +411,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"Converting: {progress:.1f}%")
 
     @Slot(str, object)
-    def _on_task_completed(self, task_id: str, result) -> None:
+    def _on_task_completed(self, task_id: str, result: ConversionResult | None) -> None:
         """Handle task completion.
 
         Args:
@@ -505,7 +506,7 @@ class MainWindow(QMainWindow):
         """
         return self._photos_service
 
-    def closeEvent(self, event) -> None:
+    def closeEvent(self, event: QCloseEvent) -> None:
         """Handle window close event.
 
         Args:

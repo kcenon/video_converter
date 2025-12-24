@@ -622,7 +622,7 @@ class CodecDetector:
         Returns:
             Container format name.
         """
-        format_name = format_info.get("format_name", "")
+        format_name: str = format_info.get("format_name", "")
 
         # Handle comma-separated format names
         if "," in format_name:
