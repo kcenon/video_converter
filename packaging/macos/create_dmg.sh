@@ -206,10 +206,19 @@ create_dmg_styled() {
     # Remove existing DMG
     rm -f "$DMG_FINAL"
 
+    # Check if icon exists
+    ICON_FILE="${SCRIPT_DIR}/resources/AppIcon.icns"
+    ICON_ARGS=""
+    if [ -f "$ICON_FILE" ]; then
+        ICON_ARGS="--volicon $ICON_FILE"
+    else
+        print_warning "AppIcon.icns not found, DMG will use default icon"
+    fi
+
     # Create DMG using create-dmg
     create-dmg \
         --volname "$VOLUME_NAME" \
-        --volicon "${SCRIPT_DIR}/resources/AppIcon.icns" \
+        ${ICON_ARGS} \
         --window-pos 200 120 \
         --window-size 600 400 \
         --icon-size 128 \
