@@ -56,18 +56,18 @@ video-converter run --source photos
 ### Filter by Album
 
 ```bash
-# Convert only specific album
-video-converter run --mode photos --album "Vacation 2024"
+# Convert only specific albums
+video-converter run --source photos --albums "Vacation 2024"
 
 # Exclude specific albums
-video-converter run --mode photos --exclude-album "Screenshots"
+video-converter run --source photos --exclude-albums "Screenshots"
 ```
 
 ### Filter by Date
 
 ```bash
 # Convert videos from specific date range
-video-converter run --mode photos --from "2024-01-01" --to "2024-06-30"
+video-converter run --source photos --from-date 2024-01-01 --to-date 2024-06-30
 ```
 
 ## iCloud Handling

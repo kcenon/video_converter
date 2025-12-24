@@ -53,23 +53,28 @@ video-converter run [options]
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--mode` | `photos` | Source mode: `photos` or `folder` |
-| `--path` | - | Folder path (for folder mode) |
-| `--concurrent` | `2` | Number of concurrent conversions |
-| `--encoder` | `hardware` | Encoder type |
-| `--dry-run` | `false` | Simulate without converting |
+| `--source` | `folder` | Source mode: `photos` or `folder` |
+| `--input-dir` | - | Input directory for folder mode |
+| `--output-dir` | - | Output directory for converted files |
+| `-r, --recursive` | `false` | Recursively scan subdirectories |
+| `--max-concurrent` | config default | Number of concurrent conversions (1-8) |
+| `--dry-run` | `false` | Preview without converting |
+| `--resume` | `false` | Resume previously interrupted session |
 
 **Examples:**
 
 ```bash
 # Convert Photos library
-video-converter run --mode photos
+video-converter run --source photos
 
 # Convert folder
-video-converter run --mode folder --path ~/Videos
+video-converter run --source folder --input-dir ~/Videos
 
 # Dry run to see what would be converted
-video-converter run --mode photos --dry-run
+video-converter run --source photos --dry-run
+
+# Resume interrupted session
+video-converter run --resume
 ```
 
 ### status

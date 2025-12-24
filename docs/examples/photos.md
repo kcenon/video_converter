@@ -46,26 +46,20 @@ Use 'video-converter run --source photos' to convert all 89 videos.
 ### Single Album
 
 ```bash
-video-converter run --mode photos --album "Vacation 2024"
+video-converter run --source photos --albums "Vacation 2024"
 ```
 
 ### Multiple Albums
 
 ```bash
-video-converter run --mode photos \
-    --album "Vacation 2024" \
-    --album "Summer Trip" \
-    --album "Family Events"
+video-converter run --source photos --albums "Vacation 2024,Summer Trip,Family Events"
 ```
 
 ### Exclude Albums
 
 ```bash
 # Exclude system albums
-video-converter run --mode photos \
-    --exclude-album "Screenshots" \
-    --exclude-album "Bursts" \
-    --exclude-album "Slo-mo"
+video-converter run --source photos --exclude-albums "Screenshots,Bursts,Slo-mo"
 ```
 
 ## iCloud Video Handling
