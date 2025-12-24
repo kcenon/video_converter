@@ -1,7 +1,7 @@
 # Video Converter - Software Requirements Specification (SRS)
 
-**Document Version**: 1.0.1
-**Date**: 2025-12-23
+**Document Version**: 1.0.2
+**Date**: 2025-12-24
 **Status**: Active
 **Reference Document**: PRD v1.1.0
 
@@ -23,6 +23,7 @@
 |---------|------|--------|---------|
 | 1.0.0 | 2025-12-21 | - | Initial creation |
 | 1.0.1 | 2025-12-23 | - | Updated document status and references to align with PRD v1.1.0 |
+| 1.0.2 | 2025-12-24 | - | Updated class names and method signatures to match implementation (MetadataProcessor, VideoValidator, CompressionValidator, ServiceManager, LaunchdPlistGenerator, PhotosVideoFilter) |
 
 ---
 
@@ -412,8 +413,8 @@ Query the macOS Photos library video list using osxphotos and filter only H.264 
 
 **Interface**:
 ```python
-class PhotosExtractor:
-    """Extract videos from Photos library"""
+class PhotosLibrary:
+    """Low-level Photos library access via osxphotos"""
 
     def __init__(self, library_path: Optional[Path] = None):
         """
@@ -423,44 +424,72 @@ class PhotosExtractor:
                           Default: ~/Pictures/Photos Library.photoslibrary
         """
 
-    def scan_videos(
+    def get_all_videos(self) -> List[PhotosVideoInfo]:
+        """Get all videos from Photos library"""
+
+
+class PhotosVideoFilter:
+    """Filter Photos library videos for conversion candidates"""
+
+    def __init__(
         self,
-        filter_codec: Optional[str] = "h264",
-        since_date: Optional[datetime] = None,
-        albums: Optional[List[str]] = None,
-        exclude_converted: bool = True
-    ) -> List[VideoInfo]:
+        library: PhotosLibrary,
+        include_albums: Optional[List[str]] = None,
+        exclude_albums: Optional[List[str]] = None
+    ):
         """
-        Scan video list
+        Parameters:
+            library: PhotosLibrary instance
+            include_albums: Specific albums to include (None for all)
+            exclude_albums: Albums to exclude (default: Screenshots, Bursts, Slo-mo)
+        """
+
+    def get_conversion_candidates(
+        self,
+        from_date: Optional[datetime] = None,
+        to_date: Optional[datetime] = None,
+        limit: Optional[int] = None
+    ) -> List[PhotosVideoInfo]:
+        """
+        Get H.264 videos that need conversion
 
         Parameters:
-            filter_codec: Codec to filter (None for all)
-            since_date: Only videos created after this date
-            albums: Specific albums only (None for all)
-            exclude_converted: Exclude already converted videos
+            from_date: Only videos created after this date
+            to_date: Only videos created before this date
+            limit: Maximum number of videos to return
 
         Returns:
-            List of VideoInfo objects
+            List of PhotosVideoInfo objects (H.264 codec only)
         """
 
-    def export_video(
+    def get_stats(self) -> LibraryStats:
+        """Get library statistics with codec distribution"""
+
+
+class VideoExporter:
+    """Export videos from Photos library to temporary directory"""
+
+    def export(
         self,
-        video: VideoInfo,
-        dest_dir: Path,
-        download_from_icloud: bool = True
+        video: PhotosVideoInfo,
+        on_progress: Optional[Callable[[float], None]] = None
     ) -> Path:
         """
-        Export video file
+        Export video file with progress tracking
 
         Parameters:
             video: Video info to export
-            dest_dir: Export destination directory
-            download_from_icloud: Download from iCloud if needed
+            on_progress: Progress callback (0.0-1.0)
 
         Returns:
-            Exported file path
+            Exported file path in temp directory
         """
 ```
+
+> **Note**: The Photos integration is split into three specialized classes:
+> - `PhotosLibrary`: Low-level library access and video enumeration
+> - `PhotosVideoFilter`: H.264 video filtering with album and date constraints
+> - `VideoExporter`: Temporary file export with progress tracking
 
 **VideoInfo Data Structure**:
 ```python
@@ -502,7 +531,7 @@ Extract all metadata from the original video using ExifTool.
 
 **Interface**:
 ```python
-class MetadataManager:
+class MetadataProcessor:
     """Metadata extraction and restoration management"""
 
     def extract(self, video_path: Path) -> Metadata:
@@ -585,25 +614,47 @@ Verify the integrity and quality of converted video files.
 
 **Interface**:
 ```python
-class QualityValidator:
-    """Conversion quality validation"""
+class VideoValidator:
+    """Video file integrity and property validation"""
 
     def validate(
         self,
-        original_path: Path,
-        converted_path: Path,
-        config: ValidationConfig
+        video_path: Path,
+        strictness: ValidationStrictness = ValidationStrictness.STANDARD
     ) -> ValidationResult:
         """
-        Comprehensive conversion result validation
+        Validate video file integrity and properties
 
         Validation steps:
         1. File integrity check (FFprobe)
-        2. Property comparison (resolution, framerate, duration)
-        3. Compression ratio check (normal range verification)
-        4. VMAF measurement (optional)
+        2. Video stream presence verification
+        3. Codec and container format detection
+        4. Duration and bitrate validation
+        """
+
+class CompressionValidator:
+    """Conversion compression ratio validation"""
+
+    def validate(
+        self,
+        original_size: int,
+        converted_size: int,
+        content_type: ContentType = ContentType.UNKNOWN
+    ) -> CompressionValidationResult:
+        """
+        Validate compression ratio is within expected range
+
+        Validation steps:
+        1. Calculate compression ratio
+        2. Determine expected range based on content type
+        3. Check if ratio is within normal, warning, or error range
+        4. Generate appropriate severity and recommendations
         """
 ```
+
+> **Note**: The validation functionality is split into two specialized classes:
+> - `VideoValidator`: Handles file integrity and video property validation
+> - `CompressionValidator`: Handles compression ratio analysis and content-aware validation
 
 **Validation Steps Detail**:
 
@@ -718,22 +769,22 @@ Use launchd's StartCalendarInterval to automatically run conversion at specified
 
 **Service Management Interface**:
 ```python
-class LaunchdManager:
-    """launchd service management"""
+class ServiceManager:
+    """launchd service lifecycle management"""
 
     PLIST_DIR = Path.home() / "Library/LaunchAgents"
     LABEL = "com.user.videoconverter"
 
-    def install(self, config: AutomationConfig) -> None:
+    def install(self, config: AutomationConfig) -> ServiceResult:
         """
         Install service
 
-        1. Generate plist file
+        1. Generate plist file using LaunchdPlistGenerator
         2. Copy to LaunchAgents directory
         3. Execute launchctl load
         """
 
-    def uninstall(self) -> None:
+    def uninstall(self) -> ServiceResult:
         """
         Remove service
 
@@ -741,15 +792,34 @@ class LaunchdManager:
         2. Delete plist file
         """
 
-    def start(self) -> None:
+    def start(self) -> ServiceResult:
         """Manual service start: launchctl start <label>"""
 
-    def stop(self) -> None:
+    def stop(self) -> ServiceResult:
         """Stop service: launchctl stop <label>"""
 
-    def status(self) -> ServiceStatus:
+    def status(self) -> DetailedServiceStatus:
         """Query service status: launchctl list | grep <label>"""
+
+
+class LaunchdPlistGenerator:
+    """launchd plist file generation"""
+
+    def generate(self, config: LaunchdConfig) -> str:
+        """
+        Generate plist XML content
+
+        Creates properly formatted launchd plist with:
+        - Label and program arguments
+        - Schedule configuration (StartCalendarInterval)
+        - Standard output/error paths
+        - ThrottleInterval and other settings
+        """
 ```
+
+> **Note**: The automation functionality is split into two specialized classes:
+> - `ServiceManager`: Handles service lifecycle (install, uninstall, start, stop, status)
+> - `LaunchdPlistGenerator`: Handles plist file generation from configuration
 
 ---
 

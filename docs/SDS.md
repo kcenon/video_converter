@@ -1,9 +1,9 @@
 # Video Converter - Software Design Specification (SDS)
 
-**Document Version**: 1.1.0
-**Date**: 2025-12-23
+**Document Version**: 1.2.0
+**Date**: 2025-12-24
 **Status**: Active
-**Reference Document**: SRS v1.0.0
+**Reference Document**: SRS v1.0.2
 
 ---
 
@@ -23,6 +23,7 @@
 |---------|------|--------|---------|
 | 1.0.0 | 2025-12-21 | - | Initial creation |
 | 1.1.0 | 2025-12-23 | - | Updated directory structure to match implementation, added new modules (ui, vmaf_analyzer, concurrent, session, error_recovery, etc.) |
+| 1.2.0 | 2025-12-24 | - | Updated class names to match implementation (MetadataProcessor, VideoValidator, CompressionValidator), fixed file name references, updated SRS reference to v1.0.2 |
 
 ---
 
@@ -193,7 +194,7 @@ video_converter/
 │       │   ├── __init__.py
 │       │   ├── codec_detector.py      # SDS-P01-001 (Codec detection)
 │       │   ├── metadata.py            # SDS-P01-002 (ExifTool metadata)
-│       │   ├── quality_validator.py   # SDS-P01-003 (Quality validation)
+│       │   ├── quality_validator.py   # SDS-P01-003 (VideoValidator, CompressionValidator)
 │       │   ├── gps.py                 # SDS-P01-004 (GPS coordinates)
 │       │   ├── vmaf_analyzer.py       # SDS-P01-005 (VMAF analysis)
 │       │   ├── verification.py        # SDS-P01-006 (Output verification)
@@ -533,20 +534,20 @@ class CodecInfo:
 | `CorruptedVideoError` | Video file is corrupted/incomplete |
 | `UnsupportedCodecError` | Unknown or unsupported codec |
 
-#### SDS-P01-002: Metadata Manager Design
+#### SDS-P01-002: Metadata Processor Design
 
 | Item | Content |
 |------|---------|
 | **SDS ID** | SDS-P01-002 |
-| **Module** | MetadataManager |
-| **File** | `src/video_converter/processors/metadata_manager.py` |
+| **Module** | MetadataProcessor |
+| **File** | `src/video_converter/processors/metadata.py` |
 | **SRS Trace** | SRS-401, SRS-402 |
 | **Responsibility** | Metadata extraction, application, and verification |
 
 **GPS Preservation Algorithm**:
 
 ```python
-class MetadataManager:
+class MetadataProcessor:
     """
     Metadata management using ExifTool
 
@@ -1100,10 +1101,10 @@ class RetryPolicy:
 | SRS-302 | Video Filtering | SDS-P01-005 | PhotosVideoFilter | Mapped |
 | SRS-303 | Video Export | SDS-P01-006 | VideoExporter | Mapped |
 | SRS-305 | Photos Re-Import | SDS-P01-009 | PhotosImporter | Mapped |
-| SRS-401 | Metadata Extraction | SDS-P01-002 | MetadataManager | Mapped |
+| SRS-401 | Metadata Extraction | SDS-P01-002 | MetadataProcessor | Mapped |
 | SRS-402 | GPS Preservation | SDS-P01-004 | GPSHandler | Mapped |
-| SRS-501 | Quality Validation | SDS-P01-003 | QualityValidator | Mapped |
-| SRS-601 | Schedule Execution | SDS-A01-001 | LaunchdManager | Mapped |
+| SRS-501 | Quality Validation | SDS-P01-003 | VideoValidator, CompressionValidator | Mapped |
+| SRS-601 | Schedule Execution | SDS-A01-001 | ServiceManager | Mapped |
 | SRS-701 | CLI Structure | SDS-I01-001 | CLI | Mapped |
 
 ### 10.2 SDS → Code Tracing
@@ -1132,7 +1133,7 @@ class RetryPolicy:
 | **Processors Module** |
 | SDS-P01-001 | codec_detector.py | CodecDetector, CodecInfo |
 | SDS-P01-002 | metadata.py | MetadataProcessor |
-| SDS-P01-003 | quality_validator.py | QualityValidator |
+| SDS-P01-003 | quality_validator.py | VideoValidator, CompressionValidator, PropertyComparer |
 | SDS-P01-004 | gps.py | GPSHandler, GPSCoordinates |
 | SDS-P01-005 | vmaf_analyzer.py | VmafAnalyzer, VmafScores |
 | SDS-P01-006 | verification.py | OutputVerifier |
@@ -1140,7 +1141,7 @@ class RetryPolicy:
 | SDS-P01-008 | retry_manager.py | RetryManager, RetryConfig |
 | **Automation Module** |
 | SDS-A01-001 | service_manager.py | ServiceManager |
-| SDS-A01-002 | launchd.py | LaunchdGenerator |
+| SDS-A01-002 | launchd.py | LaunchdPlistGenerator, LaunchdConfig, LaunchdSchedule |
 | SDS-A01-003 | notification.py | NotificationManager |
 | **Reporters Module** |
 | SDS-R01-001 | statistics_reporter.py | StatisticsReporter |
